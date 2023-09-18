@@ -38,18 +38,23 @@ targetVar <- "DefaultStatus1_lead_12_max"
 currStatusVar <- "DefaultStatus1"
 timeVar <- "Date"
 
+# - Subset given dataset accordingly; an efficiency enhancement
+datCredit <- subset(datCredit_real, select=unique(c(stratifiers,targetVar,currStatusVar,timeVar)))
+rm(datCredit_real); gc()
+
 # - Calculate prior probability of default event over all time on population. 
 # NOTE: Precalculating this is merely a coding optimisation
-prior_pop <- datCredit_real[, list(Target=get(targetVar))][Target==1,.N] / datCredit_real[,.N] 
+prior_pop <- datCredit[, list(Target=get(targetVar))][Target==1,.N] / datCredit[,.N] 
 
 # - Calculate 12-month conditional default rate on population.
 # NOTE: Precalculating this is merely a coding optimisation
-def_StartDte <- min(datCredit_real[,get(timeVar)], na.rm=T)
-def_EndDte <- max(datCredit_real[,get(timeVar)], na.rm=T)
+def_StartDte <- min(datCredit[,get(timeVar)], na.rm=T)
+def_EndDte <- max(datCredit[,get(timeVar)], na.rm=T)
 maxDate <- def_EndDte - years(1)
-eventRate_pop <- datCredit_real[, list(Target=get(targetVar), 
+eventRate_pop <- datCredit[, list(Target=get(targetVar), 
                                        Status=get(currStatusVar), Time=get(timeVar))][Status==0, list(EventRate = sum(Target, na.rm=T)/.N),
                     by=list(Time)][Time >= def_StartDte & Time <= maxDate,EventRate]
+plot(eventRate_pop, type="b")
 
 # - General
 cpu.threads <- 6
@@ -57,7 +62,7 @@ confLevel <- 0.95
 
 # - Iteration parameters
 smp_size_v <- c(100000,150000,200000,250000,375000,500000,750000,1000000,1500000,2000000,3000000,4000000,5000000,7500000,10000000)
-seed_v <- c(1:20)
+seed_v <- c(1:40)
 
 
 
@@ -65,8 +70,16 @@ seed_v <- c(1:20)
 
 # --- Defines function for applying a subsampled resampling scheme given parameters on given data
 # This function serves as an "outer job" to be called within a multithreaded environment
-subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currStatusVar=NA, timeVar=NA, datGiven, seed=123, 
-                         prior_pop=NA, eventRate_pop=NA) {
+# - Inputs: smp_size: Subsample size; smp_frac: sampling fraction for resmpling scheme;
+# stratifiers: vector of stratification field names for n-way stratified sampling inner technique;
+# targetVar: outcome field name within cross-sectional modelling (also first element of [stratifiers]);
+# currStatusVar: current status field name within cross-sectional modelling for event rate calculations
+# timeVar: field name of date for event rate calculations; seed: specific seed value
+# prior_pop: pre-calculated prior probability within population for error measurement
+# eventRate_pop: pre-calculated event rates over time within population for error measurement
+# datGiven: given dataset from which to subsample and resample
+subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currStatusVar=NA, timeVar=NA, seed=123, 
+                         prior_pop=NA, eventRate_pop=NA, datGiven) {
   
   # - Preliminaries: Error Checks
   if (any(is.na(stratifiers)) & is.na(targetVar)) { stop("Stratifiers and target variables are unspecified! Must at least include the target variable")}
@@ -142,10 +155,12 @@ subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currS
 } # end of function
 
 
-# - Testing call
-subSmp_strat(smp_size=100000, smp_frac=smp_frac, datGiven=datCredit_real, seed=123, 
+# - Testing function call
+ptm <- proc.time() #IGNORE: for computation time calculation
+subSmp_strat(smp_size=100000, smp_frac=smp_frac, seed=123, 
              stratifiers=stratifiers, targetVar=targetVar, currStatusVar=currStatusVar, timeVar=timeVar, 
-             prior_pop=prior_pop, eventRate_pop=eventRate_pop)
+             prior_pop=prior_pop, eventRate_pop=eventRate_pop, datGiven=datCredit)
+proc.time() - ptm  #IGNORE: for computation time calculation
 
 
 
@@ -160,21 +175,20 @@ cat(paste0("1 (", Sys.time(),"). Iterating across subsample sizes ..."),
 ptm <- proc.time() #IGNORE: for computation time calculation
 
 # - Multithreaded looping procedure using the foreach-package
-datResults <- foreach(it=1:(length(smp_size_v)*length(seed_v)), .combine='rbind', .verbose=F, .inorder=T, 
-                         .packages=c('dplyr','data.table', 'lubridate'), .export=unique(c('subSmp_strat'))) %dopar%
+datResults <- foreach(it=1:(length(seed_v)*length(smp_size_v)), .combine='rbind', .verbose=F, .inorder=T, 
+                         .packages=c('dplyr','data.table', 'lubridate', "scales"), .export=unique(c('subSmp_strat'))) %dopar%
   {
-    
     # - Testing 
-    #it <- 9
+    #it <- 21
     
     # - Set indices
-    iSeed <- (it-1) %% length(seed_v) + 1
-    iSize <- (it-1) %/% length(seed_v) + 1
+    iSeed <- (it-1) %% length(seed_v) + 1 # modulo operation
+    iSize <- (it-1) %/% length(seed_v) + 1 # integer-valued division
     
     # - Iterate 
-    temp <-subSmp_strat(smp_size=smp_size_v[iSize], smp_frac=smp_frac, datGiven=datCredit_real, seed=seed_v[iSeed],
+    temp <-subSmp_strat(smp_size=smp_size_v[iSize], smp_frac=smp_frac, seed=seed_v[iSeed],
                         stratifiers=stratifiers, targetVar=targetVar, currStatusVar=currStatusVar, timeVar=timeVar,
-                        prior_pop=prior_pop)
+                        prior_pop=prior_pop, eventRate_pop=eventRate_pop, datGiven=datCredit)
     
     # - Reporting
     if (iSeed == length(seed_v)) {
@@ -185,7 +199,7 @@ datResults <- foreach(it=1:(length(smp_size_v)*length(seed_v)), .combine='rbind'
     return(temp)
   }  
 
-t <- proc.time() - ptm 
+t <- proc.time() - ptm  #IGNORE: for computation time calculation
 cat(paste0("\n3 (", Sys.time(),"). ForEach-loop done. Elapsed time: ", round(t[3]/60), " minutes."),
     file="subsampleLoop.txt", append=T)
 
@@ -195,8 +209,15 @@ stopCluster(cl.port)
 
 
 # --- Graphing
-datResults[, list(MAE = mean(ErrVal_AE, na.rm=T), MAE_SD = sd(ErrVal_AE, na.rm=T),
-                  RMSE = sqrt(sum(Err_PriorProb_SqrdErr, na.rm=T)/.N), RMSE_SE = sd(Err_PriorProb_SqrdErr, na.rm=T)), by=list(SubSampleSize)]
+datGraph <- datResults[, list(PriorProb_MAE = mean(Err_PriorProb_AE , na.rm=T), PriorProb_MAE_SD = sd(Err_PriorProb_AE , na.rm=T),
+                  PriorProb_RMSE = sqrt(sum(Err_PriorProb_SqrdErr, na.rm=T)/.N), PriorProb_RMSE_SE = sd(Err_PriorProb_SqrdErr, na.rm=T),
+                  EventRate_MAE = mean(Err_EventRate_MAE, na.rm=T), EventRate_MAE_SD = sd(Err_EventRate_MAE, na.rm=T)),
+           by=list(SubSampleSize)]
 
+# SCRATCH
+plot(x=datGraph$SubSampleSize, y=datGraph$PriorProb_MAE, type="b")
+plot(x=datGraph$SubSampleSize, y=datGraph$PriorProb_RMSE, type="b")
+plot(x=datGraph$SubSampleSize, y=datGraph$EventRate_MAE, type="b")
+plot(x=datGraph$SubSampleSize, y=datGraph$EventRate_MAE_SD, type="b")
 
 
