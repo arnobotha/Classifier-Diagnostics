@@ -80,7 +80,7 @@ port.aggr[, Facet_label := "Worst-ever aggregation approach"]
 
 # - calculate TTC event rate and confidence interval for one sample, dichotomous outcome (population proportion)
 mean_EventRate <- port.aggr[Sample == "b_Train", mean(EventRate, na.rm=T)]
-stdError_EventRate <- port.aggr[Sample == "b_Train", sd(EventRate, na.rm=T)] / port.aggr[Sample == "b_Train", .N]
+stdError_EventRate <- port.aggr[Sample == "b_Train", sd(EventRate, na.rm=T)] / sqrt(port.aggr[Sample == "b_Train", .N])
 margin_EventRate <- qnorm(1-(1-confLevel)/2) * stdError_EventRate
 cat("\nMean event rate with 95% confidence intervals in training sample: ", sprintf("%.2f", mean_EventRate*100) , "% +-", sprintf("%.3f", margin_EventRate*100), "%")
 

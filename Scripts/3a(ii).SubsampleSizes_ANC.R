@@ -61,8 +61,9 @@ cpu.threads <- 6
 confLevel <- 0.95
 
 # - Iteration parameters
-smp_size_v <- c(100000,150000,200000,250000,375000,500000,750000,1000000,1500000,2000000,3000000,4000000,5000000,7500000,10000000)
-seed_v <- c(1:40)
+smp_size_v <- c(100000,150000,200000,250000,375000,500000,625000,750000,875000,1000000,1250000,1500000,1750000,2000000,
+                2500000,3000000,3500000,4000000,4500000,5000000,6000000,7000000,8000000,9000000,10000000,15000000)
+seed_v <- c(1:100)
 
 
 
@@ -209,15 +210,57 @@ stopCluster(cl.port)
 
 
 # --- Graphing
+
+# - Load in Dataset
+if (!exists('datResults')) unpack.ffdf(paste0(genObjPath,"subSampleSizes"), tempPath)
+
+# - Aggregate to subsample size level
 datGraph <- datResults[, list(PriorProb_MAE = mean(Err_PriorProb_AE , na.rm=T), PriorProb_MAE_SD = sd(Err_PriorProb_AE , na.rm=T),
                   PriorProb_RMSE = sqrt(sum(Err_PriorProb_SqrdErr, na.rm=T)/.N), PriorProb_RMSE_SE = sd(Err_PriorProb_SqrdErr, na.rm=T),
-                  EventRate_MAE = mean(Err_EventRate_MAE, na.rm=T), EventRate_MAE_SD = sd(Err_EventRate_MAE, na.rm=T)),
+                  EventRate_MAE = mean(Err_EventRate_MAE, na.rm=T), EventRate_MAE_SD = sd(Err_EventRate_MAE, na.rm=T), N=.N),
            by=list(SubSampleSize)]
+
+# - Create 95% confidence interval for point estimate (mean)
+datGraph[, EventRate_MAE_ErrMargin := (qnorm(1-(1-confLevel)/2)*EventRate_MAE_SD/sqrt(N))]
+datGraph[, EventRate_MAE_lower := EventRate_MAE - EventRate_MAE_ErrMargin]
+datGraph[, EventRate_MAE_upper := EventRate_MAE + EventRate_MAE_ErrMargin]
+
+# - Aesthetics Engineering
+datGraph[,Measure := "a_EventRate_MAE"]
+datGraph[, Facet_label := factor("'12-month default rates: Full set '*italic(D)*' vs Subsampled set '*italic(D[S])")]
 
 # SCRATCH
 plot(x=datGraph$SubSampleSize, y=datGraph$PriorProb_MAE, type="b")
 plot(x=datGraph$SubSampleSize, y=datGraph$PriorProb_RMSE, type="b")
 plot(x=datGraph$SubSampleSize, y=datGraph$EventRate_MAE, type="b")
-plot(x=datGraph$SubSampleSize, y=datGraph$EventRate_MAE_SD, type="b")
+plot(x=datGraph$SubSampleSize, y=datGraph$EventRate_MAE_ErrMargin, type="b")
+
+# - Graphing parameters
+chosenFont <- "Cambria"; dpi <- 180
+col.v <- brewer.pal(10, "Paired")[c(10)]
+fill.v <- brewer.pal(10, "Paired")[c(9)]
+
+# - Create main graph
+(g1 <- ggplot(datGraph, aes(x=SubSampleSize, y=EventRate_MAE)) + theme_minimal() + 
+  labs(x=bquote("Subsample size |"*italic(D[S])*"|"), y="Error measure value (%)") + 
+  theme(text=element_text(family=chosenFont),legend.position = "bottom",
+        axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
+        strip.background=element_rect(fill="snow2", colour="snow2"),
+        strip.text=element_text(size=8, colour="gray50"), strip.text.y.right=element_text(angle=90)) + 
+  # main line graph with overlaid points
+  geom_ribbon(aes(ymin=EventRate_MAE_lower, ymax=EventRate_MAE_upper, fill=Measure), alpha=0.5) + 
+  geom_line(aes(colour=Measure), linewidth=0.5, linetype="dotted") + 
+  geom_point(aes(colour=Measure), size=1.5) + 
+  geom_errorbar(aes(ymin=EventRate_MAE_lower, ymax=EventRate_MAE_upper), colour="black", width=1, position=position_dodge(0.1)) +
+  # facets & scale options
+  facet_grid(Facet_label ~ ., labeller=label_parsed) + 
+  scale_colour_manual(name="", values=col.v, label=expression("Mean of MAE between 2 time series ("*italic(D)*" vs "*italic(D[S])*")")) + 
+  scale_fill_manual(name="", values=fill.v, label="95% Confidence interval for point estimate") + 
+  scale_y_continuous(breaks=pretty_breaks(), label=percent) + 
+  scale_x_continuous(breaks=pretty_breaks(), label=comma)
+)
+
+# - Save graph
+ggsave(g1, file=paste0(genFigPath, "DefaultRates_SubSampleRates_Experiment.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
 
