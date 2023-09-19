@@ -209,6 +209,8 @@ pack.ffdf(paste0(genObjPath, "subSampleSizes"), datResults); gc()
 stopCluster(cl.port)
 
 
+
+
 # --- Graphing
 
 # - Load in Dataset
@@ -260,7 +262,7 @@ fill.v <- brewer.pal(10, "Paired")[c(9)]
   scale_x_continuous(breaks=pretty_breaks(), label=comma)
 )
 
+### AB: Add in table
+
 # - Save graph
 ggsave(g1, file=paste0(genFigPath, "DefaultRates_SubSampleRates_Experiment.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
-
-
