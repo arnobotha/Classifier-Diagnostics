@@ -46,6 +46,7 @@ require(survival) # for survival modelling
 require(ggplot2)
 require(scales)
 require(ggthemes)
+require(ggpp) # Extensions to ggplot2, particularly geom_table
 require(RColorBrewer)
 require(extrafont) #remotes::install_version("Rttf2pt1", version = "1.3.8"); Sys.setenv(R_GSCMD="C:/Program Files/gs/gs9.55.0/bin/gswin32c.exe"); font_import(); loadfonts(); loadfonts(device="win")
 require(survminer)
