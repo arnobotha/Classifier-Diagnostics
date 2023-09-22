@@ -53,7 +53,7 @@ def_EndDte <- max(datCredit[,get(timeVar)], na.rm=T)
 maxDate <- def_EndDte - years(1)
 eventRate_pop <- datCredit[, list(Target=get(targetVar), 
                                        Status=get(currStatusVar), Time=get(timeVar))][Status==0, list(EventRate = sum(Target, na.rm=T)/.N),
-                    by=list(Time)][Time >= def_StartDte & Time <= maxDate,EventRate]
+                    by=list(Time)][Time >= def_StartDte & Time <= maxDate, ][order(Time), EventRate]
 plot(eventRate_pop, type="b")
 
 # - General
@@ -63,7 +63,7 @@ confLevel <- 0.95
 # - Iteration parameters
 smp_size_v <- c(100000,150000,200000,250000,375000,500000,625000,750000,875000,1000000,1250000,1500000,1750000,2000000,
                 2500000,3000000,3500000,4000000,4500000,5000000,6000000,7000000,8000000,9000000,10000000,15000000)
-seed_v <- c(1:100)
+seed_v <- c(1:1)
 
 
 
@@ -97,8 +97,8 @@ subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currS
   
   # - Implement resampling scheme using given main sampling fraction
   set.seed(seed)
-  datCredit_train <- datCredit_smp %>% group_by(vars(stratifiers)) %>% slice_sample(prop=smp_frac) %>% mutate(Sample="Train") %>% as.data.table()
-  datCredit_valid <- subset(datCredit_smp, !(Ind %in% datCredit_train$Ind)) %>% mutate(Sample="Validation") %>% as.data.table()
+  datCredit_train <- datCredit_smp %>% group_by(vars(stratifiers)) %>% slice_sample(prop=smp_frac) %>% as.data.table()
+  datCredit_valid <- subset(datCredit_smp, !(Ind %in% datCredit_train$Ind)) %>% as.data.table()
   
   
   # --- Calculate error measure 1: Difference in prior probabilities between population and training (as subsampled + resampled)
@@ -133,7 +133,7 @@ subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currS
       maxDate <- def_EndDte - years(1)
       eventRate_pop <- datGiven[, list(Target=get(targetVar), 
                                              Status=get(currStatusVar), Time=get(timeVar))][Status==0, list(EventRate = sum(Target, na.rm=T)/.N),
-               by=list(Time)][Time >= def_StartDte & Time <= maxDate,EventRate]
+               by=list(Time)][Time >= def_StartDte & Time <= maxDate,][order(Time), EventRate]
     }
     
     # - Subsampled + resampled training set
@@ -142,7 +142,7 @@ subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currS
     maxDate <- def_EndDte - years(1)
     eventRate_train <- datCredit_train[, list(Target=get(targetVar), 
                                            Status=get(currStatusVar), Time=get(timeVar))][Status==0, list(EventRate = sum(Target, na.rm=T)/.N),
-              by=list(Time)][Time >= def_StartDte & Time <= maxDate,EventRate]
+              by=list(Time)][Time >= def_StartDte & Time <= maxDate,][order(Time), EventRate]
     
     # - Compare population with training set using chosen error measure
     err_eventRate_MAE <- mean(abs(eventRate_pop - eventRate_train), na.rm=t) # mean absolute error
@@ -158,7 +158,7 @@ subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currS
 
 # - Testing function call
 ptm <- proc.time() #IGNORE: for computation time calculation
-subSmp_strat(smp_size=100000, smp_frac=smp_frac, seed=123, 
+subSmp_strat(smp_size=100000, smp_frac=smp_frac, seed=1, 
              stratifiers=stratifiers, targetVar=targetVar, currStatusVar=currStatusVar, timeVar=timeVar, 
              prior_pop=prior_pop, eventRate_pop=eventRate_pop, datGiven=datCredit)
 proc.time() - ptm  #IGNORE: for computation time calculation
@@ -180,7 +180,7 @@ datResults <- foreach(it=1:(length(seed_v)*length(smp_size_v)), .combine='rbind'
                          .packages=c('dplyr','data.table', 'lubridate', "scales"), .export=unique(c('subSmp_strat'))) %dopar%
   {
     # - Testing 
-    #it <- 21
+    #it <- 101
     
     # - Set indices
     iSeed <- (it-1) %% length(seed_v) + 1 # modulo operation
@@ -229,7 +229,14 @@ datGraph[, EventRate_MAE_upper := EventRate_MAE + EventRate_MAE_ErrMargin]
 
 # - Aesthetics Engineering
 datGraph[,Measure := "a_EventRate_MAE"]
-datGraph[, Facet_label := factor("'12-month default rates: Full set '*italic(D)*' vs Subsampled set '*italic(D[S])")]
+datGraph[, Facet_label := factor("'12-month default rates: Full set '*italic(D)*' vs training set '*italic(D[T])*', given subsampled set '*italic(D[S])")]
+
+# - Create summary table for annotations within graph
+datAnnotate <- datGraph[SubSampleSize %in% c(100000,150000,250000,375000,500000,750000,1000000,1250000, 1500000,2000000,
+                                             3000000,4000000), 
+                        list(`italic(s)`=SubSampleSize, 
+                             `italic(E)(epsilon(italic(s)))`=paste0(sprintf("%.3f", EventRate_MAE*100),"%"),
+                             `95% error margin`=paste0("± ",sprintf("%.4f",EventRate_MAE_ErrMargin*100),"%"))]
 
 # SCRATCH
 plot(x=datGraph$SubSampleSize, y=datGraph$PriorProb_MAE, type="b")
@@ -244,7 +251,7 @@ fill.v <- brewer.pal(10, "Paired")[c(9)]
 
 # - Create main graph
 (g1 <- ggplot(datGraph, aes(x=SubSampleSize, y=EventRate_MAE)) + theme_minimal() + 
-  labs(x=bquote("Subsample size |"*italic(D[S])*"|"), y="Error measure value (%)") + 
+  labs(x=bquote("Subsample size "*italic(s)*" = |"*italic(D[S])*"|"), y=bquote("Error measure value "*epsilon(italic(s))*" (%)")) + 
   theme(text=element_text(family=chosenFont),legend.position = "bottom",
         axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
         strip.background=element_rect(fill="snow2", colour="snow2"),
@@ -254,15 +261,15 @@ fill.v <- brewer.pal(10, "Paired")[c(9)]
   geom_line(aes(colour=Measure), linewidth=0.5, linetype="dotted") + 
   geom_point(aes(colour=Measure), size=1.5) + 
   geom_errorbar(aes(ymin=EventRate_MAE_lower, ymax=EventRate_MAE_upper), colour="black", width=1, position=position_dodge(0.1)) +
+  annotate(geom="table", x=5000000, y=0.013, family=chosenFont, size=3,
+             label=datAnnotate, parse=T) +
   # facets & scale options
   facet_grid(Facet_label ~ ., labeller=label_parsed) + 
-  scale_colour_manual(name="", values=col.v, label=expression("Mean of MAE between 2 time series ("*italic(D)*" vs "*italic(D[S])*")")) + 
+  scale_colour_manual(name="", values=col.v, label=expression("Mean of MAE between 2 time series ("*italic(D)*" vs "*italic(D[T])*")")) + 
   scale_fill_manual(name="", values=fill.v, label="95% Confidence interval for point estimate") + 
   scale_y_continuous(breaks=pretty_breaks(), label=percent) + 
-  scale_x_continuous(breaks=pretty_breaks(), label=comma)
+  scale_x_continuous(breaks=pretty_breaks(), label=label_comma(scale=0.000001, suffix="m"))
 )
-
-### AB: Add in table
 
 # - Save graph
 ggsave(g1, file=paste0(genFigPath, "DefaultRates_SubSampleRates_Experiment.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")

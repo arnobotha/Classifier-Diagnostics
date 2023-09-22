@@ -35,21 +35,30 @@ confLevel <- 0.95
 smp_size <- 100000 # fixed size of downsampled set
 smp_frac <- 0.7 # sampling fraction for resampling scheme
 stratifiers <- c("DefaultStatus1_lead_12_max", "Date") # Must at least include target variable used in graphing event rate
+targetVar <- "DefaultStatus1_lead_12_max"
+currStatusVar <- "DefaultStatus1"
+timeVar <- "Date"
+
+# - Subset given dataset accordingly; an efficiency enhancement
+datCredit <- subset(datCredit_real, select=unique(c(stratifiers,targetVar,currStatusVar,timeVar)))
+rm(datCredit_real); gc()
+
 
 
 # ------ 2. Subsampled resampling scheme: basic cross-validation with random sampling
 
 # - Preliminaries
-smp_perc <- smp_size/datCredit_real[, .N] # Implied sampling fraction for downsampling step
+smp_perc <- smp_size/datCredit[, .N] # Implied sampling fraction for downsampling step
 
 # - Downsample data into a set with a fixed size (using stratified sampling) before implementing resampling scheme
-datCredit_smp <- datCredit_real %>% group_by(vars(stratifiers)) %>% slice_sample(prop=smp_perc) %>% as.data.table()
+set.seed(1)
+datCredit_smp <- datCredit %>% group_by(vars(stratifiers)) %>% slice_sample(prop=smp_perc) %>% as.data.table()
 datCredit_smp[, Ind := 1:.N] # prepare for resampling scheme
 
 # - Implement resampling scheme using given main sampling fraction
 set.seed(1)
-datCredit_train <- datCredit_smp %>% group_by(vars(stratifiers)) %>% slice_sample(prop=smp_frac) %>% mutate(Sample="Train") %>% as.data.table()
-datCredit_valid <- subset(datCredit_smp, !(Ind %in% datCredit_train$Ind)) %>% mutate(Sample="Validation") %>% as.data.table()
+datCredit_train <- datCredit_smp %>% group_by(vars(stratifiers)) %>% slice_sample(prop=smp_frac) %>% as.data.table()
+datCredit_valid <- subset(datCredit_smp, !(Ind %in% datCredit_train$Ind)) %>% as.data.table()
 
 
 
@@ -57,23 +66,23 @@ datCredit_valid <- subset(datCredit_smp, !(Ind %in% datCredit_train$Ind)) %>% mu
 # ------ 3. Graphing event rates over time given resampled sets
 
 # - Check representatives | dataset-level proportions should be similar
-table(datCredit_smp$DefaultStatus1_lead_12_max) %>% prop.table()
-table(datCredit_train$DefaultStatus1_lead_12_max) %>% prop.table()
-table(datCredit_valid$DefaultStatus1_lead_12_max) %>% prop.table()
+table(datCredit_smp[,get(targetVar)]) %>% prop.table()
+table(datCredit_train[,get(targetVar)]) %>% prop.table()
+table(datCredit_valid[,get(targetVar)]) %>% prop.table()
 
 # - Merge samples together
-datGraph <- rbind(datCredit_real[, list(LoanID, Date, DefaultStatus1, DefaultStatus1_lead_12_max, Sample = "a_Full")],
-                   datCredit_train[, list(LoanID, Date, DefaultStatus1, DefaultStatus1_lead_12_max, Sample = "b_Train")],
-                   datCredit_valid[, list(LoanID, Date, DefaultStatus1, DefaultStatus1_lead_12_max, Sample = "c_Valid")])
+datGraph <- rbind(datCredit[, list(Time=get(timeVar), Status=get(currStatusVar), Target=get(targetVar), Sample = "a_Full")],
+                   datCredit_train[, list(Time=get(timeVar), Status=get(currStatusVar), Target=get(targetVar), Sample = "b_Train")],
+                   datCredit_valid[, list(Time=get(timeVar), Status=get(currStatusVar), Target=get(targetVar), Sample = "c_Valid")])
 
 # - Setting some aggregation parameters, purely to facilitate graphing aesthetics
-def_StartDte <- min(datCredit_real$Date, na.rm=T)
-def_EndDte <- max(datCredit_real$Date, na.rm=T)
+def_StartDte <- min(datCredit[,get(timeVar)], na.rm=T)
+def_EndDte <- max(datCredit[,get(timeVar)], na.rm=T)
 maxDate <- def_EndDte - years(1) # A post-hoc filter, used for graphing purposes
 
 # - Aggregate to monthly level and observe up to given point
-port.aggr <- datGraph[DefaultStatus1==0, list(EventRate = sum(DefaultStatus1_lead_12_max, na.rm=T)/.N, AtRisk = .N),
-                           by=list(Sample, Date)][Date >= def_StartDte & Date <= maxDate,] %>% setkey(Sample,Date)
+port.aggr <- datGraph[Status==0, list(EventRate = sum(Target, na.rm=T)/.N),
+         by=list(Sample, Time)][Time >= def_StartDte & Time <= maxDate,] %>% setkey(Time)
 
 # - Aesthetics engineering
 port.aggr[, Facet_label := "Worst-ever aggregation approach"]
@@ -85,22 +94,24 @@ margin_EventRate <- qnorm(1-(1-confLevel)/2) * stdError_EventRate
 cat("\nMean event rate with 95% confidence intervals in training sample: ", sprintf("%.2f", mean_EventRate*100) , "% +-", sprintf("%.3f", margin_EventRate*100), "%")
 
 # - Calculate MAE over time by sample
-port.aggr2 <- port.aggr %>% pivot_wider(id_cols = c(Date), names_from = c(Sample), values_from = c(EventRate))
+port.aggr2 <- port.aggr %>% pivot_wider(id_cols = c(Time), names_from = c(Sample), values_from = c(EventRate))
 (diag.samplingRep.train <- mean(abs(port.aggr2$a_Full - port.aggr2$b_Train)) * 100)
 (diag.samplingRep.valid <- mean(abs(port.aggr2$a_Full - port.aggr2$c_Valid)) * 100)
 (diag.samplingRep.trainValid <- mean(abs(port.aggr2$b_Train - port.aggr2$c_Valid)) * 100)
 ### RESULTS: Sample-size dependent
-# 100k-sample: Train: 0.74%; Validation: 0.98%
+# 100k-sample: Train: 0.81%; Validation: 1.15%
+# 1.5m-sample: Train: 0.18%; Validation: 0.28%
+# 4m-sample: Train: 0.11%; Validation: 0.18%
 
 # - Graphing parameters
 chosenFont <- "Cambria"; dpi <- 170
 col.v <- brewer.pal(9, "Set1")[c(1,5,2,4)]; size.v <- c(0.5,0.3,0.3,0.3)
 label.v <- c("a_Full"=expression(italic(A)[t]*": Full set "*italic(D)),
-             "b_Train"=bquote(italic(C)[t]*": Training set "*italic(D)[italic(T)]~"("*.(round(smp_frac*smp_size/1000))*"k)"),
-             "c_Valid"=bquote(italic(D)[t]*": Validation set "*italic(D)[italic(V)]~"("*.(round((1-smp_frac)*smp_size/1000))*"k)"))
+             "b_Train"=bquote(italic(B)[t]*": Training set "*italic(D)[italic(T)]~"("*.(round(smp_frac*smp_size/1000))*"k)"),
+             "c_Valid"=bquote(italic(C)[t]*": Validation set "*italic(D)[italic(V)]~"("*.(round((1-smp_frac)*smp_size/1000))*"k)"))
 
 # - Create graph 1 (all sets)
-(g2 <- ggplot(port.aggr, aes(x=Date, y=EventRate, group=Sample)) + theme_minimal() + 
+(g2 <- ggplot(port.aggr, aes(x=Time, y=EventRate, group=Sample)) + theme_minimal() + 
     labs(x="Reporting date (months)", y=bquote("Conditional 12-month default rate (%) across sample "*italic(bar(D)))) + 
     theme(text=element_text(family=chosenFont),legend.position = "bottom",
           axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
@@ -110,17 +121,17 @@ label.v <- c("a_Full"=expression(italic(A)[t]*": Full set "*italic(D)),
     geom_line(aes(colour=Sample, linetype=Sample, linewidth=Sample)) + 
     geom_point(aes(colour=Sample, shape=Sample), size=1) + 
     #annotations
-    annotate("text", x=as.Date("2013-02-28"), y=port.aggr[Date <= "2008-12-31", mean(EventRate)]*1.5, size=3, family=chosenFont,
-             label=paste0("'TTC-mean '*E(italic(B[t]))*': ", sprintf("%.3f", mean_EventRate*100), "% ± ", 
-                          sprintf("%.3f", margin_EventRate*100),"%'"), parse=T) +     
-    annotate(geom="text", x=as.Date("2012-12-31"), y=port.aggr[Date <= "2008-12-31", mean(EventRate)]*1.35,
-             label=paste0("'MAE between '*italic(A)[t]*' and '*italic(B)[t]*': ", sprintf("%.3f", diag.samplingRep.train),"%'"),
+    annotate("text", x=as.Date("2013-02-28"), y=port.aggr[Time <= "2008-12-31", mean(EventRate)]*1.15, size=3, family=chosenFont,
+             label=paste0("'TTC-mean '*E(italic(B[t]))*': ", sprintf("%1.2f", mean_EventRate*100), "% ± ", 
+                          sprintf("%.2f", margin_EventRate*100),"%'"), parse=T) +     
+    annotate(geom="text", x=as.Date("2012-12-31"), y=port.aggr[Time <= "2008-12-31", mean(EventRate)]*1.05,
+             label=paste0("'MAE between '*italic(A)[t]*' and '*italic(B)[t]*': ", sprintf("%.2f", diag.samplingRep.train),"%'"),
              family=chosenFont, size=3, parse=T) +     
-    annotate(geom="text", x=as.Date("2012-12-31"), y=port.aggr[Date <= "2008-12-31", mean(EventRate)]*1.275,
-             label=paste0("'MAE between '*italic(A)[t]*' and '*italic(C)[t]*': ", sprintf("%.3f", diag.samplingRep.valid),"%'"),
+    annotate(geom="text", x=as.Date("2012-12-31"), y=port.aggr[Time <= "2008-12-31", mean(EventRate)]*1,
+             label=paste0("'MAE between '*italic(A)[t]*' and '*italic(C)[t]*': ", sprintf("%.2f", diag.samplingRep.valid),"%'"),
              family=chosenFont, size=3, parse=T) +      
-    annotate(geom="text", x=as.Date("2012-12-31"), y=port.aggr[Date <= "2008-12-31", mean(EventRate)]*1.2,
-             label=paste0("'MAE between '*italic(B)[t]*' and '*italic(C)[t]*': ", sprintf("%.3f", diag.samplingRep.trainValid),"%'"),
+    annotate(geom="text", x=as.Date("2012-12-31"), y=port.aggr[Time <= "2008-12-31", mean(EventRate)]*0.95,
+             label=paste0("'MAE between '*italic(B)[t]*' and '*italic(C)[t]*': ", sprintf("%.2f", diag.samplingRep.trainValid),"%'"),
              family=chosenFont, size=3, parse=T) +     
     # facets & scale options
     facet_grid(Facet_label ~ .) + 
@@ -131,9 +142,9 @@ label.v <- c("a_Full"=expression(italic(A)[t]*": Full set "*italic(D)),
     scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y"))
 
 # - Save graph
-ggsave(g2, file=paste0(genFigPath, "DefaultRates_SampleRates.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
+ggsave(g2, file=paste0(genFigPath, "DefaultRates_SampleRates_Subsample-", round(smp_size/1000),"k.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
 
 
 # --- Cleanup
-suppressWarnings(rm(port.aggr, port.aggr2, datGraph, datCredit_real, datCredit_smp, datCredit_train, datCredit_valid, g2))
+suppressWarnings(rm(port.aggr, port.aggr2, datGraph, datCredit, datCredit_smp, datCredit_train, datCredit_valid, g2))
