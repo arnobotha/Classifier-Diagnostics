@@ -62,8 +62,8 @@ confLevel <- 0.95
 
 # - Iteration parameters
 smp_size_v <- c(100000,150000,200000,250000,375000,500000,625000,750000,875000,1000000,1250000,1500000,1750000,2000000,
-                2500000,3000000,3500000,4000000,4500000,5000000,6000000,7000000,8000000,9000000,10000000,15000000)
-seed_v <- c(1:1)
+                2500000,3000000,3500000,4000000,4500000,5000000,6000000,7000000,8000000,9000000,10000000,12500000,15000000,20000000)
+seed_v <- c(1:100)
 
 
 
@@ -121,7 +121,7 @@ subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currS
                         "Seed"=seed, "Err_PriorProb_AE" = err_priorProb_AE, "Err_PriorProb_SqrdErr" = err_priorProb_SqrdErr)
   
   
-  # --- Calculate error measure 2: MAE between 2 time series of the event rate between population and training (as subsampled + resampled)
+  # --- Calculate error measure 2: MAE between 2 time series of the event rate between population/training and training/validation (as subsampled + resampled)
   # NOTE: event rate is a 12-month conditional event rate, e.g., k-month default rate at t+k given that event has not happened at t
   # This is an optional error measure
   if (!is.na(currStatusVar) & !is.na(timeVar)) {
@@ -144,11 +144,22 @@ subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currS
                                            Status=get(currStatusVar), Time=get(timeVar))][Status==0, list(EventRate = sum(Target, na.rm=T)/.N),
               by=list(Time)][Time >= def_StartDte & Time <= maxDate,][order(Time), EventRate]
     
-    # - Compare population with training set using chosen error measure
-    err_eventRate_MAE <- mean(abs(eventRate_pop - eventRate_train), na.rm=t) # mean absolute error
+    
+    # - Subsampled + resampled validation set
+    eventRate_valid <- datCredit_valid[, list(Target=get(targetVar), 
+                                              Status=get(currStatusVar), Time=get(timeVar))][Status==0, list(EventRate = sum(Target, na.rm=T)/.N),
+               by=list(Time)][Time >= def_StartDte & Time <= maxDate,][order(Time), EventRate]
+    
+    
+    # - Compare event rates across different sets using chosen error measure
+    err_eventRate_MAE_train <- mean(abs(eventRate_pop - eventRate_train), na.rm=t) # mean absolute error
+    err_eventRate_MAE_valid <- mean(abs(eventRate_pop - eventRate_valid), na.rm=t) # mean absolute error
+    err_eventRate_MAE_trainvalid <- mean(abs(eventRate_train - eventRate_valid), na.rm=t) # mean absolute error
     
     # - Append error value to output table
-    datTemp <- data.table(datTemp, "Err_EventRate_MAE" = err_eventRate_MAE)
+    datTemp <- data.table(datTemp, "Err_EventRate_PopTrain_MAE" = err_eventRate_MAE_train, 
+                          "Err_EventRate_PopValid_MAE" = err_eventRate_MAE_valid,
+                          "Err_EventRate_TrainValid_MAE" = err_eventRate_MAE_trainvalid)
   }
 
   # Return value of chosen error measure
@@ -216,60 +227,87 @@ stopCluster(cl.port)
 # - Load in Dataset
 if (!exists('datResults')) unpack.ffdf(paste0(genObjPath,"subSampleSizes"), tempPath)
 
+
 # - Aggregate to subsample size level
 datGraph <- datResults[, list(PriorProb_MAE = mean(Err_PriorProb_AE , na.rm=T), PriorProb_MAE_SD = sd(Err_PriorProb_AE , na.rm=T),
                   PriorProb_RMSE = sqrt(sum(Err_PriorProb_SqrdErr, na.rm=T)/.N), PriorProb_RMSE_SE = sd(Err_PriorProb_SqrdErr, na.rm=T),
-                  EventRate_MAE = mean(Err_EventRate_MAE, na.rm=T), EventRate_MAE_SD = sd(Err_EventRate_MAE, na.rm=T), N=.N),
+                  EventRate_PopTrain_MAE_Mean = mean(Err_EventRate_PopTrain_MAE, na.rm=T), EventRate_PopTrain_MAE_SD = sd(Err_EventRate_PopTrain_MAE, na.rm=T),
+                  EventRate_TrainValid_MAE_Mean = mean(Err_EventRate_TrainValid_MAE, na.rm=T), EventRate_TrainValid_MAE_SD = sd(Err_EventRate_TrainValid_MAE, na.rm=T),N=.N),
            by=list(SubSampleSize)]
 
-# - Create 95% confidence interval for point estimate (mean)
-datGraph[, EventRate_MAE_ErrMargin := (qnorm(1-(1-confLevel)/2)*EventRate_MAE_SD/sqrt(N))]
-datGraph[, EventRate_MAE_lower := EventRate_MAE - EventRate_MAE_ErrMargin]
-datGraph[, EventRate_MAE_upper := EventRate_MAE + EventRate_MAE_ErrMargin]
+# - Create 95% confidence interval for point estimate (mean) : Population-training set comparison
+datGraph[, EventRate_MAE_PopTrain_Mean_ErrMargin := (qnorm(1-(1-confLevel)/2)*EventRate_PopTrain_MAE_SD/sqrt(N))]
+datGraph[, EventRate_MAE_PopTrain_Mean_lower := EventRate_PopTrain_MAE_Mean - EventRate_MAE_PopTrain_Mean_ErrMargin]
+datGraph[, EventRate_MAE_PopTrain_Mean_upper := EventRate_PopTrain_MAE_Mean + EventRate_MAE_PopTrain_Mean_ErrMargin]
 
-# - Aesthetics Engineering
-datGraph[,Measure := "a_EventRate_MAE"]
-datGraph[, Facet_label := factor("'12-month default rates: Full set '*italic(D)*' vs training set '*italic(D[T])*', given subsampled set '*italic(D[S])")]
+# - Create 95% confidence interval for point estimate (mean) : Training-Validation set comparison
+datGraph[, EventRate_MAE_TrainValid_Mean_ErrMargin := (qnorm(1-(1-confLevel)/2)*EventRate_TrainValid_MAE_SD/sqrt(N))]
+datGraph[, EventRate_MAE_TrainValid_Mean_lower := EventRate_TrainValid_MAE_Mean - EventRate_MAE_TrainValid_Mean_ErrMargin]
+datGraph[, EventRate_MAE_TrainValid_Mean_upper := EventRate_TrainValid_MAE_Mean + EventRate_MAE_TrainValid_Mean_ErrMargin]
 
 # - Create summary table for annotations within graph
 datAnnotate <- datGraph[SubSampleSize %in% c(100000,150000,250000,375000,500000,750000,1000000,1250000, 1500000,2000000,
-                                             3000000,4000000), 
-                        list(`italic(s)`=SubSampleSize, 
-                             `italic(E)(epsilon(italic(s)))`=paste0(sprintf("%.3f", EventRate_MAE*100),"%"),
-                             `95% error margin`=paste0("± ",sprintf("%.4f",EventRate_MAE_ErrMargin*100),"%"))]
+                                             3000000,4000000,5000000,10000000), 
+                        list(`"Size "*italic(s)`=comma(SubSampleSize), 
+                             `italic(E)(epsilon(italic(s)))*" for "*italic(D):italic(D[T])`=paste0(sprintf("%.3f", EventRate_PopTrain_MAE_Mean*100),"%"),
+                             `95% CI`=paste0("± ",sprintf("%.4f",EventRate_MAE_PopTrain_Mean_ErrMargin*100),"%"),
+                              `italic(E)(epsilon(italic(s)))*" for "*italic(D[T]):italic(D[V])`=paste0(sprintf("%.3f", EventRate_TrainValid_MAE_Mean*100),"%"),
+                             `95% CI`=paste0("± ",sprintf("%.4f",EventRate_MAE_TrainValid_Mean_ErrMargin*100),"%"))]
 
 # SCRATCH
 plot(x=datGraph$SubSampleSize, y=datGraph$PriorProb_MAE, type="b")
 plot(x=datGraph$SubSampleSize, y=datGraph$PriorProb_RMSE, type="b")
-plot(x=datGraph$SubSampleSize, y=datGraph$EventRate_MAE, type="b")
-plot(x=datGraph$SubSampleSize, y=datGraph$EventRate_MAE_ErrMargin, type="b")
+plot(x=datGraph$SubSampleSize, y=datGraph$EventRate_PopTrain_MAE_Mean, type="b")
+plot(x=datGraph$SubSampleSize, y=datGraph$EventRate_TrainValid_MAE_Mean, type="b")
+plot(x=datGraph$SubSampleSize, y=datGraph$EventRate_MAE_PopTrain_Mean_ErrMargin, type="b")
+
+# - Pivot for graphing purposes: 2 different set comparisons using single error measure
+datGraph2 <- pivot_longer(datGraph[,list(SubSampleSize, a_EventRate_PopTrain=EventRate_PopTrain_MAE_Mean, b_EventRate_TrainValid=EventRate_TrainValid_MAE_Mean)],
+                          cols=a_EventRate_PopTrain:b_EventRate_TrainValid, names_to = "Set", values_to = "Value") %>% as.data.table()
+
+datGraph2_lower <- pivot_longer(datGraph[,list(SubSampleSize, a_EventRate_PopTrain=EventRate_MAE_PopTrain_Mean_lower, b_EventRate_TrainValid=EventRate_MAE_TrainValid_Mean_lower)],
+                          cols=a_EventRate_PopTrain:b_EventRate_TrainValid, names_to = "Set", values_to = "Value_Lower") %>% as.data.table()
+datGraph2_upper <- pivot_longer(datGraph[,list(SubSampleSize, a_EventRate_PopTrain=EventRate_MAE_PopTrain_Mean_upper, b_EventRate_TrainValid=EventRate_MAE_TrainValid_Mean_upper)],
+                                cols=a_EventRate_PopTrain:b_EventRate_TrainValid, names_to = "Set", values_to = "Value_Upper") %>% as.data.table()
+datGraph2_margins <- merge(datGraph2_lower, datGraph2_upper, by=c("SubSampleSize", "Set"))
+datGraph3 <- merge(datGraph2, datGraph2_margins, by=c("SubSampleSize", "Set"))
+
+# Aesthetic engineering
+datGraph3[, Facet_label := factor("'Comparison of 12-month default rate series across sets: '*(italic(D):italic(D[T]))*' ; '*(italic(D[T]):italic(D[V]))")]
 
 # - Graphing parameters
 chosenFont <- "Cambria"; dpi <- 180
-col.v <- brewer.pal(10, "Paired")[c(10)]
-fill.v <- brewer.pal(10, "Paired")[c(9)]
+col.v <- brewer.pal(10, "Paired")[c(10,8)]
+fill.v <- brewer.pal(10, "Paired")[c(9,7)]
+linetype.v <- c("solid", "dotted")
+label.v <- list(expression(italic(D)*" vs "*italic(D[T])),
+                expression(italic(D[T])*" vs "*italic(D[V])) )
+label.v2 <- list(expression(italic(D)*" vs "*italic(D[T])),
+                 expression(italic(D[T])*" vs "*italic(D[V])) )
 
 # - Create main graph
-(g1 <- ggplot(datGraph, aes(x=SubSampleSize, y=EventRate_MAE)) + theme_minimal() + 
+(g1 <- ggplot(datGraph3, aes(x=SubSampleSize, y=Value, group=Set)) + theme_minimal() + 
   labs(x=bquote("Subsample size "*italic(s)*" = |"*italic(D[S])*"|"), y=bquote("Error measure value "*epsilon(italic(s))*" (%)")) + 
   theme(text=element_text(family=chosenFont),legend.position = "bottom",
         axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
         strip.background=element_rect(fill="snow2", colour="snow2"),
         strip.text=element_text(size=8, colour="gray50"), strip.text.y.right=element_text(angle=90)) + 
   # main line graph with overlaid points
-  geom_ribbon(aes(ymin=EventRate_MAE_lower, ymax=EventRate_MAE_upper, fill=Measure), alpha=0.5) + 
-  geom_line(aes(colour=Measure), linewidth=0.5, linetype="dotted") + 
-  geom_point(aes(colour=Measure), size=1.5) + 
-  geom_errorbar(aes(ymin=EventRate_MAE_lower, ymax=EventRate_MAE_upper), colour="black", width=1, position=position_dodge(0.1)) +
-  annotate(geom="table", x=5000000, y=0.013, family=chosenFont, size=3,
+  geom_ribbon(aes(x=SubSampleSize, ymin=Value_Lower, ymax=Value_Upper, fill=Set), alpha=0.5) + 
+  geom_line(aes(colour=Set, linetype=Set), linewidth=0.5) + 
+  geom_point(aes(x=SubSampleSize, y=Value, colour=Set, shape=Set), size=1.3) + 
+  #geom_errorbar(aes(x=SubSampleSize, ymin=Value_Lower, ymax=Value_Upper),width=1, position=position_dodge(0.1), linetype="solid", colour="gray") +
+  annotate(geom="table", x=2500000, y=0.013, family=chosenFont, size=3,
              label=datAnnotate, parse=T) +
   # facets & scale options
   facet_grid(Facet_label ~ ., labeller=label_parsed) + 
-  scale_colour_manual(name="", values=col.v, label=expression("Mean of MAE between 2 time series ("*italic(D)*" vs "*italic(D[T])*")")) + 
-  scale_fill_manual(name="", values=fill.v, label="95% Confidence interval for point estimate") + 
+  scale_colour_manual(name="Mean MAE", values=col.v, label=label.v) + 
+  scale_shape_discrete(name="Mean MAE", label=label.v) + 
+  scale_linetype_manual(name="Mean MAE", values=linetype.v, label=label.v) + 
+  scale_fill_manual(name="95% CI for mean", values=fill.v, label=label.v2) + 
   scale_y_continuous(breaks=pretty_breaks(), label=percent) + 
   scale_x_continuous(breaks=pretty_breaks(), label=label_comma(scale=0.000001, suffix="m"))
 )
 
 # - Save graph
-ggsave(g1, file=paste0(genFigPath, "DefaultRates_SubSampleRates_Experiment.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
+ggsave(g1, file=paste0(genFigPath, "DefaultRates_SubSampleRates_PopTrain_Experiment.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
