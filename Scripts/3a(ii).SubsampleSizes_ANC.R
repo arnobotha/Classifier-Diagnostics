@@ -310,4 +310,4 @@ label.v2 <- list(expression(italic(D)*" vs "*italic(D[T])),
 )
 
 # - Save graph
-ggsave(g1, file=paste0(genFigPath, "DefaultRates_SubSampleRates_PopTrain_Experiment.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
+ggsave(g1, file=paste0(genFigPath, "DefaultRates_SubSampleRates_Experiment.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
