@@ -1,5 +1,6 @@
 # =============================== RESAMPLING SCHEMES FOR SURVIVAL MODELS ===============================
-# Determining the effect of a wide range of subsample sizes within a resampling scheme
+# Determining the effect of a wide range of subsample sizes within a resampling scheme amidst a 
+# cross-sectional modelling setup
 # ------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Default survival modelling
 # SCRIPT AUTHOR(S): Dr Arno Botha
@@ -8,8 +9,9 @@
 # This ancillary & exploratory script iterates across a given vector of subsample sizes towards
 # resampling data into a basic cross-validation setup (training:validation), using 2-way stratified 
 # sampling. Each chosen size is executed multiple times over various seed values to account for randomness
-# in a broader Monte Carlo setup. Thereafter, various error measures are calculated within each iteration,
-# whereupon these error values are appropriately aggregated and graphed into a single cohesive graph.
+# in following a broader Monte Carlo setup. Thereafter, various error measures are calculated within 
+# each iteration, whereupon these error values are appropriately aggregated and graphed into a 
+# single cohesive graph.
 # ------------------------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup
@@ -39,7 +41,8 @@ currStatusVar <- "DefaultStatus1"
 timeVar <- "Date"
 
 # - Subset given dataset accordingly; an efficiency enhancement
-datCredit <- subset(datCredit_real, select=unique(c(stratifiers,targetVar,currStatusVar,timeVar)))
+datCredit <- subset(datCredit_real, select=unique(c(stratifiers,targetVar,currStatusVar,timeVar))) %>% drop_na()
+datCredit[is.na(get(targetVar)), .N] == 0 # should be true
 rm(datCredit_real); gc()
 
 # - Calculate prior probability of default event over all time on population. 
@@ -92,12 +95,12 @@ subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currS
   
   # - Downsample data into a set with a fixed size (using stratified sampling) before implementing resampling scheme
   set.seed(seed)
-  datCredit_smp <- datGiven %>% group_by(vars(stratifiers)) %>% slice_sample(prop=smp_perc) %>% as.data.table()
+  datCredit_smp <- datGiven %>% group_by(across(all_of(stratifiers))) %>% slice_sample(prop=smp_perc) %>% as.data.table()
   datCredit_smp[, Ind := 1:.N] # prepare for resampling scheme
   
   # - Implement resampling scheme using given main sampling fraction
   set.seed(seed)
-  datCredit_train <- datCredit_smp %>% group_by(vars(stratifiers)) %>% slice_sample(prop=smp_frac) %>% as.data.table()
+  datCredit_train <- datCredit_smp %>% group_by(across(all_of(stratifiers)))  %>% slice_sample(prop=smp_frac) %>% as.data.table()
   datCredit_valid <- subset(datCredit_smp, !(Ind %in% datCredit_train$Ind)) %>% as.data.table()
   
   
@@ -169,7 +172,7 @@ subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currS
 
 # - Testing function call
 ptm <- proc.time() #IGNORE: for computation time calculation
-subSmp_strat(smp_size=100000, smp_frac=smp_frac, seed=1, 
+subSmp_strat(smp_size=1500000, smp_frac=smp_frac, seed=1, 
              stratifiers=stratifiers, targetVar=targetVar, currStatusVar=currStatusVar, timeVar=timeVar, 
              prior_pop=prior_pop, eventRate_pop=eventRate_pop, datGiven=datCredit)
 proc.time() - ptm  #IGNORE: for computation time calculation

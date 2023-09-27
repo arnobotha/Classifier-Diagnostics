@@ -40,7 +40,6 @@ require(zoo)
 # for analyses & modelling
 require(Hmisc)
 require(survival) # for survival modelling
-#require(splitstackshape) # for stratified sampling # Marked for deletion
 
 #for plots
 require(ggplot2)
@@ -110,10 +109,6 @@ if (Sys.getenv("USERNAME") == "WRQ") {
 
 
 
-
-
-
-
 # ================ 2. Custom functions
 
 # ------ Custom function definitions
@@ -125,4 +120,3 @@ source(paste0(path_cust,'DelinqM.R'))
 
 # - Compile the TruEnd-suite of evaluation (and auxiliary) functions
 source(paste0(path_cust,'TruEnd.R'))
-
