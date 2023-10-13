@@ -46,17 +46,6 @@
 
 ptm <- proc.time() # for runtime calculations (ignore)
 
-# --- 1.1. Macroeconomic history + forecasts from FNB Group Economics | monthly data
-# Import, then recast data into a more pliable data.table object for greater memory efficiency, during which the
-# key is set based on preliminary analysis on the data grain (itself tested later again)
-macro_data_m <- as.data.table(read_sas(paste0(genRawPath,"macro_data_monthly.sas7bdat")), stringsAsFactors=T,
-                              key=c("EffectiveDate", "Scenario"))
-
-# --- 1.2. Macroeconomic history + forecasts from FNB Group Economics | quarterly data
-# Import, then recast data into a more pliable data.table object for greater memory efficiency, during which the
-# key is set based on preliminary analysis on the data grain (itself tested later again)
-macro_data_q <- as.data.table(read_sas(paste0(genRawPath,"macro_data_quarterly.sas7bdat")), stringsAsFactors=T,
-                              key=c("EffectiveDate", "Scenario"))
 
 # -- ensure dates are correctly converted
 macro_data_m[, Date_T := as.POSIXct(EffectiveDate, format="%Y-%m-%d")]
@@ -251,9 +240,6 @@ datMV <- macro_data_hist[,list(Date=as.Date(Date_T, format="%Y-%m-%d"),
                                         M_RealGDP_Growth = round(RealGDP_Rate/100,digits=4),
                                         M_RealIncome_Growth = round(RealIncome_Rate/100,digits=4))]
 
-# - Clean-up
-rm(macro_data, macro_data_hist, macro_data_m, macro_data_q); gc()
-
 
 # --- b. Test the correlation between the "raw" and scaled MVs
 # AB: Marked for deletion, though this bit of analysis can be moved to a short ancillary script if you'd like.
@@ -277,6 +263,13 @@ rm(macro_data, macro_data_hist, macro_data_m, macro_data_q); gc()
 # AB: Marked for deletion
 #dat_ClDiag_MVs[, `:=`(Repo_Rate_I = NULL, Inflation_I = NULL, DTI_I = NULL, Employment_I = NULL,
  #                     RealGDP_I = NULL, RealIncome_I = NULL)]
+
+
+
+# ------ 5. General cleanup & checks
+
+# - Clean-up
+rm(macro_data, macro_data_hist, macro_data_m, macro_data_q)
 
 # - Save to disk (zip) for quick disk-based retrieval later
 pack.ffdf(paste0(genPath, "datMV"), datMV); gc()

@@ -1,8 +1,8 @@
-# =============================== RESAMPLING SCHEMES FOR SURVIVAL MODELS ===============================
+# ============================= SUBSAMPLING & RESAMPLING SCHEME FOR PD MODELS ==========================
 # Determining the effect of a wide range of subsample sizes within a resampling scheme amidst a 
-# cross-sectional modelling setup
+# cross-sectional modelling setup (PD-modelling)
 # ------------------------------------------------------------------------------------------------------
-# PROJECT TITLE: Default survival modelling
+# PROJECT TITLE: Classifier Diagnostics
 # SCRIPT AUTHOR(S): Dr Arno Botha
 
 # DESCRIPTION:
@@ -14,15 +14,19 @@
 # single cohesive graph.
 # ------------------------------------------------------------------------------------------------------
 # -- Script dependencies:
-#   - 0.Setup
-#   - 2f.Data_Fusion1
+#   - 0.Setup.R
+#   - 1.Data_Import.R
+#   - 2a.Data_Prepare_Credit_Basic.R
+#   - 2b.Data_Prepare_Credit_Advanced.R
+#   - 2c.Data_Prepare_Credit_Advanced2.R
+#   - 2d.Data_Enrich.R
+#   - 2f.Data_Fusion1.R
 
 # -- Inputs:
-#   - datCredit_real | Prepared from script 2d.
+#   - datCredit_real | Prepared from script 2f.
 #
 # -- Outputs:
-#   - Difference graph across subsample sizes, where 'difference' is the value of an error measure 
-#       between prior probabilities across resampled sets (full:training)
+#   - Graph: Mean error rates across subsample sizes
 # ------------------------------------------------------------------------------------------------------
 
 
@@ -30,11 +34,11 @@
 
 # ------ 1. Preliminaries
 
-# - Load in Dataset
+# - Confirm prepared datasets are loaded into memory
 if (!exists('datCredit_real')) unpack.ffdf(paste0(genPath,"creditdata_final4a"), tempPath)
 
 # - Subsampling & resampling parameters
-smp_frac <- 0.7 # sampling fraction for resampling scheme
+train_prop <- 0.7 # sampling fraction for resampling scheme
 stratifiers <- c("DefaultStatus1_lead_12_max", "Date") # Must at least include target variable used in graphing event rate
 targetVar <- "DefaultStatus1_lead_12_max"
 currStatusVar <- "DefaultStatus1"
@@ -74,7 +78,7 @@ seed_v <- c(1:100)
 
 # --- Defines function for applying a subsampled resampling scheme given parameters on given data
 # This function serves as an "outer job" to be called within a multithreaded environment
-# - Inputs: smp_size: Subsample size; smp_frac: sampling fraction for resmpling scheme;
+# - Inputs: smp_size: Subsample size; train_prop: sampling fraction for resmpling scheme;
 # stratifiers: vector of stratification field names for n-way stratified sampling inner technique;
 # targetVar: outcome field name within cross-sectional modelling (also first element of [stratifiers]);
 # currStatusVar: current status field name within cross-sectional modelling for event rate calculations
@@ -82,7 +86,7 @@ seed_v <- c(1:100)
 # prior_pop: pre-calculated prior probability within population for error measurement
 # eventRate_pop: pre-calculated event rates over time within population for error measurement
 # datGiven: given dataset from which to subsample and resample
-subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currStatusVar=NA, timeVar=NA, seed=123, 
+subSmp_strat <- function(smp_size, train_prop, stratifiers=NA, targetVar=NA, currStatusVar=NA, timeVar=NA, seed=123, 
                          prior_pop=NA, eventRate_pop=NA, datGiven) {
   
   # - Preliminaries: Error Checks
@@ -100,7 +104,7 @@ subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currS
   
   # - Implement resampling scheme using given main sampling fraction
   set.seed(seed)
-  datCredit_train <- datCredit_smp %>% group_by(across(all_of(stratifiers)))  %>% slice_sample(prop=smp_frac) %>% as.data.table()
+  datCredit_train <- datCredit_smp %>% group_by(across(all_of(stratifiers)))  %>% slice_sample(prop=train_prop) %>% as.data.table()
   datCredit_valid <- subset(datCredit_smp, !(Ind %in% datCredit_train$Ind)) %>% as.data.table()
   
   
@@ -120,7 +124,7 @@ subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currS
   err_priorProb_SqrdErr <- (prior_pop - prior_train)^2 # squared error
   
   # - create output table (preliminary)
-  datTemp <- data.table("SubSampleSize"=smp_size, "SampleFrac"=smp_frac, "Stratifiers"=paste(stratifiers, collapse="; "),
+  datTemp <- data.table("SubSampleSize"=smp_size, "SampleFrac"=train_prop, "Stratifiers"=paste(stratifiers, collapse="; "),
                         "Seed"=seed, "Err_PriorProb_AE" = err_priorProb_AE, "Err_PriorProb_SqrdErr" = err_priorProb_SqrdErr)
   
   
@@ -172,7 +176,7 @@ subSmp_strat <- function(smp_size, smp_frac, stratifiers=NA, targetVar=NA, currS
 
 # - Testing function call
 ptm <- proc.time() #IGNORE: for computation time calculation
-subSmp_strat(smp_size=1500000, smp_frac=smp_frac, seed=1, 
+subSmp_strat(smp_size=1500000, train_prop=train_prop, seed=1, 
              stratifiers=stratifiers, targetVar=targetVar, currStatusVar=currStatusVar, timeVar=timeVar, 
              prior_pop=prior_pop, eventRate_pop=eventRate_pop, datGiven=datCredit)
 proc.time() - ptm  #IGNORE: for computation time calculation
@@ -201,7 +205,7 @@ datResults <- foreach(it=1:(length(seed_v)*length(smp_size_v)), .combine='rbind'
     iSize <- (it-1) %/% length(seed_v) + 1 # integer-valued division
     
     # - Iterate 
-    temp <-subSmp_strat(smp_size=smp_size_v[iSize], smp_frac=smp_frac, seed=seed_v[iSeed],
+    temp <-subSmp_strat(smp_size=smp_size_v[iSize], train_prop=train_prop, seed=seed_v[iSeed],
                         stratifiers=stratifiers, targetVar=targetVar, currStatusVar=currStatusVar, timeVar=timeVar,
                         prior_pop=prior_pop, eventRate_pop=eventRate_pop, datGiven=datCredit)
     
@@ -249,12 +253,12 @@ datGraph[, EventRate_MAE_TrainValid_Mean_lower := EventRate_TrainValid_MAE_Mean 
 datGraph[, EventRate_MAE_TrainValid_Mean_upper := EventRate_TrainValid_MAE_Mean + EventRate_MAE_TrainValid_Mean_ErrMargin]
 
 # - Create summary table for annotations within graph
-datAnnotate <- datGraph[SubSampleSize %in% c(100000,150000,250000,375000,500000,750000,1000000,1250000, 1500000,2000000,
-                                             3000000,4000000,5000000,10000000), 
+datAnnotate <- datGraph[SubSampleSize %in% c(100000,150000,250000,375000,500000,625000,750000,875000, 1000000,1250000,1500000,1750000,
+                                             2000000,2500000,4000000,5000000,10000000), 
                         list(`"Size "*italic(s)`=comma(SubSampleSize), 
-                             `italic(E)(epsilon(italic(s)))*" for "*italic(D):italic(D[T])`=paste0(sprintf("%.3f", EventRate_PopTrain_MAE_Mean*100),"%"),
+                             `italic(E)*"["*epsilon(italic(s))*"] for "*italic(D):italic(D[T])`=paste0(sprintf("%.3f", EventRate_PopTrain_MAE_Mean*100),"%"),
                              `95% CI`=paste0("± ",sprintf("%.4f",EventRate_MAE_PopTrain_Mean_ErrMargin*100),"%"),
-                              `italic(E)(epsilon(italic(s)))*" for "*italic(D[T]):italic(D[V])`=paste0(sprintf("%.3f", EventRate_TrainValid_MAE_Mean*100),"%"),
+                              `italic(E)*"["*epsilon(italic(s))*"] for "*italic(D[T]):italic(D[V])`=paste0(sprintf("%.3f", EventRate_TrainValid_MAE_Mean*100),"%"),
                              `95% CI`=paste0("± ",sprintf("%.4f",EventRate_MAE_TrainValid_Mean_ErrMargin*100),"%"))]
 
 # SCRATCH
@@ -275,6 +279,29 @@ datGraph2_upper <- pivot_longer(datGraph[,list(SubSampleSize, a_EventRate_PopTra
 datGraph2_margins <- merge(datGraph2_lower, datGraph2_upper, by=c("SubSampleSize", "Set"))
 datGraph3 <- merge(datGraph2, datGraph2_margins, by=c("SubSampleSize", "Set"))
 
+# - Find elbow point where differential between subsequent error values becomes negligible
+# I.e., find x where 2nd derivative of f(x) is near zero
+datEventRate_PopTrain_1st <- datGraph[order(SubSampleSize), list(Gradient = diff(EventRate_PopTrain_MAE_Mean) / diff(SubSampleSize))]$Gradient
+datEventRate_TrainValid_1st <- datGraph[order(SubSampleSize), list(Gradient = diff(EventRate_TrainValid_MAE_Mean) / diff(SubSampleSize))]$Gradient
+# plot(diff(datEventRate_PopTrain_1st), type="b", main="2nd derivative") % 2nd derivative is not smooth
+# plot(diff(datEventRate_TrainValid_1st), type="b", main="2nd derivative") # 2nd derivative is neither smooth nor monotonic
+# Find index of stationary points x such that f''(x) <= epislon
+statPoint_PopTrain <- which(diff(datEventRate_PopTrain_1st) < 10^(-10.25))[1]
+statPoint_TrainValid <- which(diff(datEventRate_TrainValid_1st) < 10^(-10.5))[1] # 2nd derivative is neither smooth nor monotonic
+statPoint_TrainValid <- which(abs(datEventRate_TrainValid_1st) < 10^(-9))[1]
+# Find corresponding x-values at index
+SubSamp_PopTrain <- datGraph$SubSampleSize[statPoint_PopTrain+1] # (x + 1 to correspond to indices of original vector)
+SubSamp_TrainValid <- datGraph$SubSampleSize[statPoint_TrainValid+1] # (x + 1 to correspond to indices of original vector)
+# Find corresponding y-values at index
+Err_PopTrain <- datGraph$EventRate_PopTrain_MAE_Mean[statPoint_PopTrain+1] # (x + 1 to correspond to indices of original vector)
+Err_TrainValid <- datGraph$EventRate_TrainValid_MAE_Mean[statPoint_TrainValid+1] # (x + 1 to correspond to indices of original vector)
+
+# - Create elbow annotation object
+datAnnotate_elbow <- data.table(Set=c("a_EventRate_PopTrain", "b_EventRate_TrainValid"), 
+                                SubSampleSize=c(SubSamp_PopTrain, SubSamp_TrainValid), Value=c(Err_PopTrain,Err_TrainValid),
+                                Label=paste0( c(comma(SubSamp_PopTrain/1000000), comma(SubSamp_TrainValid/1000000)), "m") )
+
+
 # Aesthetic engineering
 datGraph3[, Facet_label := factor("'Comparison of 12-month default rate series across sets: '*(italic(D):italic(D[T]))*' ; '*(italic(D[T]):italic(D[V]))")]
 
@@ -290,17 +317,23 @@ label.v2 <- list(expression(italic(D)*" vs "*italic(D[T])),
 
 # - Create main graph
 (g1 <- ggplot(datGraph3, aes(x=SubSampleSize, y=Value, group=Set)) + theme_minimal() + 
-  labs(x=bquote("Subsample size "*italic(s)*" = |"*italic(D[S])*"|"), y=bquote("Error measure value "*epsilon(italic(s))*" (%)")) + 
+  labs(x=bquote("Subsample size "*italic(s)*" = |"*italic(D[S])*"|"), y=bquote("Error measure value "*italic(E)*'['*epsilon(italic(s))*"] (%)")) + 
   theme(text=element_text(family=chosenFont),legend.position = "bottom",
         axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
         strip.background=element_rect(fill="snow2", colour="snow2"),
         strip.text=element_text(size=8, colour="gray50"), strip.text.y.right=element_text(angle=90)) + 
+  # annotate elbow/stationary point beyond which error measure decreases markedly slower
+  geom_point(data=datAnnotate_elbow, aes(x=SubSampleSize, y=Value, colour=Set), shape=1, size=5, show.legend=F) +
+  geom_segment(data=datAnnotate_elbow, aes(x=SubSampleSize, xend=SubSampleSize, y=0, yend=Value, colour=Set),
+               show.legend=F, linewidth=0.3, linetype="dashed") + 
+  geom_label(data=datAnnotate_elbow, aes(x=SubSampleSize, label=Label, y=Value, colour=Set), show.legend = F, 
+             nudge_y=0.0002, nudge_x=1050000, size=2) + 
   # main line graph with overlaid points
   geom_ribbon(aes(x=SubSampleSize, ymin=Value_Lower, ymax=Value_Upper, fill=Set), alpha=0.5) + 
   geom_line(aes(colour=Set, linetype=Set), linewidth=0.5) + 
   geom_point(aes(x=SubSampleSize, y=Value, colour=Set, shape=Set), size=1.3) + 
-  #geom_errorbar(aes(x=SubSampleSize, ymin=Value_Lower, ymax=Value_Upper),width=1, position=position_dodge(0.1), linetype="solid", colour="gray") +
-  annotate(geom="table", x=2500000, y=0.013, family=chosenFont, size=3,
+  # annotate data table
+  annotate(geom="table", x=4000000, y=0.011, family=chosenFont, size=2.9,
              label=datAnnotate, parse=T) +
   # facets & scale options
   facet_grid(Facet_label ~ ., labeller=label_parsed) + 
@@ -315,5 +348,6 @@ label.v2 <- list(expression(italic(D)*" vs "*italic(D[T])),
 # - Save graph
 ggsave(g1, file=paste0(genFigPath, "DefaultRates_SubSampleRates_Experiment.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
-# - Clenaup
-rm(datCredit); gc()
+# - Cleanup
+rm(datCredit, datGraph2, datGraph2_lower, datGraph2_upper, datGraph2_margins, datResults, datGraph3, datAnnotate, datAnnotate_elbow, g1)
+gc()

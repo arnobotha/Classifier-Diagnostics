@@ -22,7 +22,7 @@
 # =======================================================================================
 
 
-
+# AB (2023-09-12): Questionable, given that script 2f already performs much (if not all) of this.
 
 
 # ------- 1. Fuse the macroeconomic data with the credit data

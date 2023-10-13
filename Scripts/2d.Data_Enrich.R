@@ -23,6 +23,7 @@
 # NOTE: This script predominantly comes from another project (Kasmeer), but with following changes:
 #   - removed creation of [Partition]-field
 #   - removed g1-measure variant of certain fields, opting only for the g0-measure
+#   - added checkpoints between default spell creation and performing spell creation
 # =======================================================================================
 
 
@@ -33,6 +34,7 @@ ptm <- proc.time() # for runtime calculations (ignore)
 
 # - Confirm prepared credit data is loaded into memory
 if (!exists('datCredit_real')) unpack.ffdf(paste0(genPath,"creditdata_final2"), tempPath)
+if (!exists('maxDate_observed')) maxDate_observed <- max(datCredit_real$Date, na.rm=T)
 
 
 # --- 1.1. Abstract terminal event types & times at the account-level
@@ -400,11 +402,19 @@ datCredit_real <- datCredit_real %>%
            HasLeftTruncDefSpell, .after=DefaultStatus1) %>%
   relocate(DefSpell_Key, .after=LoanID)
 
+# - Save to disk (zip) for quick disk-based retrieval later
+pack.ffdf(paste0(genPath,"creditdata_final2b"), datCredit_real)
+pack.ffdf(paste0(genObjPath,"matState_g0"), matState_g0);
+
 
 
 
 
 # ------- 3. Platform-aligned Advanced Feature engineering & Enrichment | Realised loss severity (LGW)
+
+# - Confirm prepared credit data is loaded into memory
+if (!exists('datCredit_real')) unpack.ffdf(paste0(genPath,"creditdata_final2b"), tempPath)
+if (!exists('matState_g0')) unpack.ffdf(paste0(genObjPath,"matState_g0"), tempPath)
 
 # --- 3.1 Find the starting point of the last default spell prior write-off
 
@@ -573,6 +583,9 @@ cat( check_5_real %?% "SAFE: Zero-loss-on-cure assumption successfully imposed s
 # - Cleanup
 rm(datLGD_L, test); gc()
 
+# - Save to disk (zip) for quick disk-based retrieval later
+pack.ffdf(paste0(genPath,"creditdata_final2c"), datCredit_real)
+
 
 
 
@@ -580,6 +593,9 @@ rm(datLGD_L, test); gc()
 # ------- 4. Platform-aligned Advanced Feature engineering & Enrichment | Performing spells
 
 # --- 4.0 Preliminaries & intermediary fields
+
+# - Confirm prepared credit data is loaded into memory
+if (!exists('datCredit_real')) unpack.ffdf(paste0(genPath,"creditdata_final2c"), tempPath)
 
 # - Delete variables from dataset if they already exist (useful during debugging)
 suppressWarnings({
@@ -595,12 +611,12 @@ suppressWarnings({
 
 # - Performing spell counter
 # Each moment of entering default is also the terminal event for a performing spell/duration
-# Therefore, lag the default-episode number (>=0) by 1 period backwards. Wherever this lagged counter changes,
-# we know a new default episode has started, thereby ending the previous performing spell.
-# Then, add 1 to the counter so that it starts at 1 (DefSpell_Num starts at 0)
+# Therefore, lag the default-episode number (>=0) by 1 period backwards. Wherever this lagged quantity changes from
+# its previous value, we know a new default episode has started, thereby ending the previous performing spell (if it exists).
+# Then, add 1 to the counter so that the performing spell starts at 1 (since we fill the NA-parts within the lagged quantity with 0 )
 datCredit_real[ExclusionID==0, PerfSpell_Num := coalesce(shift(DefSpell_Num, n=1, type="lag", fill=0),0) + 1, by=list(LoanID)]
 # Now, void the performing spell counter whenever the account is in actual default, except for time-in-default = 1,
-# unless it's the first record of a left-truncated account that is currently in default at the start of observation. 
+# or unless it's the first record of a left-truncated account that is currently in default at the start of observation. 
 # Otherwise we'll accidentally override our own mechanism for indicating end-of-time for the current performing spell
 # This operation should also cater for episodic delinquency (re-defaults) as well
 datCredit_real[ExclusionID==0 & DefaultStatus1==1 & (TimeInDefSpell > 1 | Counter==1), PerfSpell_Num := NA]
@@ -731,12 +747,11 @@ datCredit_real <- datCredit_real %>%
 
 # [SANITY CHECK] Confirm dataset's grain
 check_cred3b <- datCredit_real[,list(Freqs = .N), by=list(LoanID, Date)][Freqs > 1,.N]
-cat( (check_cred3b == 0) %?% cat('SAFE: Grain of {datCredit_real} confirmed.\n') %:% 
-       cat(paste0('ERROR: Grain broken in {datCredit_real} for ', check_cred3b, " cases.\n")) )
+cat( (check_cred3b == 0) %?% 'SAFE: Grain of {datCredit_real} confirmed.\n' %:% 
+       paste0('ERROR: Grain broken in {datCredit_real} for ', check_cred3b, " cases.\n") )
 
 # - Save to disk (zip) for quick disk-based retrieval later
 pack.ffdf(paste0(genPath,"creditdata_final3"), datCredit_real)
-pack.ffdf(paste0(genObjPath,"matState_g0"), matState_g0);
 
 # - Cleanup
 rm(matState_g0, advance_adjterm_v_real); gc()

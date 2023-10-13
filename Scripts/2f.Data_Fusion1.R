@@ -1,15 +1,20 @@
 # ===================================== DATA FUSION =====================================
-# Basic fusion between credit dataset and macroeconomic dataset
+# Applying exclusions, data fusion between credit and macroeconomic datasets, followed by
+# engineering some basic features that must precede any (non-clustered) subsampling
 # ---------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer
+# SCRIPT AUTHOR(S): Dr Arno Botha
 
 # DESCRIPTION:
 # This script performs the following high-level tasks:
-#   1) Removes a few variables that are unlikely to be useful within the context of 
+#   1) Apply preliminary exclusions and assess impact using event rate
+#   2a) Removes a few variables that are unlikely to be useful within the context of 
 #      analysing/modelling of default risk.
-#   2) Fuses macroeconomic data unto the main credit dataset
-#   3) Creates a preliminary target/outcome variable for modelling default risk
+#   2b) Fuses macroeconomic data unto the main credit dataset
+#   3a) Creates a preliminary target/outcome variable for modelling default risk,
+#       itself used in tracking influence of exclusions
+#   3b) Engineers a few basic features that require entire loan histories, given
+#       the intended (non-clustered) subsampling scheme in script 3-series
 # ---------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
@@ -18,14 +23,14 @@
 #   - 2b.Data_Prepare_Credit_Advanced.R
 #   - 2c.Data_Prepare_Credit_Advanced2.R
 #   - 2d.Data_Enrich.R
-#   - 2f.Data_Fusion1.R
+#   - 2e.Data_Prepare_Macro.R
 #
 # -- Inputs:
 #   - datCredit_real | Prepared credit data from script 2d
 #   - datMV | Prepared macroeconomic dataset from script 2e
 #
 # -- Outputs:
-#   - datCredit_allBasic | enriched credit dataset, fused with various input fields
+#   - datCredit_real | enriched credit dataset, fused with base macroeconomic variables
 # =======================================================================================
 
 
@@ -38,23 +43,59 @@ ptm <- proc.time() # for runtime calculations (ignore)
 # - Confirm prepared datasets are loaded into memory
 if (!exists('datCredit_real')) unpack.ffdf(paste0(genPath,"creditdata_final3"), tempPath)
 if (!exists('datMV')) unpack.ffdf(paste0(genPath,"datMV"), tempPath)
+if (!exists('datExclusions')) unpack.ffdf(paste0(genObjPath,"Exclusions-TruEnd"), tempPath)
+
+# - Population-level prevalence rate and record tally before any Exclusions
+# NOTE: choose default prior probability as measure for evaluating impact
+classPrior_Pop <- datCredit_real[, sum(DefaultStatus1, na.rm=T)]/datCredit_real[!is.na(DefaultStatus1), .N]
+recCount_start <- datCredit_real[,.N]
+
+# - Add a starting line for Exclusions table
+datExclusions <- rbind(data.table(Excl_ID=NA, Reason="Base dataset", Impact_Account=0, Impact_Dataset=0, Impact_records=0),
+                       datExclusions)
+
+# - Define data structure for vectors wherein impacts of Exclusions are to be captured
+excl_count <- datExclusions[!is.na(Excl_ID), .N]; vecExcl <- datExclusions[!is.na(Excl_ID), Excl_ID]
+recCount_impact <- rep(0, excl_count); classPrior_remainRecs <- copy(recCount_impact); 
+recCount_remain <- copy(recCount_impact); excl_impactRelat <- copy(recCount_impact)
+
+# - Iterate through each listed Exclusion and assess impact
+for (i in 1:excl_count) {
+  recCount_impact[i] <- datCredit_real[ExclusionID == vecExcl[i], .N]
+  recCount_remain[i] <- datCredit_real[ExclusionID > vecExcl[i] | ExclusionID == 0, .N]
+  # [SANITY CHECK] Does record tallies remain logical and correct as we progress through ExclusionIDs?
+  if (recCount_remain[i] == recCount_start - sum(recCount_impact[1:i])) cat('SAFE\t') else cat('ERROR\t') # TRUE = safe
+  # Impact on event prevalence (Default prior probability)
+  classPrior_remainRecs[i] <- datCredit_real[ExclusionID > vecExcl[i] | ExclusionID == 0, sum(DefaultStatus1, na.rm=T)] /
+    datCredit_real[ExclusionID > vecExcl[i] | ExclusionID == 0 & !is.na(DefaultStatus1), .N] 
+  # Relative impact on dataset (row-wise) given proposed sequential application of exclusions
+  excl_impactRelat[i] <- recCount_impact[i] / recCount_remain[i]
+}
+
+# - Enrich Exclusions Table with new fields
+datExclusions[, Records_Remain := c(recCount_start, recCount_remain)]
+datExclusions[, Impact_Dataset_Cumul := c(NA, percent(excl_impactRelat, accuracy = 0.001))]
+datExclusions[, ClassPrior_Remain := percent(c(classPrior_Pop, classPrior_remainRecs), accuracy = 0.001)]
+datExclusions[, classPrior_Remain_Diff := c(NA,percent(diff(c(classPrior_Pop,classPrior_remainRecs)), accuracy = 0.001))]
+
+# - Store experimental objects | Memory optimisation
+pack.ffdf(paste0(genObjPath,"Exclusions-TruEnd-Enriched"), datExclusions);
 
 # - Check the impact of the exclusions from script 2d | RECORD-LEVEL
 (exclusions_credit <- datCredit_real[ExclusionID != 0, .N] / datCredit_real[, .N] * 100)
-# Exclusion's impact: 6.0530%
+# Exclusions' impact: 5.88%
 
-# - Check the combined impact for possible overlaps | RECORD-LEVEL
-(exclusions_all <- datCredit_real[ExclusionID != 0 | is.na(PerfSpell_Num), .N] / datCredit_real[, .N] * 100)
-# Total exclusions' impact: 10.6505%
-
-# - Now apply the exclusions (but keep the default exposures)
+# - Now apply the exclusions
 datCredit_real <- subset(datCredit_real, ExclusionID == 0); gc()
 
-# - Checks
-sum(datCredit_real$ExclusionID > 0) == 0 # check - success
+# - Successful?
+cat( (datCredit_real[ExclusionID > 0, .N] == 0) %?% "SAFE: Exclusions applied successfully.\n" %:%
+       "WARNING: Some Exclusions failed to apply.\n")
 
 # - Remove unnecessary variables
 datCredit_real <- subset(datCredit_real, select = -c(ExclusionID))
+
+
 
 
 
@@ -65,25 +106,22 @@ datCredit_real <- subset(datCredit_real, select = -c(ExclusionID))
 
 # - Remove fields that will not likely be used in the eventual analysis/modelling of default risk, purely to save memory
 names(datCredit_real)
-# AB: Commented fields marked for deletion. I strongly suspect these will be useful in exploratory analysis, if not modelling
-# Further, we'll optimise for memory via the subsampled resampling scheme later
-# Unless we need to discuss, the uncommented parts can be grouped together neatly while deleting the commented fields
 datCredit_real <- subset(datCredit_real, 
                          select = -c(Age, #PerfSpell_Key, New_Ind, Max_Counter, Date_Origination, Principal,
                                      AccountStatus, #Instalment, Arrears, 
                                      DelinqState_g0, #DefaultStatus1, DefSpell_Num, TimeInDefSpell,
                                      DefSpell_LeftTrunc, DefSpell_Event, DefSpell_Censored,
                                      DefSpellResol_TimeEnd, #DefSpell_Age, DefSpellResol_Type_Hist,
-                                     HasLeftTruncPerfSpell, DefSpell_LastStart, ReceiptPV, LossRate_Real,
+                                     DefSpell_LastStart, ReceiptPV, LossRate_Real, #HasLeftTruncPerfSpell, 
                                      PerfSpell_LeftTrunc, PerfSpell_Event, PerfSpell_Censored,
                                      PerfSpell_TimeEnd, #PerfSpellResol_Type_Hist,
-                                     HasLeftTruncDefSpell, Account_Censored, #Event_Time, Event_Type,
+                                     Account_Censored, #Event_Time, Event_Type, HasLeftTruncDefSpell,
                                      HasTrailingZeroBalances, ZeroBal_Start, NCA_CODE, STAT_CDE, LN_TPE,
                                      #DefSpell_Key, DefSpell_Counter, PerfSpell_Counter,
-                                     HasWOff, WriteOff_Amt, HasSettle, EarlySettle_Amt, HasFurtherLoan, HasRedraw,
+                                     HasWOff, WriteOff_Amt, HasSettle, EarlySettle_Amt, # HasFurtherLoan, HasRedraw,
                                      HasClosure, CLS_STAMP, Curing_Ind, BOND_IND, Undrawn_Amt, # TreatmentID,
                                      slc_past_due_amt, WOff_Ind, EarlySettle_Ind, #PerfSpell_Num, PerfSpell_Age,
-                                     FurtherLoan_Amt, FurtherLoan_Ind, Redrawn_Ind, Redrawn_Amt, Repaid_Ind, HasRepaid)); gc()
+                                     FurtherLoan_Amt, FurtherLoan_Ind, Redraw_Ind, Redrawn_Amt, Repaid_Ind, HasRepaid)); gc()
 
 # - Merge on Date by performing a left-join
 datCredit_real <- merge(datCredit_real, datMV, by="Date", all.x=T); gc()
@@ -99,14 +137,20 @@ for (i in 1:length(list_merge_variables)){
   output <- sum(is.na(datCredit_real$list_merge_variables[i]))
   results_missingness[[i]] <- output
 }
-length(which(results_missingness > 0)) == 0 # confirmed, no missing values
+cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fusion with macroeconomic data is successful.\n" %:%
+       "WARNING: Missingness in certain macroecnomic fields detected, fusion compromised.\n")
 
-# - Clean-up
-rm(datMV, list_merge_variables, results_missingness); gc()
+# - Cleanup
+rm(datMV); gc()
 
 
 
-# ------- 3. Create preliminary target/outcome variables for stated modelling objective
+
+# ------- 3. Feature Engineering that needs entire loan histories
+
+# --- Create preliminary target/outcome variables for stated modelling objective
+# NOTE: This particular field is instrumental to designing the subsampling & resampling scheme,
+# as well as in tracking the impact of exclusions
 
 # - Creating 12-month default indicators using the worst-ever approach
 # NOTE: This step deliberately spans both performing and default spells
@@ -114,15 +158,27 @@ rm(datMV, list_merge_variables, results_missingness); gc()
 # Uses the custom function "imputLastKnown" defined in script 0
 datCredit_real[, DefaultStatus1_lead_12_max := imputeLastKnown(frollapply(x=DefaultStatus1, n=13, align="left", FUN=max)), by=list(LoanID)]
 datCredit_real$DefaultStatus1_lead_12_max %>% table() %>% prop.table() 
-### RESULTS: 92.04% of observations had not defaulted in the next 12 months from reporting date, whilst 7.96% of accounts had.
+### RESULTS: 91.93% of observations have not defaulted in the next 12 months from reporting date, whilst 8.07% of accounts have.
 
 # - Relocate variable next to current default status variable
 datCredit_real <- datCredit_real %>% relocate(DefaultStatus1_lead_12_max, .after=DefaultStatus1)
 
 
+# --- Delinquency-themed
+# - Embed previous defaults into a new Boolean-valued input variable
+datCredit_real[, PrevDefaults := ifelse(all(is.na(PerfSpell_Num)), F, max(PerfSpell_Num,na.rm = T) > 1), by=list(LoanID)]
+cat( (datCredit_real[is.na(PrevDefaults), .N] == 0) %?% "SAFE: No missingness, [PrevDefaults] created successful.\n" %:%
+       "WARNING: Missingness detected, [PrevDefaults] compromised.\n")
+describe(datCredit_real$PrevDefaults)
+describe(datCredit_real[Counter==1, PrevDefaults])
+### RESULTS: 11.6% of records had previous defaults, which is 6.9% of accounts
 
 
-# ------- 4. Pack objects to disk
+
+
+# ------ 4. General cleanup & checks
+# - Clean-up
+rm(list_merge_variables, results_missingness)
 
 # - Save to disk (zip) for quick disk-based retrieval later
 pack.ffdf(paste0(genPath, "creditdata_final4a"), datCredit_real); gc()
