@@ -195,7 +195,7 @@ cat( check3 %?% 'SAFE: Interpolation successful with no residual missingness whe
 # --- c. Scaling
 
 # - create scaled "indices" of each macroeconomic variable
-# AB: Following marked for deletion.
+### AB: Following marked for deletion.
 # uses custom interpolation function "scaler.norm()" defined in 0.Setup
 # macro_data_hist[, Inflation_I := scaler.norm(Inflation)]
 # macro_data_hist[, Repo_Rate_I := scaler.norm(Repo_Rate)]
@@ -230,7 +230,7 @@ cat( check3 %?% 'SAFE: Interpolation successful with no residual missingness whe
 
 # - Subsample monthly historical macroeconomic information with some light data preparation
 datMV <- macro_data_hist[,list(Date=as.Date(Date_T, format="%Y-%m-%d"),
-                                        # AB: Following marked for deletion
+                                        ### AB: Following marked for deletion
                                         #Repo_Rate_I, Inflation_I, DTI_I, Employment_I, 
                                         #RealGDP_I, RealIncome_I, 
                                         M_Repo_Rate = Repo_Rate/100, 
@@ -242,7 +242,7 @@ datMV <- macro_data_hist[,list(Date=as.Date(Date_T, format="%Y-%m-%d"),
 
 
 # --- b. Test the correlation between the "raw" and scaled MVs
-# AB: Marked for deletion, though this bit of analysis can be moved to a short ancillary script if you'd like.
+### AB: Marked for deletion, though this bit of analysis can be moved to a short ancillary script if you'd like.
 #cor(dat_ClDiag_MVs$Repo_Rate_I, dat_ClDiag_MVs$M_Repo_Rate)
 # Correlation - 100%
 #cor(dat_ClDiag_MVs$Inflation_I, dat_ClDiag_MVs$M_Inflation_Growth)
@@ -257,10 +257,10 @@ datMV <- macro_data_hist[,list(Date=as.Date(Date_T, format="%Y-%m-%d"),
 # Correlation - 99.99996%
 # Since the variables are all highly/perfectly correlated, no need to test both in a modelling statement
 # Therefore, choose the raw macroeconomic variables to use as features in the model
-# AB: Agreed.
+### AB: Agreed.
 
 # - Remove the scaled variants
-# AB: Marked for deletion
+### AB: Marked for deletion
 #dat_ClDiag_MVs[, `:=`(Repo_Rate_I = NULL, Inflation_I = NULL, DTI_I = NULL, Employment_I = NULL,
  #                     RealGDP_I = NULL, RealIncome_I = NULL)]
 
