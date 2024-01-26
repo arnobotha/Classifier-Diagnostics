@@ -40,9 +40,11 @@ require(zoo)
 # for analyses & modelling
 require(Hmisc)
 require(survival) # for survival modelling
+require(pROC); require(ROCR) # both for conducting ROC-analyses
 
 #for plots
 require(ggplot2)
+require(corrplot) # For correlation plots
 require(scales)
 require(ggthemes)
 require(ggpp) # Extensions to ggplot2, particularly geom_table
@@ -103,7 +105,16 @@ if (Sys.getenv("USERNAME") == "WRQ") {
   # - Common path for importing raw data
   genRawPath <- "E:/DataDump/FNB SLC/"
   
-} else {
+} else if (Sys.getenv("USERNAME") == "R5532132") {
+  # - Custom path where R-scripts are saved
+  path_cust <- "C:/Users/R5532132/OneDrive - FRG/Classifier-Diagnostics/Scripts/"
+  
+  # - Common path for storing important R-objects as back-up
+  genObjPath <- "C:/Users/R5532132/OneDrive - FRG/Classifier-Diagnostics/Objects/"
+  
+  # - Common path for saving important analytics (e.g., sampling)
+  genFigPath <- "C:/Users/R5532132/OneDrive - FRG/Classifier-Diagnostics/Figures/"
+}  else {
   stop("User-specific paths not set for current user: ", Sys.getenv("USERNAME"), ". Please fix in Setup script (0.Setup.R) before continuing")
 }
 

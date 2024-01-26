@@ -315,6 +315,156 @@ SICR_flag <- function(delinq, d, s) {
 
 
 
+# ------------------------- YEO-JOHNSON TRANSFORMATION ---------------------------
+# A function for applying Yeo-Johnson transformation to a given vector. The optimal transformation is selected based on either a normal log-likelihood
+# function of the transformed vector. The optimal transformation is thus chosen based on the best approximation to normality.
+# Input: [x]: a real-valued vector
+# Output:vector transformed with an optimal power transformation
+transform_yj <- function(x, bound_lower=-2, bound_upper=2, lambda_inc=0.5, verbose=FALSE, plotopt=FALSE, plotqq=FALSE, norm_test=FALSE){
+  # --- Unit test
+  # x <- 1560*rbeta(10000, shape1=1, shape2=20); hist(x)
+  # x <- rgamma(10000, shape=2, rate=5); hist(x) 
+  # bound_lower<--5; bound_upper<-5; lambda_inc<-0.5; verbose<-FALSE; plotopt<-TRUE; plotqq<-TRUE; norm_test=TRUE
+  
+  # - Preliminaries
+  require(MASS) # Ensure the requried pacakage in loaded of the Box-Cox function
+  lambda_search <- seq(from=bound_lower, to=bound_upper, by=lambda_inc) # Check if lambda_search exists and if not, assign a value: This parameter specifies the search space to obatin the optimal power transformation in th boxcox function
+  
+  # - Ensuring the plotting area is ready for possible plots 
+  par(mfcol=c(1,1))
+  
+  # - Selecting the optimal lambda1 parameter based on the choice of the loss function
+  lambda <- boxcox((x-min(x)+0.000001)~1,lambda=seq(from=bound_lower,to=bound_upper,by=lambda_inc), plotit=FALSE)
+  lambda_opt <- lambda$x[which.max(lambda$y)]
+  lambda_yj <- lambda_opt
+  
+  # - Applying the Yeo-Johnson transformation with the optimal lambda parameter
+  con1 <- as.integer(x>=0)*(lambda_yj!=0)
+  con2 <- as.integer(x>=0)*(lambda_yj==0) 
+  con3 <- as.integer(x<0)*(lambda_yj!=2)
+  con4 <- as.integer(x<0)*(lambda_yj==2)
+  
+  y <- ((con1*x+1)^lambda_yj-1)/(ifelse(lambda_yj!=0,lambda_yj,1)) + log(con2*x+1) - ((-con3*x+1)^(2-lambda_yj)-1)/(2-ifelse(lambda_yj!=2,lambda_yj,1)) - log(-con4*x+1)
+  
+  
+  # - Reporting the optimal lambda parameter, as well as the corresponding log-likelihood
+  cat('\nNOTE:\tThe optimal power-transformation is lambda1 = ', lambda_yj)
+  cat('\n \tThe optimal transformation has a log-likelihood =', round(max(lambda$y[which(lambda$x==lambda_yj)])), '\n')
+  
+  # - Plotting two qq-plots to show the normality of the given vector (x) before and after the optimal transformation 
+  if(plotqq==TRUE){
+    par(mfcol= c(1,2)); qqnorm(x); qqline(x, distribution = qnorm); qqnorm(y); qqline(y, distribution = qnorm);
+    par(mfcol=c(1,1)) # Resetting plotting graph dimensions
+  }
+  
+  # - Conducting a KS test for normality
+  if(norm_test){
+    ks_test_x <- ks.test(x, "pnorm")$p.value
+    ks_test_y <- ks.test(y, "pnorm")$p.value
+    
+    cat('\nNOTE:\tThe KS-test for normality on the un-transformed data yields a p-value of ', ks_test_x)
+    cat('\n \tThe KS-test for normality on the transformed data yields a p-value of ', ks_test_y)
+  }
+  
+  # - Return the transformed vector
+  cat('\n \n')
+  return(y)
+  #rm(x,y,bound_lower,bound_upper, verbose, plotopt, plotqq, lambda1, lambda2, lambda_search, norm_test)
+}
+
+# Some more testing conditions
+# transform_yj(x=1560*rbeta(10000, shape1=1, shape2=20), bound_lower=4, plotopt=TRUE)
+# transform_yj(x=1560*rbeta(10000, shape1=1, shape2=20),bound_lower=-2,bound_upper=2,lambda_inc=0.1, plotopt=TRUE, plotqq=TRUE, norm_test=TRUE)
 
 
 
+
+# ------------------------- VARIABLE IMPORTANCE FOR LOGIT MODELS ---------------------------
+# A function for assessing the variable importance of a logit model. The absolute size of
+# the coefficients are use to rank the variables from most to least importance.
+# A larger/ smaller absolute value of a coefficient indicates a more/ less important
+# variable. This technique assumes that the variables have the exact same scale.
+# Input:  [logit_model]: A logistic regression model
+#         [datTrain]:    Dataset on which the model is trained
+#         [method]:      The method use for computing the variable importance; either "log_odds" for an odds ratio analysis or "pd" for partial dependence (a form of explainable AI)
+#         [same_scales]: Are the coefficients the same scales (TRUE), if not (FALSE) then the coefficients will be standardised
+#         [sig_level]:   The threshold under which the variables are considered significant
+#         [plot]:        Should a bar chart be produced which shows the variable importance
+#         [pd_plot]:     Should a partial dependence plot be created for each variable
+# Output: A data table containing the variable importance information
+varImport_logit <- function(logit_model, method="odds_ratio", same_scales=F, sig_level=0.05, plot=F, pd_plot=F){
+  # - Unit testing conditions:
+  # datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
+  # logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
+  # method <- "pd"; same_scales=F; sig_level<-0.05; plot<-T
+  
+  # - Get the data the model was trained on
+  datTrain1 <- subset(logit_model$data, select = names(logit_model$data)[names(logit_model$data) %in% names(model.frame(logit_model))])
+  
+  # - Variable importance as determined by an odds ratio analysis (Rank variables according to the absolute values of their associated coefficients)
+  if (method=="odds_ratio") {
+    # Getting the names of the original training dataset
+    datTrain1_names <- names(datTrain1)
+    # Assigning new names to the training dataset according to the names of the coefficients in the model (this is since factor variables have different names in the model, e.g., "student" vs "studentYES")
+    names(datTrain1)[2:length(datTrain1_names)] <- names(logit_model$coefficients)[-1]
+    # Get the names of the variables that are significant (no use in performing variable importance on non-significant variables)
+    coefficients_sig <- summary(logit_model)$coefficients[,4][-1]; coefficients_sig <- names(coefficients_sig[which(coefficients_sig<=sig_level)])
+    # Displaying an message if there are no significant variables
+    if (length(coefficients_sig)==0){
+      return(cat("WARNING: Variable importance not conducted since there are no significant variables."))
+    }
+    # Creating the results dataset
+    results <- data.table(Variable = coefficients_sig,
+                          Coefficient = logit_model$coefficients[which(names(logit_model$coefficients) %in% coefficients_sig)],
+                          Std_Coefficient = 0,
+                          Log_Odds = 0,
+                          Rank = 0)
+    # Scaling the variables
+    if (same_scales==F){
+      datTrain2 <- copy(datTrain1)
+      for (i in 1:length(coefficients_sig)){
+        # Checking if the variable is numeric so that the underlying training data can be scaled
+        if (class(datTrain2[, get(coefficients_sig[i])]) %in% "numeric"){
+          datTrain2[, (coefficients_sig[i]) := (get(coefficients_sig[i])-mean(get(coefficients_sig[i]),na.rm=T))/sd(get(coefficients_sig[i]), na.rm=T)]
+        }
+      }
+      # Re-training the model on the scaled data
+      names(datTrain2) <- datTrain1_names
+      logit_model2 <- glm(logit_model$formula, data=datTrain2, family="binomial")
+    } else {
+      logit_model2 <- logit_model
+    }
+    # - Populating the results table
+    results[,Std_Coefficient := logit_model2$coefficients[which(names(logit_model2$coefficients) %in% coefficients_sig)]]
+    results[,Log_Odds := exp(Std_Coefficient)]
+    results <- results %>% arrange(desc(abs(Std_Coefficient))) %>% mutate(Rank=row_number())
+    
+    if (plot==T){ # Creating a simple bar chart to visualy display the variable importance
+      ggplot(results, aes(x=reorder(Variable, abs(Std_Coefficient)))) + geom_col(aes(y=abs(as.numeric(Coefficient))), col='blue', fill='blue') + 
+        theme_grey() + theme(plot.title = element_text(hjust=0.5)) + coord_flip() +
+        xlab("Variable name") + ylab("Absolute value of fitted coefficient")
+    }
+  } else if (method=="pd") { # - Variable importance as determined by feature importance rank measure (explainable AI technique)
+    # Get the names of the significant variables
+    coefficients_sig <- summary(logit_model)$coefficients[,4]<=sig_level; coefficients_sig[1]<-F # Setting the intercept's index value to FALSE to ensure that variable importance is not computed for it
+    # Create the results table
+    results <- vip::vi_firm(logit_model, feature_names=names(model.frame(logit_model))[coefficients_sig], method="firm", train=datTrain1)
+    if (plot==T){
+      # Plotting the variable importance
+      vip::vip(results)
+    }
+    if (pd_plot==T){ # Plotting the partial dependence
+      pd_plot_fun <- function(i) {plot(attr(results, which = "effects")[[i]])}
+      sapply(1:length(names(model.frame(logit_model))[coefficients_sig]), pd_plot_fun)
+    }
+    # Adding a column to indicate the rank order of the variables' importance
+    results <- data.table(results) %>% rename(FIRM = Importance) %>% arrange(desc(FIRM)) %>% mutate(Rank=row_number())
+  }
+  # - Return results
+  return(results)
+  # rm(logit_model)
+}
+# - Unit test
+# datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
+# logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
+# varImport_logit(logit_model = logit_model, method="pd", same_scales = F, sig_level = 0.05, plot=T, pd_plot = T)

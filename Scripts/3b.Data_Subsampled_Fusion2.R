@@ -2,7 +2,7 @@
 # Subsampling and resampling data prior to fusing the input space towards PD-modelling
 # ------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer
+# SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer, Marcel Muller
 
 # DESCRIPTION:
 # This script performs the following high-level tasks:
@@ -26,6 +26,7 @@
 # -- Outputs:
 #   - datCredit_smp | Subsampled set, fused with input space, duly prepared
 # ------------------------------------------------------------------------------------------------------
+
 
 
 
@@ -122,7 +123,12 @@ if (!exists('datCredit_smp')) unpack.ffdf(paste0(genPath,"creditdata_final4b"), 
 if (!exists('datInput.raw')) unpack.ffdf(paste0(genPath,"creditdata_input1"), tempPath)
 
 # - Find intersection between fields in input space and those perhaps already in the main credit dataset
-(overlap_flds <- intersect(colnames(datCredit_smp), colnames(datInput.raw))) # no overlapping fields
+overlap_flds <- intersect(colnames(datCredit_smp), colnames(datInput.raw))
+check.input1 <- length(overlap_flds) == 0 # FALSE; duplicate columns exists.
+cat(check.input1 %?% 'SAFE: No overlapping fields in the input space and the main credit dataset' %:%
+      'WARNING: Overlapping field(s) detected in the input space and the main credit dataset.')
+# Conditional reporting
+if (check.input1 == 0) {cat('NOTE: The following fields overlap: ', overlap_flds,"\n",sep="\t")}
 
 # - Remove any additional variables that are not going to be used
 suppressWarnings( datInput.raw[, `:=`(slc_status_final_pred7 = NULL, slc_status_final = NULL, 
@@ -135,23 +141,24 @@ datInput.raw[, date := as.Date(date, format="%Y-%m-%d")]
 colnames(datInput.raw)[colnames(datInput.raw) %in% c("date", "acct_no")] <- c("Date", "LoanID")
 
 # - [SANITY CHECK] Check the data grain
-check_input1a <- datInput.raw[, list(Freq = .N), by=list(LoanID, Date)][Freq>1, .N]
-cat( (check_input1a == 0) %?% 'SAFE: Grain of {datInput.rawdatInput.raw} confirmed.\n' %:% 
-       paste0('WARNING: Grain broken in {datInput.raw} for ', check_input1a, " cases.\n") )
+check_input2a <- datInput.raw[, list(Freq = .N), by=list(LoanID, Date)][Freq>1, .N]
+cat( (check_input2a == 0) %?% 'SAFE: Grain of {datInput.rawdatInput.raw} confirmed.\n' %:% 
+       paste0('WARNING: Grain broken in {datInput.raw} for ', check_input2a, " cases.\n") )
+# Data grain broken for some missing LoanIDs, we aren't interested in these cases in anyways
 
 # - Merge on LoanID and Date by performing a left-join
 datCredit_smp <- merge(datCredit_smp, datInput.raw, by=c("Date", "LoanID"), all.x=T); gc()
 
 # [SANITY CHECK] Confirm dataset's grain after fusion
-check_fuse5a <- datCredit_smp[,list(Freqs = .N), by=list(LoanID, Date)][Freqs > 1,.N]
-cat( (check_fuse5a == 0) %?% 'SAFE: Grain of {datCredit_smp} confirmed after fusion.\n' %:% 
-       paste0('ERROR: Grain broken in {datCredit_smp} after fusion for ', check_fuse5a, " cases.\n") )
+check_input2b <- datCredit_smp[,list(Freqs = .N), by=list(LoanID, Date)][Freqs > 1,.N]
+cat( (check_input2b == 0) %?% 'SAFE: Grain of {datCredit_smp} confirmed after fusion.\n' %:% 
+       paste0('ERROR: Grain broken in {datCredit_smp} after fusion for ', check_input2b, " cases.\n") )
 
 # - Save to disk (zip) for quick disk-based retrieval later
 pack.ffdf(paste0(genPath, "creditdata_final4c"), datCredit_smp); gc()
 
 # - Clean-up
-rm(datInput.raw, data_grain_check); gc()
+rm(datInput.raw, check_input1, check_input2a, check_input2b); gc()
 
 
 
@@ -170,6 +177,7 @@ datCredit_smp[, value_ind_slc_acct_pre_lim_perc := ifelse(is.na(slc_acct_pre_lim
 datCredit_smp[, value_ind_slc_acct_roll_ever_24 := ifelse(is.na(slc_acct_roll_ever_24) | slc_acct_roll_ever_24 == "", 1, 0)]
 datCredit_smp[, value_ind_slc_acct_arr_dir_3 := ifelse(is.na(slc_acct_arr_dir_3) | slc_acct_arr_dir_3 == "", 1, 0)]
 datCredit_smp[, value_ind_slc_acct_prepaid_perc_dir_12 := ifelse(is.na(slc_acct_prepaid_perc_dir_12) | slc_acct_prepaid_perc_dir_12 == "", 1, 0)]
+datCredit_smp[, value_ind_slc_past_due_amt := ifelse(is.na(slc_past_due_amt) | slc_past_due_amt == "", 1, 0)]
 
 # - Check the missingness of the variables
 # If they are more than 50% missing - remove
@@ -185,10 +193,30 @@ suppressWarnings( datCredit_smp[, `:=`(value_ind_slc_days_excess = NULL, slc_day
 
 
 
-# --- 2. Missing value treatment (categorical variables)
+# --- 2. Basic statistics of each variable
+# - Categorical variables
+varList_Cat <- c('slc_pmnt_method','slc_acct_arr_dir_3',
+                     'g0_Delinq','DefaultStatus1', 'DefaultStatus1_lead_12_max',
+                     'PerfSpellResol_Type_Hist','HasLeftTruncPerfSpell',
+                     'DefSpellResol_Type_Hist','HasLeftTruncDefSpell',
+                     'Event_Type','g0_Delinq_Shift')
+var_Info_Cat <- describe(subset(datCredit_smp, select = varList_Cat))
+
+# - Numeric variables
+varList_Num <- c('slc_past_due_amt','slc_acct_pre_lim_perc','slc_acct_prepaid_perc_dir_12','slc_acct_roll_ever_24',
+                 'Age_Adj', 'PerfSpell_Num','Term','InterestRate_Nom','InterestRate_Margin','Principal','Instalment','Receipt_Inf','Arrears',
+                 'Balance','TimeInPerfSpell','PerfSpell_Age', 'PerfSpell_Counter',
+                 'TimeInDefSpell', 'DefSpell_Age', 'DefSpell_Counter',
+                 'Event_Time', 'g0_Delinq_Num', 'g0_Delinq_SD')
+var_Info_Num <- describe(subset(datCredit_smp, select = varList_Num))
+
+
+
+# --- 3. Missing value treatment (categorical variables)
 # Treatment: create "missing"-bin for all N/A values
 
 # - Payment method
+var_Info_Cat$slc_pmnt_method
 # Merge with existing "Unknown" bin or empty values
 datCredit_smp[, slc_pmnt_method := 
                  ifelse(is.na(slc_pmnt_method) | slc_pmnt_method == "" | slc_pmnt_method == "Unknown",
@@ -197,10 +225,11 @@ datCredit_smp[, slc_pmnt_method :=
 cat( (sum(datCredit_smp$slc_pmnt_method == "" | is.na(datCredit_smp$slc_pmnt_method) | 
             datCredit_smp$slc_pmnt_method == "Unknown") == 0) %?% 
        'SAFE: Treatment successful for [slc_pmnt_method].\n' %:% 'ERROR: Treatment failed for [slc_pmnt_method] \n' )
-describe(datCredit_smp$slc_pmnt_method)
+(var_Info_Cat$slc_pmnt_method <- describe(datCredit_smp$slc_pmnt_method))
 
 
 # - Account-level arrears direction vs three months ago
+var_Info_Cat$slc_acct_arr_dir_3
 # Merge with existing "N/A" bin or empty values
 datCredit_smp[, slc_acct_arr_dir_3 := 
                  ifelse(is.na(slc_acct_arr_dir_3) | slc_acct_arr_dir_3 == "" | slc_acct_arr_dir_3 == "N/A", 
@@ -209,98 +238,95 @@ datCredit_smp[, slc_acct_arr_dir_3 :=
 cat( ( sum(datCredit_smp$slc_acct_arr_dir_3 == "" | is.na(datCredit_smp$slc_acct_arr_dir_3) |
              datCredit_smp$slc_acct_arr_dir_3 == "N/A") == 0) %?% 
        'SAFE: Treatment successful for [slc_acct_arr_dir_3].\n' %:% 'ERROR: Treatment failed for [slc_acct_arr_dir_3] \n' )
-describe(datCredit_smp$slc_acct_arr_dir_3)
+(var_Info_Cat$slc_acct_arr_dir_3 <- describe(datCredit_smp$slc_acct_arr_dir_3))
 
 
 
-# --- 3. Missing value treatment (numeric variables)
+# --- 4. Missing value treatment (numeric variables)
 # Analyse whether to use mean or median value imputation
 
 # - Prepaid/available funds to limit
-describe(datCredit_smp$slc_acct_pre_lim_perc); hist(datCredit_smp$slc_acct_pre_lim_perc)
+var_Info_Num$slc_acct_pre_lim_perc; hist(datCredit_smp$slc_acct_pre_lim_perc, breaks='FD')
 datCredit_smp[is.na(slc_acct_pre_lim_perc), .N] / datCredit_smp[,.N] * 100
 ### RESULTS: Highly right-skewed distribution, with mean of ~0.09 vs median of 0,
 # bounded by [0, 0.79] for 5%-95% percentiles; no outliers
 # Use median imputation, given 10.78% missingness degree, trading off the minor distributional distortion as a result
-datCredit_smp[, slc_acct_pre_lim_perc_imputed := 
+datCredit_smp[, slc_acct_pre_lim_perc_imputed_med := 
                  ifelse(is.na(slc_acct_pre_lim_perc) | slc_acct_pre_lim_perc == "", 
                         median(slc_acct_pre_lim_perc, na.rm=TRUE), slc_acct_pre_lim_perc)]
 # [SANITY CHECK] Confirm treatment success
-cat( ( datCredit_smp[is.na(slc_acct_pre_lim_perc_imputed), .N ] == 0) %?% 
-       'SAFE: Treatment successful for [slc_acct_pre_lim_perc_imputed].\n' %:% 
-       'ERROR: Treatment failed for [slc_acct_pre_lim_perc_imputed] \n' )
-describe(datCredit_smp$slc_acct_pre_lim_perc_imputed); hist(datCredit_smp$slc_acct_pre_lim_perc_imputed)
+cat( ( datCredit_smp[is.na(slc_acct_pre_lim_perc_imputed_med), .N ] == 0) %?% 
+       'SAFE: Treatment successful for [slc_acct_pre_lim_perc_imputed_med].\n' %:% 
+       'ERROR: Treatment failed for [slc_acct_pre_lim_perc_imputed_med] \n' )
+(var_Info_Num$slc_acct_pre_lim_perc_imputed_med <- describe(datCredit_smp$slc_acct_pre_lim_perc_imputed_med)); hist(datCredit_smp$slc_acct_pre_lim_perc_imputed_med, breaks='FD')
 
 
 # - Number of times an account was in arrears over last 24 months
-describe(datCredit_smp$slc_acct_roll_ever_24); hist(datCredit_smp$slc_acct_roll_ever_24)
+var_Info_Num$slc_acct_roll_ever_24; hist(datCredit_smp$slc_acct_roll_ever_24, breaks='FD')
 datCredit_smp[is.na(slc_acct_roll_ever_24), .N] / datCredit_smp[,.N] * 100
 ### RESULTS: Highly right-skewed distribution with mean of 0.4871, though discrete values with 80% of data having 0-value.
 # Use mean imputation, given 10.79% missingness degree, trading off the minor distributional distortion as a result
-datCredit_smp[, slc_acct_roll_ever_24_imputed := 
+datCredit_smp[, slc_acct_roll_ever_24_imputed_mean := 
                  ifelse(is.na(slc_acct_roll_ever_24) | slc_acct_roll_ever_24 == "", 
                         mean(slc_acct_roll_ever_24, na.rm=TRUE), slc_acct_roll_ever_24)]
 # [SANITY CHECK] Confirm treatment success
-cat( ( datCredit_smp[is.na(slc_acct_roll_ever_24_imputed), .N ] == 0) %?% 
-       'SAFE: Treatment successful for [slc_acct_roll_ever_24_imputed].\n' %:% 
-       'ERROR: Treatment failed for [slc_acct_roll_ever_24_imputed] \n' )
-describe(datCredit_smp$slc_acct_roll_ever_24_imputed); hist(datCredit_smp$slc_acct_roll_ever_24_imputed)
+cat( ( datCredit_smp[is.na(slc_acct_roll_ever_24_imputed_mean), .N ] == 0) %?% 
+       'SAFE: Treatment successful for [slc_acct_roll_ever_24_imputed_mean].\n' %:% 
+       'ERROR: Treatment failed for [slc_acct_roll_ever_24_imputed_mean] \n' )
+var_Info_Num$slc_acct_roll_ever_24_imputed_mean <- describe(datCredit_smp$slc_acct_roll_ever_24_imputed_mean); hist(datCredit_smp$slc_acct_roll_ever_24_imputed_mean, breaks='FD')
 
 
 # - Percentage-valued direction of prepaid/available funds - current compared to 12 months ago
-describe(datCredit_smp$slc_acct_prepaid_perc_dir_12); hist(datCredit_smp[slc_acct_prepaid_perc_dir_12<=5, slc_acct_prepaid_perc_dir_12])
+var_Info_Num$slc_acct_prepaid_perc_dir_12; hist(datCredit_smp[slc_acct_prepaid_perc_dir_12<=5, slc_acct_prepaid_perc_dir_12])
 datCredit_smp[is.na(slc_acct_prepaid_perc_dir_12), .N] / datCredit_smp[,.N] * 100
 ### RESULTS: Highly right-skewed distribution, with mean of ~1.6m vs median of 0, 
 # bounded by [0, 3.34] for 5%-95% percentiles; some very large outliers
 ### AB: Scope for extreme value treatment if those outliers are correct; or use winsorized mean (Std-PrinciplesForDataPrep)
 # Use median imputation, given 10.78% missingness degree, trading off the minor distributional distortion as a result
-datCredit_smp[, slc_acct_prepaid_perc_dir_12_imputed := 
+datCredit_smp[, slc_acct_prepaid_perc_dir_12_imputed_med := 
                  ifelse(is.na(slc_acct_prepaid_perc_dir_12) | slc_acct_prepaid_perc_dir_12 == "", 
                         median(slc_acct_prepaid_perc_dir_12, na.rm=TRUE), slc_acct_prepaid_perc_dir_12)]
 # [SANITY CHECK] Confirm treatment success
-cat( ( datCredit_smp[is.na(slc_acct_prepaid_perc_dir_12_imputed), .N] == 0) %?% 
-       'SAFE: Treatment successful for [slc_acct_prepaid_perc_dir_12_imputed].\n' %:% 
-       'ERROR: Treatment failed for [slc_acct_prepaid_perc_dir_12_imputed] \n' )
-describe(datCredit_smp$slc_acct_prepaid_perc_dir_12_imputed); hist(datCredit_smp[slc_acct_prepaid_perc_dir_12_imputed<=5, slc_acct_prepaid_perc_dir_12_imputed])
+cat( ( datCredit_smp[is.na(slc_acct_prepaid_perc_dir_12_imputed_med), .N] == 0) %?% 
+       'SAFE: Treatment successful for [slc_acct_prepaid_perc_dir_12_imputed_med].\n' %:% 
+       'ERROR: Treatment failed for [slc_acct_prepaid_perc_dir_12_imputed_med] \n' )
+describe(datCredit_smp$slc_acct_prepaid_perc_dir_12_imputed_med); hist(datCredit_smp[slc_acct_prepaid_perc_dir_12_imputed_med<=5, slc_acct_prepaid_perc_dir_12_imputed_med])
 
+
+# - Amount the account is overdue by at the associated reporting date
+var_Info_Num$slc_past_due_amt; hist(datCredit_smp$slc_past_due_amt, breaks='FD')
+datCredit_smp[is.na(slc_past_due_amt), .N] / datCredit_smp[,.N] * 100
+### RESULTS: Highly right-skewed distribution, with mean of ~2772 vs median of 0, 
+# bounded by [0, 0] for 5%-95% percentiles; some very large outliers
+### MM: Scope for extreme value treatment if those outliers are correct; or use winsorized mean (Std-PrinciplesForDataPrep)
+# Use median imputation, given 10.78% missingness degree, trading off the minor distributional distortion as a result
+datCredit_smp[, slc_past_due_amt_imputed_med := 
+                ifelse(is.na(slc_past_due_amt) | slc_past_due_amt == "", 
+                       median(slc_past_due_amt, na.rm=TRUE), slc_past_due_amt)]
+# [SANITY CHECK] Confirm treatment success
+cat( ( datCredit_smp[is.na(slc_past_due_amt_imputed_med), .N] == 0) %?% 
+       'SAFE: Treatment successful for [slc_past_due_amt_imputed_med].\n' %:% 
+       'ERROR: Treatment failed for [slc_past_due_amt_imputed_med] \n' )
+var_Info_Num$slc_past_due_amt_imputed_med <- describe(datCredit_smp$slc_past_due_amt_imputed_med); hist(datCredit_smp$slc_past_due_amt_imputed_med, breaks='FD')
 
 # - InterestRate_Margin (incorporating risk-based pricing info)
-describe(datCredit_smp$InterestRate_Margin); hist(datCredit_smp$InterestRate_Margin, breaks="FD")
+var_Info_Num$InterestRate_Margin; hist(datCredit_smp$InterestRate_Margin, breaks="FD")
 datCredit_smp[is.na(InterestRate_Margin), .N] / datCredit_smp[,.N] * 100
 ### RESULTS: Highly right-skewed distribution (as expected), with mean of -0.007 vs median of -0.008, 
 # bounded by [-0.02, 0.01] for 5%-95% percentiles; some negative outliers distort shape of distribution
 # Use median imputation, given 0.46% missingness degree
-datCredit_smp[, InterestRate_Margin_imputed := 
+datCredit_smp[, InterestRate_Margin_imputed_mean := 
                 ifelse(is.na(InterestRate_Margin) | InterestRate_Margin == "", 
                        median(InterestRate_Margin, na.rm=TRUE), InterestRate_Margin)]
 # [SANITY CHECK] Confirm treatment success
-cat( ( datCredit_smp[is.na(InterestRate_Margin_imputed), .N] == 0) %?% 
-       'SAFE: Treatment successful for [InterestRate_Margin_imputed].\n' %:% 
-       'ERROR: Treatment failed for [InterestRate_Margin_imputed] \n' )
-describe(datCredit_smp$InterestRate_Margin_imputed); hist(datCredit_smp$InterestRate_Margin_imputed, breaks="FD")
+cat( ( datCredit_smp[is.na(InterestRate_Margin_imputed_mean), .N] == 0) %?% 
+       'SAFE: Treatment successful for [InterestRate_Margin_imputed_mean].\n' %:% 
+       'ERROR: Treatment failed for [InterestRate_Margin_imputed_mean] \n' )
+(var_Info_Num$InterestRate_Margin_imputed_mean <- describe(datCredit_smp$InterestRate_Margin_imputed_mean)); hist(datCredit_smp$InterestRate_Margin_imputed_mean, breaks="FD")
 
 
 
-# --- 4. Feature Engineering: Exploring transformations
-
-# - Log-transform of Balance
-describe(datCredit_smp$Balance); hist(datCredit_smp$Balance, breaks="FD")
-datCredit_smp[, BalanceLog := ifelse(Balance > 0, log(Balance), log(1))]
-# [SANITY CHECK] Check new feature for illogical values
-cat( ( datCredit_smp[is.na(BalanceLog), .N] == 0) %?% 
-       'SAFE: New feature [BalanceLog] has logical values.\n' %:% 
-       'WARNING: New feature [BalanceLog] has illogical values \n' )
-describe(datCredit_smp$BalanceLog); hist(datCredit_smp$BalanceLog, breaks="FD")
-### RESULTS: Large spike at zero values with some negative outliers, which skews mean to 11.8 (median: 12.8)
-# However, majority of distribution's bulk is left-skewed between 5 and 15, aside from the large spike at 0
-### AB: Scope to use Yeo-Johnson transform from Marcel's work (Std-PrinciplesForDataPrep)
-
-
-# - YJ-transform of InterestRate_Margin
-### AB: Will need some help here. Consult with Marcel
-
-
-# --- 5. Feature Engineering: ratio-type variables
+# --- 6. Feature Engineering: ratio-type variables (Period-level)
 
 # - Loan age to loan term
 datCredit_smp[, AgeToTerm := Age_Adj/Term] # where the loan is in its lifetime
@@ -308,10 +334,9 @@ datCredit_smp[, AgeToTerm := Age_Adj/Term] # where the loan is in its lifetime
 cat( ( datCredit_smp[is.na(AgeToTerm), .N] == 0) %?% 
        'SAFE: New feature [AgeToTerm] has logical values.\n' %:% 
        'WARNING: New feature [AgeToTerm] has illogical values \n' )
-describe(datCredit_smp$AgeToTerm); hist(datCredit_smp[AgeToTerm<2, AgeToTerm])
+(var_Info_Num$AgeToTerm <- describe(datCredit_smp$AgeToTerm)); hist(datCredit_smp[AgeToTerm<2, AgeToTerm], breaks='FD')
 ### RESULTS: Highly right-skewed distribution as expected, with mean of 0.37 vs median of 0.29,
 # bounded by [0.02917, 0.9] for 5%-95% percentiles; some large outliers (max: 198)
-
 
 # - Balance to loan term | how much is still outstanding compared to Principal/Limit
 datCredit_smp[, BalanceToPrincipal := Balance/Principal]
@@ -320,14 +345,13 @@ cat( ( datCredit_smp[is.na(BalanceToPrincipal), .N] == 0) %?%
        'SAFE: New feature [BalanceToPrincipal] has logical values.\n' %:% 
        'WARNING: New feature [BalanceToPrincipal] has illogical values \n' )
 # distributional analysis
-describe(datCredit_smp$BalanceToPrincipal); hist(datCredit_smp$BalanceToPrincipal)
+(var_Info_Num$BalanceToTerm <- describe(datCredit_smp$BalanceToPrincipal)); hist(datCredit_smp$BalanceToPrincipal, breaks='FD')
 ### RESULTS: Highly left-skewed distribution, with mean of 0.6967 vs median of 0.8464,
 # bounded by [~0.000, 0.997] for 5%-95% percentiles; no outliers
 
 
 
-# --- 6. Featuring Engineering: General
-
+# --- 7. Feature Engineering: Binning and factorisation
 # - Condense the payment group
 datCredit_smp[, pmnt_method_grp := 
                 case_when(slc_pmnt_method == "Debit Order FNB account" | slc_pmnt_method == "Debit Order other bank" ~ "Debit Order",
@@ -337,11 +361,242 @@ datCredit_smp[, pmnt_method_grp :=
 cat( ( datCredit_smp[is.na(pmnt_method_grp), .N] == 0) %?% 
        'SAFE: New feature [pmnt_method_grp] has logical values.\n' %:% 
        'WARNING: New feature [pmnt_method_grp] has illogical values \n' )
-describe(datCredit_smp$pmnt_method_grp)
+(var_Info_Cat$pmnt_method_grp <- describe(datCredit_smp$pmnt_method_grp))
 ### RESULTS: Bins grouped logically such that each bin now has sufficient observations
 
+# - Factorised [g0_Delinq] variable
+datCredit_smp[,g0_Delinq_fac := as.factor(g0_Delinq)]
+
+# - Bin [InterestRate_Margin_imputed] | Binning the variable into three equally sized bins
+datCredit_smp[, InterestRate_Margin_imputed_bin := ntile(InterestRate_Margin_imputed_mean, n=3)]
+(var_Info_Num$InterestRate_Margin_Imputed_Bin <- describe(datCredit_smp$InterestRate_Margin_imputed_bin))
+
+
+
+# --- 8. Featuring Engineering: Portfolio-level information
+### AB: Look at more recent lags: 1-6 months may be useful (use code from macroeconomic variable lags); AB: Create a simple variable - Any_Delinquency - and work with its lags as well; before we move on to the more detailed versions
+### EO: Can create a variable which compares the current delinquency level to n-months ago
+### AB: Can create another experimental script which tests all these ideas and only keep the necessary feature engineering in this script.
+
+# - Creating an aggregated dataset with which to fuse to the full dataset
+dat_g0_Delinq_Aggr <- data.table(datCredit_smp[DefaultStatus1==0, list(sum(g0_Delinq>0, na.rm=T)/.N), by=list(Date)])
+colnames(dat_g0_Delinq_Aggr) <- c("Date", "g0_Delinq_Any_Aggr_Prop")
+
+# - Aggregated delinquency proportions (any delinquency)
+# Fusing the aggregated variable to the full dataset
+datCredit_smp <- merge(datCredit_smp, dat_g0_Delinq_Aggr, by="Date", all.x=T)
+# [SANITY CHECK] Check new feature for illogical values
+cat( ( sum(datCredit_smp[DefaultStatus1==0, sum(g0_Delinq_Any_Aggr_Prop + sum(g0_Delinq==0)/.N, na.rm=T), by=Date][,2])==sum(datCredit_smp[DefaultStatus1==0,.N,by=Date][,2]) & (sum(is.na(datCredit_smp$g0_Delinq_Any_Aggr_Prop))==0)) %?% 
+       'SAFE: New feature [g0_Delinq_Any_Aggr_Prop] has logical values.\n' %:% 
+       'WARNING: New feature [g0_Delinq_Any_Aggr_Prop] has illogical values \n' )
+(var_Info_Num$g0_Delinq_Any_Aggr_Prop <- describe(datCredit_smp$g0_Delinq_Any_Aggr_Prop)); plot(unique(datCredit_smp$g0_Delinq_Any_Aggr_Prop))
+
+# - 5 month lagged delinquency proportion (as found to be significant within experimental script 2)
+# Lagging the delinquency proportions by 12-months
+dat_g0_Delinq_Aggr[, g0_Delinq_Any_Aggr_Prop_Lag_5 := shift(g0_Delinq_Any_Aggr_Prop, n=5, type="lag")]
+# Fusing the aggregated variables to the full dataset
+datCredit_smp <- merge(datCredit_smp, dat_g0_Delinq_Aggr[, -c("g0_Delinq_Any_Aggr_Prop")], by="Date", all.x=T)
+# [SANITY CHECK]
+cat( ( (datCredit_smp[is.na(g0_Delinq_Any_Aggr_Prop_Lag_5), .N] == datCredit_smp[Date %in% (min(Date) %m+% months(seq(0, round(interval(min(Date), min(Date) %m+% months(4)) / months(1)), 1))), .N])) %?% 
+       'SAFE: New feature [g0_Delinq_Any_Aggr_Prop_Lag_5] has logical values.\n' %:% 
+       'WARNING: New feature [g0_Delinq_Any_Aggr_Prop_Lag_5] has illogical values \n' )
+(var_Info_Cat$g0_Delinq_Any_Aggr_Prop_Lag_5 <- describe(datCredit_smp$g0_Delinq_Any_Aggr_Prop_Lag_5)); plot(unique(datCredit_smp$g0_Delinq_Any_Aggr_Prop_Lag_5))
+
+# - Average delinquency level
+datCredit_smp[,g0_Delinq_Ave:=mean(ifelse(DefaultStatus1==0,g0_Delinq,0), na.rm=T), by=Date]
+# [SANITY CHECK] Check new feature for illogical values
+cat( (sum(datCredit_smp[, sum(is.na(g0_Delinq_Ave)), by=Date][,2])==0) %?% 
+       'SAFE: New feature [g0_Delinq_Ave] has logical values.\n' %:% 
+       'WARNING: New feature [g0_Delinq_Ave] has illogical values \n' )
+(var_Info_Cat$g0_Delinq_Ave <- describe(datCredit_smp$g0_Delinq_Ave)); plot(unique(datCredit_smp$g0_Delinq_Ave))
+
+# - Ratio type variables (portfolio-level) - These variables are engineered to capture/ aggregate information only for accounts that are in the performance spell
+# (Total) Arrears to (Total) Balance & (Total) Installments to (Total) Balance
+# Creating an aggregated dataset with which to fuse to the full dataset
+dat_Aggr <- data.table(datCredit_smp[DefaultStatus1==0, list(sum(Arrears, na.rm=T)/sum(Balance, na.rm=T)), by=list(Date)], # [ArrearsToBalance_Aggr]
+                       datCredit_smp[DefaultStatus1==0, list(sum(Instalment, na.rm=T)/sum(Balance)), by=list(Date)][,2]) # [InstalmentToBalance_Aggr]
+colnames(dat_Aggr) <- c("Date", "ArrearsToBalance_Aggr_Prop", "InstalmentToBalance_Aggr_Prop")
+# Fusing the aggregated dataset to the full dataset
+datCredit_smp <- merge(datCredit_smp, dat_Aggr, by="Date", all.x=T)
+# [SANITY CHECK] Check new feature for illogical values
+cat( (sum(datCredit_smp[, sum(is.na(ArrearsToBalance_Aggr_Prop)), by=Date][,2])==0) %?% 
+       'SAFE: New feature [ArrearsToBalance_Aggr_Prop] has logical values.\n' %:% 
+       'WARNING: New feature [ArrearsToBalance_Aggr_Prop] has illogical values \n' )
+cat( (sum(datCredit_smp[, sum(is.na(InstalmentToBalance_Aggr_Prop)), by=Date][,2])==0) %?% 
+       'SAFE: New feature [InstalmentToBalance_Aggr_Prop] has logical values.\n' %:% 
+       'WARNING: New feature [InstalmentToBalance_Aggr_Prop] has illogical values \n' )
+(var_Info_Cat$InstalmentToBalance_Aggr_Prop <- describe(datCredit_smp$InstalmentToBalance_Aggr_Prop)); plot(unique(datCredit_smp$InstalmentToBalance_Aggr_Prop))
+(var_Info_Cat$ArrearsToBalance_Aggr_Prop <- describe(datCredit_smp$ArrearsToBalance_Aggr_Prop)); plot(unique(datCredit_smp$ArrearsToBalance_Aggr_Prop))
+
+# - Proportion of curing loans - Variables is engineered to capture/ aggregate information for all accounts (whether in performance- or default spells)
+datCredit_smp[, CuringEvents_Aggr_Prop := sum(PerfSpell_Counter==1 & PerfSpell_Num>=2, na.rm=T)/.N, by=list(Date)]
+cat( (sum(datCredit_smp[, sum(is.na(CuringEvents_Aggr_Prop)), by=Date][,2])==0) %?% 
+       'SAFE: New feature [CuringEvents_Aggr_Prop] has logical values.\n' %:% 
+       'WARNING: New feature [CuringEvents_Aggr_Prop] has illogical values \n' )
+(var_Info_Cat$CuringEvents_Aggr_Prop <- describe(datCredit_smp$CuringEvents_Aggr_Prop)); plot(unique(datCredit_smp$CuringEvents_Aggr_Prop))
+
+# - Proportion of new loans (type of credit demand variable + market conditions)
+# Creating an aggregated dataset
+dat_NewLoans_Aggr <- datCredit_smp[, list(NewLoans_Aggr_Prop = sum(Age_Adj==1, na.rm=T)/.N), by=list(Date)]
+# Applying various lags
+lags <- c(1,3,4,5) # Lags
+datNewLoans_Aggr_Check1 <- data.table(Variable = NULL, # Dataset for conducting sanity checks
+                                      Check = NULL)
+ColNames <- colnames(dat_NewLoans_Aggr)[-1] # Names of the columns
+for (i in seq_along(lags)){ # Looping over the specified lags and applying each to each of the specified columns
+  for (j in seq_along(ColNames)){
+    dat_NewLoans_Aggr[, (paste0(ColNames[j],"_",lags[i])) := shift(get(ColNames[j]), n=lags[i], type="lag")]
+    datNewLoans_Aggr_Check1 <- rbind(datNewLoans_Aggr_Check1,
+                                     data.table(Variable=paste0(ColNames[j],"_",lags[i]),
+                                                Check=sum(is.na(dat_NewLoans_Aggr[,get(paste0(ColNames[j],"_",lags[i]))]))==lags[i]))
+  }
+}
+# [SANITY CHECK] Check whether the lags were created correctly
+cat( (datNewLoans_Aggr_Check1[,.N]==sum(datNewLoans_Aggr_Check1$Check)) %?% "SAFE: Lags applied successfully to the aggregated variable [NewLoans_Aggr].\n" %:%
+       "WARNING: Excessive missingness detected in the lagged aggregated variable [NewLoans_Aggr] variables.\n")
+# Merging the credit dataset with the aggregated dataset
+datCredit_smp <- merge(datCredit_smp, dat_NewLoans_Aggr, by="Date", all.x=T)
+# Validate merging success )by checking for missingness (should be zero)
+list_merge_variables <- list(colnames(dat_NewLoans_Aggr))
+results_missingness <- list()
+for (i in 1:length(list_merge_variables)){
+  output <- sum(is.na(datCredit_smp$list_merge_variables[i]))
+  results_missingness[[i]] <- output
+}
+cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fusion with aggregated data is successful.\n" %:%
+       "WARNING: Missingness in certain aggregated fields detected, fusion compromised.\n")
+(var_Info_Num$NewLoans_Aggr <- describe(datCredit_smp$NewLoans_Aggr_Prop)); plot(unique(datCredit_smp$NewLoans_Aggr_Prop)) # Only saving the base variable's descriptive statistics
+# Clean up
+rm(dat_NewLoans_Aggr, datNewLoans_Aggr_Check1, list_merge_variables, results_missingness, output, lags, ColNames)
+
+# - Marutiry of portfolio - Variable is engineered to capture/ aggregate information for all accounts (whether in performance- or default spells)
+datCredit_smp[, BookMaturity_Aggr_Mean := mean(Age_Adj/Term, na.rm=T), by=Date]
+cat( (sum(datCredit_smp[, sum(is.na(BookMaturity_Aggr_Mean)), by=Date][,2])==0) %?% 
+       'SAFE: New feature [BookMaturity_Aggr_Mean] has logical values.\n' %:% 
+       'WARNING: New feature [BookMaturity_Aggr_Mean] has illogical values \n' )
+(var_Info_Cat$BookMaturity_Aggr_Mean <- describe(datCredit_smp$BookMaturity_Aggr_Mean)); plot(unique(datCredit_smp$BookMaturity_Aggr_Mean))
+
+# - Maturity of performance spells - Variable is engineered to capture/ aggregate information for all accounts (whether in performance- or default spells)
+datCredit_smp[, PerfSpell_Maturity_Aggr_Mean := mean(PerfSpell_Age, na.rm=T), by=Date]
+cat( (sum(datCredit_smp[, sum(is.na(PerfSpell_Maturity_Aggr_Mean)), by=Date][,2])==0) %?% 
+       'SAFE: New feature [PerfSpell_Maturity_Aggr_Mean] has logical values.\n' %:% 
+       'WARNING: New feature [Perf_SpellMaturity_Aggr_Mean] has illogical values \n' )
+(var_Info_Cat$PerfSpell_Maturity_Aggr_Mean <- describe(datCredit_smp$PerfSpell_Maturity_Aggr_Mean)); plot(unique(datCredit_smp$PerfSpell_Maturity_Aggr_Mean))
+
+# - Aggregated age-to-term of portfolio
+datCredit_smp[, AgeToTerm_Aggr_Mean := mean(Age_Adj/Term, na.rm=T), by=Date]
+cat( (sum(datCredit_smp[, sum(is.na(BookMaturity_Aggr_Mean)), by=Date][,2])==0) %?% 
+       'SAFE: New feature [AgeToTerm_Aggr_Mean] has logical values.\n' %:% 
+       'WARNING: New feature [AgeToTerm_Aggr_Mean] has illogical values \n' )
+(var_Info_Cat$AgeToTerm_Aggr_Mean <- describe(datCredit_smp$AgeToTerm_Aggr_Mean)); plot(unique(datCredit_smp$AgeToTerm_Aggr_Mean))
+
+# - Average interest rate margin
+# Creating an aggregated dataset
+dat_IRM_Aggr <- datCredit_smp[, list(InterestRate_Margin_Aggr_Mean = mean(InterestRate_Margin_imputed_mean, na.rm=T)/.N), by=list(Date)]
+# Applying various lags
+lags <- c(1,2,3) # Lags as found to be significant within the experimental script
+dat_IRM_Aggr_Check1 <- data.table(Variable = NULL, # Dataset for conducting sanity checks
+                                  Check = NULL)
+ColNames <- colnames(dat_IRM_Aggr)[-1] # Names of the columns
+for (i in seq_along(lags)){ # Looping over the specified lags and applying each to each of the specified columns
+  for (j in seq_along(ColNames)){
+    dat_IRM_Aggr[, (paste0(ColNames[j],"_",lags[i])) := shift(get(ColNames[j]), n=lags[i], type="lag")]
+    dat_IRM_Aggr_Check1 <- rbind(dat_IRM_Aggr_Check1,
+                                 data.table(Variable=paste0(ColNames[j],"_",lags[i]),
+                                            Check=sum(is.na(dat_IRM_Aggr[,get(paste0(ColNames[j],"_",lags[i]))]))==lags[i]))
+  }
+}
+# [SANITY CHECK] Check whether the lags were created correctly
+cat( (dat_IRM_Aggr_Check1[,.N]==sum(dat_IRM_Aggr_Check1$Check)) %?% "SAFE: Lags applied successfully to the aggregated variable [InterestRate_Margin_Aggr_Mean].\n" %:%
+       "WARNING: Excessive missingness detected in the lagged aggregated variable [InterestRate_Margin_Aggr_Mean] variables.\n")
+# Merging the credit dataset with the aggregated dataset
+datCredit_smp <- merge(datCredit_smp, dat_IRM_Aggr, by="Date", all.x=T)
+# Validate merging success )by checking for missingness (should be zero)
+list_merge_variables <- list(colnames(dat_IRM_Aggr))
+results_missingness <- list()
+for (i in 1:length(list_merge_variables)){
+  output <- sum(is.na(datCredit_smp$list_merge_variables[i]))
+  results_missingness[[i]] <- output
+}
+cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fusion with aggregated data is successful.\n" %:%
+       "WARNING: Missingness in certain aggregated fields detected, fusion compromised.\n")
+(var_Info_Num$InterestRate_Margin_Aggr_Mean <- describe(datCredit_smp$InterestRate_Margin_Aggr_Mean)); plot(unique(datCredit_smp$InterestRate_Margin_Aggr_Mean)) # Only saving the base variable's descriptive statistics
+# Clean up
+rm(dat_IRM_Aggr, dat_IRM_Aggr_Check1, list_merge_variables, results_missingness, output, lags, ColNames)
+
+
+
+# --- 9. Macroeconomic feature engineering
+# - Loading in the raw dataset
+if (!exists('datMV')) unpack.ffdf(paste0(genPath,"datMV"), tempPath)
+
+# - Lags
+# Specifying the lags (monthly) that should be applied
+lags <- c(1,2,3,6,9,12)
+# Creating a dataset with which to check if the lags are applied correctly to the macroeconomic variables
+datMV_Check1 <- data.table(Variable = NULL,
+                           Check = NULL)
+# Getting the column names with which to apply the lags
+ColNames <- colnames(datMV)[-1]
+# Looping over the specified lags and applying each to each of the specified columns
+for (i in seq_along(lags)){
+  for (j in seq_along(ColNames)){
+    datMV[, (paste0(ColNames[j],"_",lags[i])) := shift(get(ColNames[j]), n=lags[i], type="lag")]
+    datMV_Check1 <- rbind(datMV_Check1,
+                          data.table(Variable=paste0(ColNames[j],"_",lags[i]),
+                                     Check=sum(is.na(datMV[,get(paste0(ColNames[j],"_",lags[i]))]))==lags[i]))
+  }
+}
+# [SANITY CHECK] Check whether the lages were created correctly
+cat( (datMV_Check1[,.N]==sum(datMV_Check1$Check)) %?% "SAFE: Lags applied successfully to the macroeconomic variables.\n" %:%
+      "WARNING: Excessive missingness detected in the lagged macroeconomic variables.\n")
+
+# - Rolling volatility/ standard deviations
+# Specifying the rolling standard deviation windows (monthly) that should be applied
+SD_windows <- c(4,5,6,9,12)
+# Creating a dataset with which to check if the standard deviations are applied correctly to the macroeconomic variables
+datMV_Check2 <- data.table(Variable = NULL,
+                           Check = NULL)
+# Getting the column names with which to apply the rolling standard deviations
+ColNames <- colnames(datMV)[2:7]
+# Looping over the specified lags and applying each to each of the specified columns
+for (i in seq_along(SD_windows)){
+  for (j in seq_along(ColNames)){
+    datMV[, (paste0(ColNames[j],"_SD_",SD_windows[i])) := frollapply(get(ColNames[j]), n=SD_windows[i], FUN=sd, align="right")]
+    datMV_Check2 <- rbind(datMV_Check2,
+                          data.table(Variable=paste0(ColNames[j],"_SD_",SD_windows[i]),
+                                     Check=sum(is.na(datMV[,get(paste0(ColNames[j],"_SD_",SD_windows[i]))]))==SD_windows[i]-1))
+  }
+}
+# [SANITY CHECK] Check whether the lags were created correctly
+cat( (datMV_Check2[,.N]==sum(datMV_Check2$Check)) %?% "SAFE: Lags applied successfully to the macroeconomic variables.\n" %:%
+       "WARNING: Excessive missingness detected in the lagged macroeconomic variables.\n")
+
+# - Merging the macroeconomic information to the subsampled dataset
+datCredit_smp <- merge(datCredit_smp, subset(datMV, select=colnames(datMV)[!(colnames(datMV) %in% ColNames)]), by = "Date", all.x = T)
+# - Validate merging success )by checking for missingness (should be zero)
+list_merge_variables <- list(colnames(datMV))
+results_missingness <- list()
+for (i in 1:length(list_merge_variables)){
+  output <- sum(is.na(datCredit_smp$list_merge_variables[i]))
+  results_missingness[[i]] <- output
+}
+cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fusion with macroeconomic data is successful.\n" %:%
+       "WARNING: Missingness in certain macroecnomic fields detected, fusion compromised.\n")
+
+# - Cleanup
+rm(datMV); gc()
 
 ### AB: Note: Consider discretising interestrate_margin with portfolio-level view
+
+### EO: Guidance on portfolio-level variables. Deviations from the portfolio-average over a range of time to identify "abnormalities" of the underlying loan compared to the portfolio.
+
+
+
+# --- Save "description" objects to disk
+pack.ffdf(paste0(genObjPath, "var_Info_Cat"), var_Info_Cat)
+pack.ffdf(paste0(genObjPath, "var_Info_Num"), var_Info_Num)
+
 
 
 
@@ -353,7 +608,20 @@ set.seed(1)
 datCredit_train <- datCredit_smp %>% group_by(across(all_of(stratifiers))) %>% slice_sample(prop=train_prop) %>% as.data.table()
 datCredit_valid <- subset(datCredit_smp, !(Ind %in% datCredit_train$Ind)) %>% as.data.table()
 
+# - Clean up
+datCredit_train[,Ind:=NULL]; datCredit_valid[,Ind:=NULL]
+
+# - [SANITY CHECK] Ensuring that the resampling scheme reconstitutes the full (subsampled) dataset
+cat( (datCredit_smp[,.N] == datCredit_train[,.N] + datCredit_valid[,.N]) %?% "SAFE: Resampling scheme implemented successfully\n" %:%
+       "WARNING: Resampling scheme not implemented successfully.\n")
+
 # - Save to disk (zip) for quick disk-based retrieval later
 pack.ffdf(paste0(genPath, "creditdata_train"), datCredit_train); gc()
 pack.ffdf(paste0(genPath, "creditdata_valid"), datCredit_valid); gc()
 
+
+# --- Clean up
+rm(varList_Cat, varList_Num, var_Info_Cat, var_Info_Num, datExcl, datExclusions,
+   stratifiers, smp_perc, smp_size, targetVar, timeVar, train_prop, overlap_flds,
+   dat_Aggr, dat_g0_Delinq_Aggr, datMV_Check1, datMV_Check2, list_merge_variables, results_missingness,
+   ColNames, lags, confLevel, datCredit_smp)

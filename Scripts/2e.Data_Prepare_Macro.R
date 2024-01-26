@@ -192,23 +192,6 @@ check3 <- !any(is.na(macro_data_hist[, list(Inflation, Repo_Rate, HousePriceInde
 cat( check3 %?% 'SAFE: Interpolation successful with no residual missingness where relevant.\n' %:% 'WARNING: Residual missingness detected, treatment failed.\n')
 
 
-# --- c. Scaling
-
-# - create scaled "indices" of each macroeconomic variable
-### AB: Following marked for deletion.
-# uses custom interpolation function "scaler.norm()" defined in 0.Setup
-# macro_data_hist[, Inflation_I := scaler.norm(Inflation)]
-# macro_data_hist[, Repo_Rate_I := scaler.norm(Repo_Rate)]
-# macro_data_hist[, HousePriceIndex_I := scaler.norm(HousePriceIndex_Rate)]
-# macro_data_hist[, Employment_I := scaler.norm(Employment_Rate)]
-# macro_data_hist[, DSC_I := scaler.norm(DebtServiceCosts_Rate)]
-# macro_data_hist[, DTI_I := scaler.norm(DebtToIncome_Rate)]
-# macro_data_hist[, RealGDP_I := scaler.norm(RealGDP_Rate)]
-# macro_data_hist[, NominalGDP_I := scaler.norm(NominalGDP_Rate)]
-# macro_data_hist[, RealIncome_I := scaler.norm(RealIncome_Rate)]
-# macro_data_hist[, NominalIncome_I := scaler.norm(NominalIncome_Rate)]
-# macro_data_hist[, Consumption_I := scaler.norm(Consumption_Rate)]
-# macro_data_hist[, Durables_I := scaler.norm(Durables_Rate)]
 
 
 
@@ -230,9 +213,6 @@ cat( check3 %?% 'SAFE: Interpolation successful with no residual missingness whe
 
 # - Subsample monthly historical macroeconomic information with some light data preparation
 datMV <- macro_data_hist[,list(Date=as.Date(Date_T, format="%Y-%m-%d"),
-                                        ### AB: Following marked for deletion
-                                        #Repo_Rate_I, Inflation_I, DTI_I, Employment_I, 
-                                        #RealGDP_I, RealIncome_I, 
                                         M_Repo_Rate = Repo_Rate/100, 
                                         M_Inflation_Growth = round(Inflation/100,digits=4),
                                         M_DTI_Growth = round(DebtToIncome_Rate/100,digits=4),
@@ -241,28 +221,6 @@ datMV <- macro_data_hist[,list(Date=as.Date(Date_T, format="%Y-%m-%d"),
                                         M_RealIncome_Growth = round(RealIncome_Rate/100,digits=4))]
 
 
-# --- b. Test the correlation between the "raw" and scaled MVs
-### AB: Marked for deletion, though this bit of analysis can be moved to a short ancillary script if you'd like.
-#cor(dat_ClDiag_MVs$Repo_Rate_I, dat_ClDiag_MVs$M_Repo_Rate)
-# Correlation - 100%
-#cor(dat_ClDiag_MVs$Inflation_I, dat_ClDiag_MVs$M_Inflation_Growth)
-# Correlation - 99.99999%
-#cor(dat_ClDiag_MVs$DTI_I, dat_ClDiag_MVs$M_DTI_Growth)
-# Correlation - 100%
-#cor(dat_ClDiag_MVs$Employment_I, dat_ClDiag_MVs$M_Emp_Growth)
-# Correlation - 99.99993%
-#cor(dat_ClDiag_MVs$RealGDP_I, dat_ClDiag_MVs$M_RealGDP_Growth)
-# Correlation - 99.99994%
-#cor(dat_ClDiag_MVs$RealIncome_I, dat_ClDiag_MVs$M_RealIncome_Growth)
-# Correlation - 99.99996%
-# Since the variables are all highly/perfectly correlated, no need to test both in a modelling statement
-# Therefore, choose the raw macroeconomic variables to use as features in the model
-### AB: Agreed.
-
-# - Remove the scaled variants
-### AB: Marked for deletion
-#dat_ClDiag_MVs[, `:=`(Repo_Rate_I = NULL, Inflation_I = NULL, DTI_I = NULL, Employment_I = NULL,
- #                     RealGDP_I = NULL, RealIncome_I = NULL)]
 
 
 
