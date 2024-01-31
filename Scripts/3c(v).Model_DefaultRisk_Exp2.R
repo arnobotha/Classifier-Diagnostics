@@ -20,10 +20,11 @@
 #   - 0a.CustomFunctions.R
 #
 # -- Inputs:
-#   - datCredit_real | Prepared credit data from script 2f
+#   - datCredit_train | Prepared credit data from script 3b
+#   - datCredit_valid | Prepared credit data from script 3b
 #
 # -- Outputs:
-#   - 
+#   - Various results and recommendations from experiments.
 # =========================================================================================
 
 
@@ -256,7 +257,7 @@ logitMod_g0_Any2 <- glm(form_g0_Any2, data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_g0_Any2) # Null deviance = 552507; Residual deviance = 548305; AIC = 548325
 # - Variable importance
-varImport(logitMod_g0_Any2) # Top 3 variables: [g0_Delinq_Any_Aggr_Prop_5], and [g0_Delinq_Any_Aggr_Prop]
+varImport(logitMod_g0_Any2) # Top 3 variables: [g0_Delinq_Any_Aggr_Prop_5] and [g0_Delinq_Any_Aggr_Prop]
 # - ROC analysis
 datCredit_valid[, prob_g0_Any2 := predict(logitMod_g0_Any2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_Any2) # 55.8%
@@ -377,7 +378,7 @@ varImport(logitMod_IRM_best) # Top 3 variables: [InterestRate_Margin_mean_Aggr_m
 # - ROC analysis
 datCredit_valid[, prob_IRM_best := predict(logitMod_IRM_best, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM_best) # 55.53%
-### RESULTS:    The final set of variables are [InterestRate_Margin_imputed_Aggr_1], [InterestRate_Margin_imputed_Aggr_2], and [InterestRate_Margin_imputed_Aggr_12]
+### RESULTS:    The final set of variables are [InterestRate_Margin_imputed_Aggr_mean_1], [InterestRate_Margin_imputed_Aggr_mean_2], and [InterestRate_Margin_imputed_Aggr_mean_12]
 ###             All coefficient estimates and the associated standard errors are very large.
 
 # --- Clean up
@@ -442,6 +443,8 @@ varImport(logitMod_IRM3) # Top 3 variables: [InterestRate_Margin_mean_Aggr_med_3
 datCredit_valid[, prob_IRM3:= predict(logitMod_IRM3, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM3) # 55.6%
 
+### CONCLUSION: Use [InterestRate_Margin_mean_Aggr_med], [InterestRate_Margin_mean_Aggr_med_1], [InterestRate_Margin_mean_Aggr_med_2], and [InterestRate_Margin_mean_Aggr_med_3]
+
 # --- Clean up
 rm(ColNames, logitMod_IRM2,logitMod_IRM3, logitMod_IRM_best, inputs_IRM2, inputs_IRM3, form_IRM2, form_IRM3)
 datCredit_valid[, `:=` (prob_IRM2=NULL, prob_IRM_best=NULL, prob_IRM3=NULL)]
@@ -480,7 +483,7 @@ varImport(logitMod_NL_best) # Top 3 variables: [NewLoans_Aggr_Prop], [NewLoans_A
 # - ROC analysis
 datCredit_valid[, prob_NL_best := predict(logitMod_NL_best, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_NL_best) # 53.53%
-### RESULTS:    The final set of variables are [NewLoans_Aggr_Prop], [NewLoans_Aggr_Prop_1], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_PRop_4], [NewLoans_Aggr_Prop_5], and [NewLoans_Aggr_Prop_12]
+### RESULTS:    The final set of variables are [NewLoans_Aggr_Prop], [NewLoans_Aggr_Prop_1], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop_4], [NewLoans_Aggr_Prop_5], and [NewLoans_Aggr_Prop_12]
 
 # --- Clean up
 rm(ColNames, logitMod_NL1, logitMod_NL_best, form_NL1, inputs_NL1)
@@ -544,6 +547,7 @@ varImport(logitMod_NL3) # Top 3 variables: [NewLoans_Aggr_Prop], [NewLoans_Aggr_
 datCredit_valid[, prob_NL3:= predict(logitMod_NL3, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_NL3) # 52.59%
 
+### CONCLUSION: Use [NewLoans_Aggr_Prop], [NewLoans_Aggr_Prop_1], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop_4], and [NewLoans_Aggr_Prop_5]
 
 # --- Clean up
 rm(ColNames, logitMod_NL2, logitMod_NL3, logitMod_NL_best, form_NL2, form_NL3, inputs_NL2, inputs_NL3)
@@ -604,6 +608,7 @@ varImport(logitMod_g0_SD2) # Top 2 variables: [g0_Delinq_SD_6], [g0_Delinq_SD_4]
 datCredit_valid[, prob_g0_SD2 := predict(logitMod_g0_SD2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_SD2) # 73.03%
 
+### CONCLUSION: Use [g0_Delinq_SD_6] and [g0_Delinq_SD_4]
 
 # --- Clean up
 rm(logitMod_g0_SD1, logitMod_g0_SD2, logitMod_g0_SD_best, form_g0_SD1, form_g0_SD2, inputs_g0_SD1, inputs_g0_SD2, ColNames)

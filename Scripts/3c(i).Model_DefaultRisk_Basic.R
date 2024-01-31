@@ -3,7 +3,7 @@
 # features to models with more features to predict default risk.
 # ---------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer
+# SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer, Marcel Muller
 
 # DESCRIPTION:
 # This script uses the previously prepared credit dataset  to create multiple logistic
@@ -13,12 +13,14 @@
 # -- Script dependencies:
 #   - 0.Setup.R
 #   - 0a.CustomFunctions.R
+#   - 3b.Data_Subsample_Fusion2
 #
 # -- Inputs:
-#   - datCredit_real | Prepared credit data from script 2f
+#   - datCredit_train | Prepared credit data from script 3b
+#   - datCredit_valid | Prepared credit data from script 3b
 #
 # -- Outputs:
-#   - 
+#   - Sets of macroeconomic variables as selected thematically and using the entire input space.
 # =======================================================================================
 
 # GOAL: Series of candidate models, starting with simplest logit-models containing ONLY the most basic of information, e.g., delinquency-themed input spaces.
@@ -49,9 +51,6 @@ datCredit_valid <- datCredit_valid %>% subset(DefaultStatus1==0)
 # Modelling Tutorials: https://stats.oarc.ucla.edu/r/dae/logit-regression/
 # https://stackoverflow.com/questions/63748817/odds-ratio-and-95-ci-for-interaction-in-logistic-model-in-r
 # https://stackoverflow.com/questions/41384075/r-calculate-and-interpret-odds-ratio-in-logistic-regression
-
-### AB: Look at a correlalogram - cFLI codebase | can be used as a callable function
-
 
 # --- 2.1 Correlation analysis using Spearman correlation
 # - Correlation threshold
@@ -143,7 +142,7 @@ summary(logitMod_ali_best) # No insignificant variables
 ### CONCLUSION:   Use of all specified variables
 
 # - Clean up
-rm(logitMod_ali_best, logit_ali1)
+rm(logit_ali1)
 datCredit_valid[,prob_ali1:=NULL]
 
 
@@ -171,14 +170,19 @@ datCredit_valid[,prob_ali_exp3:=NULL]
 
 
 # --- 2.5 Final account-level information variables
+# - FIRM analysis on the final model (which in this case is the variables from the best subset model)
+varImport_logit(logitMod_ali_best, method="pd", plot=T, pd_plot=T, sig_level=0.1) # Top 3 variables: [Balance], [Principal], and [TimeInPerfSpell]
+# - Final variables
+### CONCLUSION: Use [TimeInPerfSpell], [Term], [Balance], [InterestRate_Margin_imputed_mean], [Principal] as the account-level information variables.
+# - Save variables
 inputs_ali_fin <-  DefaultStatus1_lead_12_max ~ TimeInPerfSpell + Term + Balance + InterestRate_Margin_imputed_mean + Principal
 pack.ffdf(paste0(genObjPath, "ALI_Formula"), inputs_ali_fin); gc()
-###  CONCLUSION:    Use [inputs_ali_fin] as set of account-level information variables
 
 
 
 # --- 2.6 Clean up
-rm(cor_ali_spear, ind_row_spear, ind_col_spear, cor_ali_spear2, inputs_ali_fin)
+rm(cor_ali_spear, ind_row_spear, ind_col_spear, cor_ali_spear2, inputs_ali_fin,
+   logitMod_ali_best)
 
 
 
@@ -247,7 +251,7 @@ summary(logitMod_del1) # Null deviance = 255631; Residual deviance = 171760; AIC
 round(exp(cbind(OR = coef(logitMod_del1), confint.default(logitMod_del1))), 3)
 # ROC analysis
 datCredit_valid[, prob_del1 := predict(logitMod_del1, newdata = datCredit_valid, type="response")]
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del1) # 87.72%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del1) # 87.62%
 
 # - Best subset selection
 logitMod_del_best <- MASS::stepAIC(logitMod_del1, direction="both")
@@ -270,8 +274,8 @@ summary(logitMod_del_exp2) # Null deviance = 255631; Residual deviance = 171747;
 # - ROC analysis
 datCredit_valid[, prob_del_exp2 := predict(logitMod_del_exp2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp2) # 87.61%
-### RESULTS   : Model with factorised delinquency variable has lower AIC (123648 vs 122791) and a slightly higher AUC (95.93% vs 95.91%) than the model with the raw variable 
-### COMCLUSION: Use [g0_Delinq_fac] as it has better predictive power and allows for non-linear relationships between the delinquency level and default
+### RESULTS   : Model with factorised delinquency variable has lower AIC (171773 vs 171784) and a slightly lower AUC (87.61% vs 87.72%) than the model with the raw variable 
+### COMCLUSION: Use [g0_Delinq] as it has better predictive power and results in a slightly more parsimonious model (1- vs 2 variables)
 
 # - Clean up
 rm(logitMod_del_exp2); gc()
@@ -313,11 +317,16 @@ datCredit_valid[, `:=`(prob_del_exp3_1=NULL, prob_del_exp3_2=NULL)]
 
 
 
-# --- 3.6 Final delinquency information variables
-inputs_del_fin <- DefaultStatus1_lead_12_max ~ PrevDefaults + g0_Delinq_fac + g0_Delinq_Num + g0_Delinq_SD + PerfSpell_g0_Delinq_Num +
-  PerfSpell_g0_Delinq_SD + slc_acct_roll_ever_24_imputed/value_ind_slc_acct_roll_ever_24 + slc_acct_arr_dir_3 + slc_past_due_amt_imputed
+# --- 3.6 Final delinquency-level information variables
+# - FIRM analysis on the final model (which in this case is the variables from the best subset model)
+varImport_logit(logitMod_del_best, method="pd", plot=T, pd_plot=T, sig_level=0.1) # Top 3 variables: [Balance], [Principal], and [TimeInPerfSpell]
+# - Final variables
+### CONCLUSION: Use [PrevDefaults], [g0_Delinq], [g0_Delinq_Num], [g0_Delinq_SD_4], [g0_Delinq_SD_6], [PerfSpell_g0_Delinq_Num],
+###                 [slc_acct_roll_ever_24_imputed_mean], [slc_acct_arr_dir_3], [slc_past_due_amt_imputed_med]
+# - Save variables
+inputs_del_fin <- DefaultStatus1_lead_12_max ~ PrevDefaults + g0_Delinq + g0_Delinq_Num + g0_Delinq_SD_4 + g0_Delinq_SD_6 +
+  PerfSpell_g0_Delinq_Num + slc_acct_roll_ever_24_imputed_mean + slc_acct_arr_dir_3 + slc_past_due_amt_imputed_med
 pack.ffdf(paste0(genObjPath, "Del_Formula"), inputs_del_fin); gc()
-###  CONCLUSION:    Use [inputs_del_fin] as set of account-level information variables
 
 
 
@@ -377,6 +386,7 @@ datCredit_valid[, `:=` (prob_beh_exp1_1, prob_beh_exp1_2)]
 # - Full model (as fitted above)
 logitMod_beh_exp2_1 <- glm(DefaultStatus1_lead_12_max ~ slc_acct_pre_lim_perc_imputed_med + slc_pmnt_method
                           , data=datCredit_train, family = "binomial")
+# - Model with which to compare the full model
 logitMod_beh_exp2_2 <- glm(DefaultStatus1_lead_12_max ~ slc_acct_pre_lim_perc_imputed_med + pmnt_method_grp
                            , data=datCredit_train, family = "binomial")
 # - Deviance and AIC
@@ -390,14 +400,14 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_beh_exp2_2)
 ### CONCLUSION:  Use [slc_pmnt_method] as it results in a model with a slightly higher AUC and a lower AIC.
 
 # - Clean up
-rm(logitMod_beh_exp2_1, logitMod_beh_exp2_2); gc()
+rm(logitMod_beh_exp2_2); gc()
 datCredit_valid[, `:=` (prob_beh_exp2_1=NULL, prob_beh_exp2_2=NULL)]
 
 
 
 # --- 4.4 Subtheme: Missing value indicators
 # - Full model (as fitted above)
-logitMod_beh_exp3 <- glm(DefaultStatus1_lead_12_max ~ slc_acct_pre_lim_perc_imputed/value_ind_slc_acct_pre_lim_perc + slc_pmnt_method # [slc_pmnt_method] already has a dedicated level for missing values, therefore do not include the missing value indicator
+logitMod_beh_exp3 <- glm(DefaultStatus1_lead_12_max ~ slc_acct_pre_lim_perc_imputed_med/value_ind_slc_acct_pre_lim_perc + slc_pmnt_method # [slc_pmnt_method] already has a dedicated level for missing values, therefore do not include the missing value indicator
                          , data=datCredit_train, family = "binomial")
 # - Deviance and AIC
 summary(logitMod_beh_exp3) # Null deviance = 275184; Residual deviance = 252143; AIC = 252159
@@ -413,15 +423,20 @@ datCredit_valid[, prob_beh_exp3:=NULL]
 
 
 
-# --- 4.5 Final behavioral information variables
-inputs_beh_fin <- DefaultStatus1_lead_12_max ~ slc_acct_pre_lim_perc_imputed + slc_pmnt_method
+# --- 4.5 Final behavioral-information variables
+# - FIRM analysis on the final model (which in this case is the variables from the best subset model)
+varImport_logit(logitMod_beh_exp2_1, method="pd", plot=T, pd_plot=T, sig_level=0.1) # Top 2 variables: Error in partial.default(...): NA not found in training data
+# - Final variables
+### CONCLUSION: Use [slc_acct_pre_lim_perc_imputed_med], [slc_pmnt_method]
+# - Save variables
+inputs_beh_fin <- DefaultStatus1_lead_12_max ~ slc_acct_pre_lim_perc_imputed_med + slc_pmnt_method
 pack.ffdf(paste0(genObjPath, "Beh_Formula"), inputs_beh_fin); gc()
 ###  CONCLUSION:    Use [inputs_beh_fin] as set of behavioral information variables
 
 
 
 # --- 4.6 Clean up
-rm(cor_beh_spear, ind_row_spear, ind_col_spear, cor_beh_spear2, inputs_beh_fin); gc()
+rm(cor_beh_spear, ind_row_spear, ind_col_spear, cor_beh_spear2, inputs_beh_fin, logitMod_beh_exp2_1); gc()
 
 
 
@@ -431,12 +446,11 @@ rm(cor_beh_spear, ind_row_spear, ind_col_spear, cor_beh_spear2, inputs_beh_fin);
 # - Correlation threshold
 cor_thresh <- 0.6
 # - Computing the correlation matrix
-cor_por_spear <-cor(x=datCredit_train[!is.na(g0_Delinq_Any_Aggr_Lag_12),list(g0_Delinq_Any_Aggr, g0_Delinq_Any_Aggr_Lag_5, g0_Delinq_Any_Aggr_Lag_12, g0_Delinq_Ave,
-                                                                             InstalmentToBalance_Aggr, CuringEvents_Aggr,
-                                                                             NewLoans_Aggr, NewLoans_Aggr_1, NewLoans_Aggr_3, NewLoans_Aggr_4, NewLoans_Aggr_5, NewLoans_Aggr_12,
-                                                                             BookMaturity_Aggr, PerfSpell_Maturity_Aggr, AgeToTerm_Aggr,
-                                                                             InterestRate_Margin_imputed_Aggr, InterestRate_Margin_imputed_Aggr_1, InterestRate_Margin_imputed_Aggr_2,
-                                                                             InterestRate_Margin_imputed_Aggr_12)],
+cor_por_spear <-cor(x=datCredit_train[!is.na(g0_Delinq_Any_Aggr_Prop_Lag_5),list(g0_Delinq_Any_Aggr_Prop, g0_Delinq_Any_Aggr_Prop_Lag_5, g0_Delinq_Ave, # Subsetting so that there are no missing values taken into account in the correlation matrix
+                                                                                 InstalmentToBalance_Aggr_Prop, CuringEvents_Aggr_Prop,
+                                                                                 NewLoans_Aggr_Prop, NewLoans_Aggr_Prop_1, NewLoans_Aggr_Prop_3, NewLoans_Aggr_Prop_4, NewLoans_Aggr_Prop_5,
+                                                                                 BookMaturity_Aggr_Mean, PerfSpell_Maturity_Aggr_Mean, AgeToTerm_Aggr_Mean,
+                                                                                 InterestRate_Margin_Aggr_Med, InterestRate_Margin_Aggr_Med_1, InterestRate_Margin_Aggr_Med_2, InterestRate_Margin_Aggr_Med_3)],
                     method = "spearman")
 # - Creating a correlalogram
 corrplot(cor_por_spear, type="upper")
@@ -453,16 +467,16 @@ for(i in 1:(nrow(cor_por_spear2))) {cat("Absolute correlation above ", cor_thres
 ###   These aggregated portfolio-level variables are expected to be highly correlated with each other, so the following conclusions may seek to overide many of these high correlations as to fit a model capable of capturing default contagion.
 ###   The aggregated delinquency variables have high correlations among themselves and many other variables. Do not remove variables as they give vital information on default contagion.
 ###   The aggregated new loans variables have high correlation among themselves (but not to other variables). Do not remove variables.
-###   The aggregated interest rate margin variables have high correlations among themselves and many other variables. Test if these variables are worth keeping (either in the best subset procedure are in a subtheme)
+###   The aggregated interest rate margin variables have high correlations among themselves and many other variables. Do not remove as they may still give vital information of default contagion
 ###   Remove [g0_Delinq_Ave] as it the information of this variable is inherently captured by the aggregated delinquency variables
 ###   Remove either [BookMaturity_Aggr] or [PerfSpell_Maturity_Aggr]
 
 
 # --- 5.2 Prelimanry experimenting: Using insights from correlation analysis
 # - [BookMaturity_Aggr] vs [PerfSpell_Maturity_Aggr]
-logitMod_por_exp1_1 <- glm(DefaultStatus1_lead_12_max ~ BookMaturity_Aggr
+logitMod_por_exp1_1 <- glm(DefaultStatus1_lead_12_max ~ BookMaturity_Aggr_Mean
                            , data=datCredit_train, family="binomial")
-logitMod_por_exp1_2 <- glm(DefaultStatus1_lead_12_max ~ PerfSpell_Maturity_Aggr
+logitMod_por_exp1_2 <- glm(DefaultStatus1_lead_12_max ~ PerfSpell_Maturity_Aggr_Mean
                            , data=datCredit_train, family="binomial")
 summary(logitMod_por_exp1_1) # Null deviance = 275184; Residual deviance = 272044; AIC = 272048
 summary(logitMod_por_exp1_2) # Null deviance = 275184; Residual deviance = 274819; AIC = 274823
@@ -480,46 +494,53 @@ datCredit_valid[, `:=` (prob_por_exp1_1=NULL, prob_por_exp1_2=NULL)]
 
 # --- 5.3 Best subset selection
 # - Full logit model with all account-level information - Exclude variables using insights from correlation analysis:  [g0_Delinq_Ave]; [PerfSpell_Maturity_Aggr]
-logitMod_por1 <- glm(inputs_por1 <- DefaultStatus1_lead_12_max ~ g0_Delinq_Any_Aggr + g0_Delinq_Any_Aggr_Lag_5 + g0_Delinq_Any_Aggr_Lag_12 +
-                     InstalmentToBalance_Aggr + CuringEvents_Aggr +
-                     NewLoans_Aggr + NewLoans_Aggr_1 + NewLoans_Aggr_3 + NewLoans_Aggr_4 + NewLoans_Aggr_5 + NewLoans_Aggr_12 +
-                     BookMaturity_Aggr + AgeToTerm_Aggr + 
-                     InterestRate_Margin_imputed_Aggr + InterestRate_Margin_imputed_Aggr_1 + InterestRate_Margin_imputed_Aggr_2 +
-                     InterestRate_Margin_imputed_Aggr_12
+logitMod_por1 <- glm(inputs_por1 <- DefaultStatus1_lead_12_max ~ g0_Delinq_Any_Aggr_Prop + g0_Delinq_Any_Aggr_Prop_Lag_5 +
+                     InstalmentToBalance_Aggr_Prop + CuringEvents_Aggr_Prop +
+                     NewLoans_Aggr_Prop + NewLoans_Aggr_Prop_1 + NewLoans_Aggr_Prop_3 + NewLoans_Aggr_Prop_4 + NewLoans_Aggr_Prop_5 +
+                     BookMaturity_Aggr_Mean + AgeToTerm_Aggr_Mean +
+                     InterestRate_Margin_Aggr_Med + InterestRate_Margin_Aggr_Med_1 + InterestRate_Margin_Aggr_Med_2 + InterestRate_Margin_Aggr_Med_3
                      , data=datCredit_train, family="binomial")
 
 # - Assess full model
 # Deviance and AIC
-summary(logitMod_por1) # Null deviance = 248769; Residual deviance = 245789; AIC = 245823
+summary(logitMod_por1) # Null deviance = 266435; Residual deviance = 262841; AIC = 262871
 # Odds Ratio analysis 
 round(exp(cbind(OR = coef(logitMod_por1), confint.default(logitMod_por1))), 3)
 # ROC analysis
 datCredit_valid[, prob_por1 := predict(logitMod_por1, newdata = datCredit_valid, type="response")]
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_por1) # 58.15%
-### RESULTS   : [AgeToTerm_Aggr] has a fitted coefficient of "NA", whilst the estimated coefficients and standard errors of all variables related to [InterestRate_Margin_imputed_Aggr] are very large.
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_por1) # 58.29%
+### RESULTS   : [AgeToTerm_Aggr]_Mean has a fitted coefficient of "NA", whilst the estimated coefficients and standard errors of all variables related to [InterestRate_Margin_imputed_Aggr] are very large.
 ###             Most variables are insignificant.
-### CONCLUSION: Run 
+### CONCLUSION: Perform best subset selection.
 
 
 # - Best subset selection
 logitMod_por_best <- MASS::stepAIC(logitMod_por1, direction="both")
-# Start AIC = 245823
-# End AIC = 245810.3
+# Start AIC = 262871.1
+# End AIC = 62863.1
 summary(logitMod_por_best) # No insignificant variables left in model
+# ROC Analysis
 datCredit_valid[, prob_por_best := predict(logitMod_por_best, newdata = datCredit_valid, type="response")]
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_por_best) # 58.16%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_por_best) # 58.32%
 length(all.vars(getCall(logitMod_por1)$formula)); length(all.vars(getCall(logitMod_por_best)$formula))
-### RESULTS:      The AIC of the model from the best subset selection is lower than the full model (245810 vs 245823).
-###               The AUC of the model from the best subset selection is slightly higher than the full model (58.16% vs 58.15%).
-###               The number of variables in the model from the best subset selection has been reduced to 9 from the full model which has 19 variables.
+### RESULTS:      The AIC of the model from the best subset selection is lower than the full model (262863 vs 262871).
+###               The AUC of the model from the best subset selection is slightly higher than the full model (58.32% vs 58.29%).
+###               The number of variables in the model from the best subset selection has been reduced to 8 from the full model which has 18 variables.
 
 ### CONCLUSION:   Use the specified variables of the best subset selection in the dynamic variable selection process.
 
 
 
 # --- 5.5 Final portfolio-level information variables
-inputs_por_fin <- DefaultStatus1_lead_12_max ~ g0_Delinq_Any_Aggr + CuringEvents_Aggr + NewLoans_Aggr_1 + NewLoans_Aggr_3 + NewLoans_Aggr_12 + BookMaturity_Aggr +
-  InterestRate_Margin_imputed_Aggr + InterestRate_Margin_imputed_Aggr_12
+# - FIRM analysis on the final model (which in this case is the variables from the best subset model)
+# Variable importance
+varImport_logit(logitMod_por_best, method="pd", plot=T, pd_plot=T, sig_level=0.1) # Top 3 variables: [g0_Delinq_Any_Aggr_Prop], [BookMaturity_Aggr_Mean], and [NewLoans_Aggr_Prop_1]
+# - Final variables
+### CONCLUSION: Use [g0_Delinq_Any_Aggr_Prop], [NewLoans_Aggr_Prop_1], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop_5], [BookMaturity_Aggr_Mean],
+###                 [InterestRate_Margin_Aggr_Med], [InterestRate_Margin_Aggr_Med_2]
+# - Save variables
+inputs_por_fin <- DefaultStatus1_lead_12_max ~ g0_Delinq_Any_Aggr_Prop + NewLoans_Aggr_Prop_1 + NewLoans_Aggr_Prop_3 + NewLoans_Aggr_Prop_5 + BookMaturity_Aggr_Mean +
+  InterestRate_Margin_Aggr_Med + InterestRate_Margin_Aggr_Med_2
 pack.ffdf(paste0(genObjPath, "Por_Formula"), inputs_por_fin); gc()
 ###  CONCLUSION:    Use [inputs_por_fin] as set of portfolio-level information variables
 
@@ -533,16 +554,72 @@ rm(cor_por_spear, ind_row_spear, ind_col_spear, cor_por_spear2,
 
 
 
+# ------ 6. Modelling & Feature Selection by combining all previous themes
+# --- Create full model formula
+# - Load in all thematic variables
+unpack.ffdf(paste0(genObjPath, "ALI_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Del_Formula"), tempPath)
+unpack.ffdf(paste0(genObjPath, "Beh_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Por_Formula"), tempPath)
+# - Create formula
+inputs_full <- c(labels(terms(inputs_ali_fin)), labels(terms(inputs_del_fin)), labels(terms(inputs_beh_fin)), labels(terms(inputs_por_fin)))
+form_com_full <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_full, collapse="+")))
+
+# --- Full model
+# - Full logit model with all account-level information - Exclude variables using insights from correlation analysis:  [g0_Delinq_Ave]; [PerfSpell_Maturity_Aggr]
+logitMod_full1 <- glm(form_com_full, data=datCredit_train, family="binomial")
+# - Assess full model
+# Deviance and AIC
+summary(logitMod_full1) # Null deviance = 255631; Residual deviance = 168141; AIC = 168203
+# Odds Ratio analysis
+round(exp(cbind(OR = coef(logitMod_full1), confint.default(logitMod_full1))), 3)
+# ROC analysis
+datCredit_train[, prob_full1 := predict(logitMod_full1, newdata = datCredit_train, type="response")]
+datCredit_valid[, prob_full1 := predict(logitMod_full1, newdata = datCredit_valid, type="response")]
+auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_full1) # 90.67%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full1) # 90.61%
+car::vif(logitMod_full1)
+### RESULTS:  Not all variable are significant, run a best subset selection
+
+# --- Best subset
+logitMod_full_best <- MASS::stepAIC(logitMod_full1, direction="both")
+# Start AIC = 168202.9
+# End AIC = 168202.6
+# - Assess best subset full model
+# Deviance and AIC
+summary(logitMod_full_best) # Null deviance = 255631; Residual deviance = 168141; AIC = 168203
+# Odds Ratio analysis
+round(exp(cbind(OR = coef(logitMod_full_best), confint.default(logitMod_full_best))), 3)
+# FIRM analysis
+varImport_logit(logitMod_full_best, method="pd", plot=T, pd_plot=T, sig_level=0.1) # Top 3 variables: [M_RealIncome_Growth_12], [M_RealGDP_Growth_12], and [M_RealIncome_Growth_9]
+# ROC analysis
+datCredit_train[, prob_full_best1 := predict(logitMod_full_best, newdata = datCredit_train, type="response")]
+datCredit_valid[, prob_full_best1 := predict(logitMod_full_best, newdata = datCredit_valid, type="response")]
+auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_full_best1) # 90.67%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full_best1) # 90.61%
+# VIF analysis
+car::vif(logitMod_full_best)
+
+### RESULTS:  All variables are significant and have reasonable standard errors.
+###           Model is not overfitted as evidenced by the small change in AUC when a ROC analysis is conducted on the training- and validaiton datasets (90.67% vs 90.61%)
+###           Number of variables is reduced from xx in the full model to xx in the best subset model
+###           Some VIFs are over 10, but majority are not; thus no cause for concern.
+
+### CONCLUSION: Use variable from best subset selection.
+
+# --- Save model formula to disk
+# - Final variables
+### CONCLUSION: Use [TimeInPerfSpell], [Term], [Balance], [g0_Delinq], [g0_Delinq_Num], [g0_Delinq_SD_4], [g0_Delinq_SD_6], [PerfSpell_g0_Delinq_Num],
+###                 [slc_acct_roll_ever_24_imputed_mean], [slc_acct_arr_dir_3], [slc_past_due_amt_imputed_med], [slc_acct_pre_lim_perc_imputed_med],
+###                 [slc_pmnt_method], [g0_Delinq_Any_Aggr_Prop], [NewLoans_Aggr_Prop_1], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop_5],
+###                 [BookMaturity_Aggr_Mean], [InterestRate_Margin_Aggr_Med_2]
+# - Save variables
+inputs_fin_com <- formula(logitMod_full_best)
+pack.ffdf(paste0(genObjPath, "Basic_Com_Formula"), inputs_fin_com); gc()
 
 
-
-
-
-
-
-
-
-
+# --- Clean up
+datCredit_train[,`:=`(prob_full1=NULL, prob_full_best1=NULL)]
+datCredit_valid[,`:=`(prob_full1=NULL, prob_full_best1=NULL)]
+rm(logitMod_full1, logitMod_full_best)
 
 
 
@@ -615,6 +692,9 @@ rm(cor_por_spear, ind_row_spear, ind_col_spear, cor_por_spear2,
 # odds <- probs / (1-probs)
 # plot(x=probs, y=odds, type="b")
 # Put odds ratios as annotations on above graph (ggplot2-variant of course)
+
+# See this link for plotting odds ratios on a log scale (which should always be done when comparing odds ratios in a graph):
+# https://andrewpwheeler.com/2013/10/26/odds-ratios-need-to-be-graphed-on-log-scales/
 
 
 

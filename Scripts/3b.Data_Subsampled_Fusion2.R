@@ -490,9 +490,9 @@ cat( (sum(datCredit_smp[, sum(is.na(BookMaturity_Aggr_Mean)), by=Date][,2])==0) 
        'WARNING: New feature [AgeToTerm_Aggr_Mean] has illogical values \n' )
 (var_Info_Cat$AgeToTerm_Aggr_Mean <- describe(datCredit_smp$AgeToTerm_Aggr_Mean)); plot(unique(datCredit_smp$AgeToTerm_Aggr_Mean))
 
-# - Average interest rate margin
+# - Median aggregated interest rate margin | The median is preferred over the mean as it results in a superior model - ss investigated in the experimental script (3c(v).Model_DefaultRisk-exp2)
 # Creating an aggregated dataset
-dat_IRM_Aggr <- datCredit_smp[, list(InterestRate_Margin_Aggr_Mean = mean(InterestRate_Margin_imputed_mean, na.rm=T)/.N), by=list(Date)]
+dat_IRM_Aggr <- datCredit_smp[, list(InterestRate_Margin_Aggr_Med = median(InterestRate_Margin_imputed_mean, na.rm=T)/.N), by=list(Date)]
 # Applying various lags
 lags <- c(1,2,3) # Lags as found to be significant within the experimental script
 dat_IRM_Aggr_Check1 <- data.table(Variable = NULL, # Dataset for conducting sanity checks
@@ -507,8 +507,8 @@ for (i in seq_along(lags)){ # Looping over the specified lags and applying each 
   }
 }
 # [SANITY CHECK] Check whether the lags were created correctly
-cat( (dat_IRM_Aggr_Check1[,.N]==sum(dat_IRM_Aggr_Check1$Check)) %?% "SAFE: Lags applied successfully to the aggregated variable [InterestRate_Margin_Aggr_Mean].\n" %:%
-       "WARNING: Excessive missingness detected in the lagged aggregated variable [InterestRate_Margin_Aggr_Mean] variables.\n")
+cat( (dat_IRM_Aggr_Check1[,.N]==sum(dat_IRM_Aggr_Check1$Check)) %?% "SAFE: Lags applied successfully to the aggregated variable [InterestRate_Margin_Aggr_Med].\n" %:%
+       "WARNING: Excessive missingness detected in the lagged aggregated variable [InterestRate_Margin_Aggr_Med] variables.\n")
 # Merging the credit dataset with the aggregated dataset
 datCredit_smp <- merge(datCredit_smp, dat_IRM_Aggr, by="Date", all.x=T)
 # Validate merging success )by checking for missingness (should be zero)
@@ -520,7 +520,7 @@ for (i in 1:length(list_merge_variables)){
 }
 cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fusion with aggregated data is successful.\n" %:%
        "WARNING: Missingness in certain aggregated fields detected, fusion compromised.\n")
-(var_Info_Num$InterestRate_Margin_Aggr_Mean <- describe(datCredit_smp$InterestRate_Margin_Aggr_Mean)); plot(unique(datCredit_smp$InterestRate_Margin_Aggr_Mean)) # Only saving the base variable's descriptive statistics
+(var_Info_Num$InterestRate_Margin_Aggr_Med <- describe(datCredit_smp$InterestRate_Margin_Aggr_Med)); plot(unique(datCredit_smp$InterestRate_Margin_Aggr_Med)) # Only saving the base variable's descriptive statistics
 # Clean up
 rm(dat_IRM_Aggr, dat_IRM_Aggr_Check1, list_merge_variables, results_missingness, output, lags, ColNames)
 

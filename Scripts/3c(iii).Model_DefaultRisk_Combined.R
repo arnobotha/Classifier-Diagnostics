@@ -38,32 +38,41 @@ datCredit_train <- datCredit_train %>% subset(DefaultStatus1==0)
 datCredit_valid <- datCredit_valid %>% subset(DefaultStatus1==0)
 
 # - Load in all formulas
-unpack.ffdf(paste0(genObjPath, "ALI_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Del_Formula"), tempPath)
-unpack.ffdf(paste0(genObjPath, "Beh_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Por_Formula"), tempPath)
-unpack.ffdf(paste0(genObjPath, "Dev_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Mac_Repo_Formula"), tempPath)
-unpack.ffdf(paste0(genObjPath, "Mac_Full_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Mac_Red_Formula"), tempPath)
-unpack.ffdf(paste0(genObjPath, "Mac_Full_Sub_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Mac_Red_Sub_Formula"), tempPath)
+# Basic variables
+unpack.ffdf(paste0(genObjPath, "Basic_Com_Formula"), tempPath)
+# Macroeconomic variables
+unpack.ffdf(paste0(genObjPath, "Mac_Com_Full_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Mac_Com_Theme_Formula"), tempPath)
 
 
 
 
-# ------ 2. Combined variables, excluding all SD macroeconomic variables
+# ------ 2. Combing the basic variables with the macroeconomic vairables form the thematic selection
 # --- Concatenate all variables into a single formula
-inputs_com1 <- c(labels(terms(inputs_ali_fin)), labels(terms(inputs_del_fin)), labels(terms(inputs_beh_fin)), labels(terms(inputs_por_fin)),
-                 labels(terms(form_mac_final1)))
+inputs_com1 <- c(labels(terms(inputs_fin_com)), inputs_mac_com_fin_theme)
 # --- Create formula
 form_com1 <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_com1, collapse="+")))
 # --- Fitting the full model
 logitMod_com1 <- glm(form_com1, data=datCredit_train, family="binomial")
 # --- Deviance and AIC
-summary(logitMod_com1) # Null deviance = 248088; Residual deviance = 105949; AIC = 106119
-# --- Odds Ratio analysis
-round(exp(cbind(OR = coef(logitMod_com1), confint.default(logitMod_com1))), 3)
+summary(logitMod_com1) # Null deviance = 254945; Residual deviance = 167618; AIC = 167714
+### RESULTS:    Not all variables are significant.
+### CONCLUSION: Run a best subset selection.
+
+# --- Best subset selection
+logitMod_com_best1 <- MASS::stepAIC(logitMod_com1, direction="both")
+# Start AIC = 167713.6
+# End AIC = 62863.1
+# - AIC and deviance
+summary(logitMod_com_best1)
+# - Odds Ratio analysis
+round(exp(cbind(OR = coef(logitMod_com_best1), confint.default(logitMod_com_best1))), 3)
+# - FIRM analysis
+varImport_logit(logitMod_com_best1, method="pd", plot=T, pd_plot=T, sig_level=0.1) # Top 2 variables: Error in partial.default(...): NA not found in training data
 # --- ROC analysis
-datCredit_train[, prob_com1 := predict(logitMod_com1, newdata = datCredit_train, type="response")]
-datCredit_valid[, prob_com1 := predict(logitMod_com1, newdata = datCredit_valid, type="response")]
-auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_com1) # 91.75%
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_com1) # 91.36%
+datCredit_train[, prob_com_best1 := predict(logitMod_com_best1, newdata = datCredit_train, type="response")]
+datCredit_valid[, prob_com_best1 := predict(logitMod_com_best1, newdata = datCredit_valid, type="response")]
+auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_com_best1) # 91.75%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob__com_best1) # 91.36%
 # --- VIF analysis
 car::vif(logitMod_com1)
 
@@ -78,113 +87,6 @@ rm(inputs_com1, logitMod_com1)
 datCredit_train[, prob_com1:=NULL]; datCredit_valid[, prob_com1:=NULL]
 
 
-
-
-# ------ 3. Combined variables, excluding all SD macroeconomic variables
-# --- Concatenate all variables into a single formula
-inputs_com2 <- c(labels(terms(inputs_ali_fin)), labels(terms(inputs_del_fin)), labels(terms(inputs_beh_fin)), labels(terms(inputs_por_fin)),
-                 labels(terms(form_mac_final2)))
-# --- Create formula
-form_com2 <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_com2, collapse="+")))
-# --- Fitting the full model
-logitMod_com2 <- glm(form_com2, data=datCredit_train, family="binomial")
-# --- Deviance and AIC
-summary(logitMod_com2) # Null deviance = 248088; Residual deviance = 106032; AIC = 106156
-# --- Odds Ratio analysis
-round(exp(cbind(OR = coef(logitMod_com1), confint.default(logitMod_com1))), 3)
-# --- ROC analysis
-datCredit_train[, prob_com2 := predict(logitMod_com2, newdata = datCredit_train, type="response")]
-datCredit_valid[, prob_com2 := predict(logitMod_com2, newdata = datCredit_valid, type="response")]
-auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_com2) # 91.75%
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_com2) # 91.35%
-# --- VIF analysis
-car::vif(logitMod_com2)
-
-### RESULTS:  ``Not all variables are significant, especially the macroeconomic variables.
-###           ``The standard errors of the estimated coefficients are high for some aggregated variables.
-###             The AIC of the reduced model is higher than the full model (106156 vs 106119).
-###             The AUC of the reduced model is slightly lower than the full model on the validation set (91.35% vs 91.36%).
-###             The VIFs of some aggregated variables and some SD macroeconomic variables are high.
-
-### CONCLUSION:`Compare the full- and reduced models to their best subset counterparts.
-
-# --- Clean up
-rm(inputs_com2, logitMod_com2)
-datCredit_train[, prob_com2:=NULL]; datCredit_valid[, prob_com2:=NULL]
-
-
-
-
-# ------ 4. Combined variables, all variables and the best subset of the full macroeconomic variables (including all SD macroeconomic variables)
-# --- Concatenate all variables into a single formula
-inputs_com3 <- c(labels(terms(inputs_ali_fin)), labels(terms(inputs_del_fin)), labels(terms(inputs_beh_fin)), labels(terms(inputs_por_fin)),
-                 labels(terms(form_mac_sub_fin1)))
-# --- Create formula
-form_com3 <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_com3, collapse="+")))
-# --- Fitting the full model
-logitMod_com3 <- glm(form_com3, data=datCredit_train, family="binomial")
-# --- Deviance and AIC
-summary(logitMod_com3) # Null deviance = 248088; Residual deviance = 105979; AIC = 106117
-# --- Odds Ratio analysis
-round(exp(cbind(OR = coef(logitMod_com3), confint.default(logitMod_com3))), 3)
-# --- ROC analysis
-datCredit_train[, prob_com3 := predict(logitMod_com3, newdata = datCredit_train, type="response")]
-datCredit_valid[, prob_com3 := predict(logitMod_com3, newdata = datCredit_valid, type="response")]
-auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_com3) # 91.75%
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_com3) # 91.35%
-# --- VIF analysis
-car::vif(logitMod_com3)
-
-### RESULTS:  ``Not all variables are significant, especially the macroeconomic variables.
-###           ``The standard errors of the estimated coefficients are high for some aggregated variables.
-###             The AIC of the full best subset model is higher than the full model (106117 vs 106119).
-###             The AUC of the full subset model is slightly lower than the full model on the validation set (91.35% vs 91.36%).
-###             The VIFs of some aggregated variables and some SD macroeconomic variables are high.
-
-### CONCLUSION:`Rather use the full subset model as opposed to the full model as it has fewer variables whilst having a better model fit and better predictive power.
-###             Compare the full subset model to the reduced subset model.
-
-# --- Clean up
-rm(inputs_com3, logitMod_com3)
-datCredit_train[, prob_com3:=NULL]; datCredit_valid[, prob_com3:=NULL]
-
-
-
-
-# ------ 5 Combined variables, all variables and the best subset of the full macroeconomic variables (including all SD macroeconomic variables)
-# --- Concatenate all variables into a single formula
-inputs_com4 <- c(labels(terms(inputs_ali_fin)), labels(terms(inputs_del_fin)), labels(terms(inputs_beh_fin)), labels(terms(inputs_por_fin)),
-                 labels(terms(form_mac_sub_fin2)))
-# --- Create formula
-form_com4 <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_com4, collapse="+")))
-# --- Fitting the full model
-logitMod_com4 <- glm(form_com4, data=datCredit_train, family="binomial")
-# --- Deviance and AIC
-summary(logitMod_com4) # Null deviance = 248088; Residual deviance = 106043; AIC = 106153
-# --- Odds Ratio analysis
-round(exp(cbind(OR = coef(logitMod_com4), confint.default(logitMod_com4))), 3)
-# --- ROC analysis
-datCredit_train[, prob_com4 := predict(logitMod_com4, newdata = datCredit_train, type="response")]
-datCredit_valid[, prob_com4 := predict(logitMod_com4, newdata = datCredit_valid, type="response")]
-auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_com4) # 91.75%
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_com4) # 91.35%
-# --- VIF analysis
-car::vif(logitMod_com4)
-# --- Model parsimony comparison
-length(labels(terms(logitMod_com1))); length(labels(terms(logitMod_com2))); length(labels(terms(logitMod_com3))); length(labels(terms(logitMod_com4)))
-### RESULTS:  ``Not all variables are significant, especially the macroeconomic variables.
-###           ``The standard errors of the estimated coefficients are high for some aggregated variables.
-###             The AIC of the reduced subset model is sligtly lower than the reduced model (106153 vs 106156).
-###             The AUC of the reduced subset model is exactly the same as the reduced model on the validation set (91.35% vs 91.35%).
-###             The AIC of the reduced subset model is higher than the full subset model (106153 vs 106117).
-###             The AUC of the reduced subset model is exactly the same as the full subset model on the validation set (91.35% vs 91.35%).
-###             The VIFs of some aggregated variables and some SD macroeconomic variables are high.
-
-### CONCLUSION:`Use the reduced subset model as it is the most parsimonious model (46 variables compared to 76-, 53-, and 60 variables in the full-, reduced-, and full subset models) and has equal AUCs compared to the other models.
-
-# --- Clean updata:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAWElEQVR42mNgGPTAxsZmJsVqQApgmGw1yApwKcQiT7phRBuCzzCSDSHGMKINIeDNmWQlA2IigKJwIssQkHdINgxfmBBtGDEBS3KCxBc7pMQgMYE5c/AXPwAwSX4lV3pTWwAAAABJRU5ErkJggg==
-rm(inputs_com4)
-datCredit_train[, prob_com4:=NULL]; datCredit_valid[, prob_com4:=NULL]
 
 
 
@@ -210,8 +112,3 @@ datCredit_train[, prob_com4:=NULL]; datCredit_valid[, prob_com4:=NULL]
 
 
 
-
-
-# --- Loading in the final combined models
-# unpack.ffdf(paste0(genObjPath, "Com_Full_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Com_Red_Formula"), tempPath)
-# unpack.ffdf(paste0(genObjPath, "Com_Full_Sub_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Com_Red_Sub_Formula"), tempPath)

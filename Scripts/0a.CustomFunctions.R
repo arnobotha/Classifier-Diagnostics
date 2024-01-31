@@ -386,85 +386,126 @@ transform_yj <- function(x, bound_lower=-2, bound_upper=2, lambda_inc=0.5, verbo
 # variable. This technique assumes that the variables have the exact same scale.
 # Input:  [logit_model]: A logistic regression model
 #         [datTrain]:    Dataset on which the model is trained
-#         [method]:      The method use for computing the variable importance; either "log_odds" for an odds ratio analysis or "pd" for partial dependence (a form of explainable AI)
+#         [method]:      The method use for computing the variable importance; either "ac" for the absolute value of the coefficients; "sc" for standardised coefficients; "FIRM" for the FIRM technique that uses partial dependence (a form of explainable AI) (https://arxiv.org/pdf/1904.03959.pdf)
 #         [same_scales]: Are the coefficients the same scales (TRUE), if not (FALSE) then the coefficients will be standardised
 #         [sig_level]:   The threshold under which the variables are considered significant
 #         [plot]:        Should a bar chart be produced which shows the variable importance
 #         [pd_plot]:     Should a partial dependence plot be created for each variable
 # Output: A data table containing the variable importance information
-varImport_logit <- function(logit_model, method="odds_ratio", same_scales=F, sig_level=0.05, plot=F, pd_plot=F){
+varImport_logit <- function(logit_model, method="sc", standardise=F, sig_level=0.05, plot=F, pd_plot=F){ ### Use the SC method as standard (get a tutorial on this for "backup")
+  ### Standardise output of function
+  
   # - Unit testing conditions:
   # datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
   # logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
-  # method <- "pd"; same_scales=F; sig_level<-0.05; plot<-T
+  # method <- "pd"; same_scales=F; sig_level<-0.05; plot<-T; pd_plot<-T; standardise<-T
   
   # - Get the data the model was trained on
   datTrain1 <- subset(logit_model$data, select = names(logit_model$data)[names(logit_model$data) %in% names(model.frame(logit_model))])
-  
-  # - Variable importance as determined by an odds ratio analysis (Rank variables according to the absolute values of their associated coefficients)
-  if (method=="odds_ratio") {
-    # Getting the names of the original training dataset
-    datTrain1_names <- names(datTrain1)
-    # Assigning new names to the training dataset according to the names of the coefficients in the model (this is since factor variables have different names in the model, e.g., "student" vs "studentYES")
-    names(datTrain1)[2:length(datTrain1_names)] <- names(logit_model$coefficients)[-1]
-    # Get the names of the variables that are significant (no use in performing variable importance on non-significant variables)
-    coefficients_sig <- summary(logit_model)$coefficients[,4][-1]; coefficients_sig <- names(coefficients_sig[which(coefficients_sig<=sig_level)])
+  # Getting the names of the original training dataset
+  datTrain1_names <- names(datTrain1)
+
+  # - Filtering for significant variables
+  if (!is.na(sig_level)){ # Filter for significant variables
+    # Get the index of the names that are significant
+    coefficients_ind <- summary(logit_model)$coefficients[,4][-1]; coefficients_ind <- which(coefficients_ind<=sig_level)
     # Displaying an message if there are no significant variables
-    if (length(coefficients_sig)==0){
-      return(cat("WARNING: Variable importance not conducted since there are no significant variables."))
+    if (is.null(coefficients_ind)){
+      stop("ERROR: Variable importance not conducted since there are no significant variables.") # TEST (use warning() to display a warning...but function execution continues on)
     }
-    # Creating the results dataset
-    results <- data.table(Variable = coefficients_sig,
-                          Coefficient = logit_model$coefficients[which(names(logit_model$coefficients) %in% coefficients_sig)],
-                          Std_Coefficient = 0,
-                          Log_Odds = 0,
-                          Rank = 0)
+  } else { # Do not filter for significant variables
+    # Assign all index values
+    coefficients_ind <- summary(logit_model)$coefficients[,4][-1]
+    
+  }
+  # Get the corresponding names of the significant variables in the training data
+  coefficients_sig_model <- names(summary(logit_model)$coefficients[,4][-1][coefficients_ind])
+  # Get the names of the significant variables in the model (this may differ from the training data if there are factors/categorical variables present)
+  coefficients_sig_data <- names(datTrain1)[-which(names(datTrain1) %in% names(model.frame(logit_model))[1])][coefficients_ind] # The chaining ensures that the target variable is excluded from the variables' names
+  
+  # - Initiating the dataset to be returned (results dataset)
+  results <- list(data = data.table(Variable = coefficients_sig_data,
+                                    Value = 0,
+                                    Rank = 0))
+  
+  ### MM: This first technique is under construction. I took a stab at it and I hope that my interpretation of the technique was correct?
+  ###     A quick comparison to the "ac" method reveals that the ranking of the variables differ between techniques, but those that are considered "more" important by the one technique are also considers as such bu the other
+  # - Computing the variable importance according to the selected technqiue
+  if (method=="sc") { # - Variable importance as determined by the standardised coefficients (Rank variables according to the absolute value of the variables' odd ratios divided by the associated standard error of the estimated coefficient)
+    # Assigning the method to the results
+    results$Method <- "Standardised Coefficient"
+    # Computing the importance measure and populating the results dataset
+    results$data <- data.table(Variable=coefficients_sig_data, Coefficient=summary(logit_model)$coefficients[coefficients_ind+1,1], # Get the estimated coefficients and their associated standard errors
+                               SE=summary(logit_model)$coefficients[coefficients_ind+1,2])
+    results$data[,Value:=abs(Coefficient/SE)] # Compute the importance measure
+    results$data[,`:=`(Coefficient=NULL,SE=NULL)]
+  } else if (method=="ac") { # - Variable importance as determined by the absolute values of the variables' coefficients (Rank variables according to the absolute values of the variables' estimated coefficients)
+    # Assigning the method to the results
+    results$Method <- "Absolute Coefficient"
+    # Assigning new names to the training dataset according to the names of the coefficients in the model (this is since factor variables have different names in the model, e.g., "student" vs "studentYES")
+    names(datTrain1)[-which(names(datTrain1) %in% names(model.frame(logit_model))[1])] <- names(logit_model$coefficients)[-1]
     # Scaling the variables
-    if (same_scales==F){
+    if (standardise==T){
       datTrain2 <- copy(datTrain1)
-      for (i in 1:length(coefficients_sig)){
+      for (i in 1:length(coefficients_sig_model)){
         # Checking if the variable is numeric so that the underlying training data can be scaled
-        if (class(datTrain2[, get(coefficients_sig[i])]) %in% "numeric"){
-          datTrain2[, (coefficients_sig[i]) := (get(coefficients_sig[i])-mean(get(coefficients_sig[i]),na.rm=T))/sd(get(coefficients_sig[i]), na.rm=T)]
-        }
-      }
+        if (class(datTrain2[, get(coefficients_sig_model[i])]) %in% "numeric"){ ### Can have a "binary" as well as "factor" type variables - check how these types of variables are handled - check in an additional script to confirm; factorise numeric variables (in model call)P and fit model - check funcitonality
+          datTrain2[, (coefficients_sig_model[i]) := (get(coefficients_sig_model[i])-mean(get(coefficients_sig_model[i]),na.rm=T))/sd(get(coefficients_sig_model[i]), na.rm=T)]
+        } # if
+      } # else
       # Re-training the model on the scaled data
       names(datTrain2) <- datTrain1_names
       logit_model2 <- glm(logit_model$formula, data=datTrain2, family="binomial")
     } else {
       logit_model2 <- logit_model
-    }
-    # - Populating the results table
-    results[,Std_Coefficient := logit_model2$coefficients[which(names(logit_model2$coefficients) %in% coefficients_sig)]]
-    results[,Log_Odds := exp(Std_Coefficient)]
-    results <- results %>% arrange(desc(abs(Std_Coefficient))) %>% mutate(Rank=row_number())
-    
-    if (plot==T){ # Creating a simple bar chart to visualy display the variable importance
-      ggplot(results, aes(x=reorder(Variable, abs(Std_Coefficient)))) + geom_col(aes(y=abs(as.numeric(Coefficient))), col='blue', fill='blue') + 
-        theme_grey() + theme(plot.title = element_text(hjust=0.5)) + coord_flip() +
-        xlab("Variable name") + ylab("Absolute value of fitted coefficient")
-    }
-  } else if (method=="pd") { # - Variable importance as determined by feature importance rank measure (explainable AI technique)
-    # Get the names of the significant variables
-    coefficients_sig <- summary(logit_model)$coefficients[,4]<=sig_level; coefficients_sig[1]<-F # Setting the intercept's index value to FALSE to ensure that variable importance is not computed for it
+    } # if else
+    # Populating the results dataset
+    results$data[,Std_Coefficient := logit_model2$coefficients[which(names(logit_model2$coefficients) %in% coefficients_sig_model)]]
+    results$data[,Value:=abs(Std_Coefficient)]
+    results$data <- results$data %>% arrange(desc(abs(Std_Coefficient))) %>% mutate(Rank=row_number())
+    results$data[,Std_Coefficient:=NULL]
+    # Plotting the odds ratios (if specified)
+    if (plot==T){ 
+      # Computing the odds ratios and the corresponding confidence interval
+      datPlot_odds_ratios <- data.table(Variable=coefficients_sig_data, round(exp(cbind(OR = coef(logit_model2), confint.default(logit_model2))), 3)[coefficients_ind+1,])
+      colnames(datPlot_odds_ratios) <- c("Variable","OR","CI_Lower", "CI_Upper")
+       
+      (results$plots$Odds_Ratios <- ggplot(datPlot_odds_ratios, aes(x=OR, y=Variable)) + theme_minimal() + labs(x="Odds ratio (log scale)") + geom_vline(aes(xintercept=1), linewidth=0.25, linetype="dashed") +
+                                     geom_errorbarh(aes(xmax=CI_Upper,xmin=CI_Lower), size=0.5, height=0.2) + geom_point(size=3.5, colour="blue") + theme(panel.grid.minor=element_blank()) +
+                                     coord_trans(x="log10") + scale_x_continuous(breaks=c(0,0.1,0.25,0.5,1,2,4,max(datPlot_odds_ratios$CI_Upper))))
+    } # if
+   } else if (method=="FIRM") { # - Variable importance as determined by feature importance rank measure (FIRM) (explainable AI technique)
+    # Assigning the method to the results
+    results$Method <- "FIRM"
     # Create the results table
-    results <- vip::vi_firm(logit_model, feature_names=names(model.frame(logit_model))[coefficients_sig], method="firm", train=datTrain1)
-    if (plot==T){
-      # Plotting the variable importance
-      vip::vip(results)
-    }
-    if (pd_plot==T){ # Plotting the partial dependence
-      pd_plot_fun <- function(i) {plot(attr(results, which = "effects")[[i]])}
-      sapply(1:length(names(model.frame(logit_model))[coefficients_sig]), pd_plot_fun)
-    }
-    # Adding a column to indicate the rank order of the variables' importance
-    results <- data.table(results) %>% rename(FIRM = Importance) %>% arrange(desc(FIRM)) %>% mutate(Rank=row_number())
-  }
+    results$data <- vip::vi_firm(logit_model, feature_names=coefficients_sig_data, method="firm", train=datTrain1)
+    # Plotting the partial dependence
+    if (pd_plot==T){
+      for (i in seq_along(coefficients_sig_model)){
+        datPlot_pd <- data.table(attr(results$data, which = "effects")[[i]])
+        names(datPlot_pd) <- c("x","y")
+        (results$plots[[paste0("pd_",coefficients_sig_model[i])]] <- ggplot(datPlot_pd) + geom_point(aes(x=x,y=y)) + theme_minimal() +
+           labs(x=coefficients_sig_data[i],y="yhat") + theme(plot.title = element_text(hjust=0.5)))
+      } # for
+    } # if
+    # Adding a column to indicate the rank order of the variables' importance and getting the data in the desired format
+    results$data <- data.table(results$data) %>% rename(Value = Importance) %>% arrange(desc(Value)) %>% mutate(Rank=row_number())
+  } else {stop(paste0('"', method,'" is not supported. Please use either "sc", "ac", or "pd" as method.'))}# if else (method)
+  # - Creating a general plot of the variable importance (if desired)
+  if (plot==T){
+    (results$plots[["Ranking"]] <- ggplot(results$data, aes(x=reorder(Variable, Value))) + geom_col(aes(y=Value), col='blue', fill='blue') +
+       coord_flip() + theme_minimal() + theme(plot.title = element_text(hjust=0.5)) +
+       xlab("Variable name") + ylab(ifelse(method=="sc", "Absolute value of standardised coefficient",
+                                           ifelse(method=="ac","Absolute value of fitted coefficient",
+                                                  "FIRM Value"))))
+  } # if
   # - Return results
   return(results)
-  # rm(logit_model)
+  # rm(logit_model, logit_model2, datTrain1, datTrain2, method, same_scales, plot, coefficients_sig_model, coefficients_sig_data)
 }
 # - Unit test
+# install.packages("ISLR"); require(ISLR)
 # datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
 # logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
-# varImport_logit(logit_model = logit_model, method="pd", same_scales = F, sig_level = 0.05, plot=T, pd_plot = T)
+# a<-varImport_logit(logit_model = logit_model, method="pd", standardise = F, sig_level = 0.05, plot=T, pd_plot = T)
+# b<-varImport_logit(logit_model = logit_model, method="ac", standardise = T, sig_level = 0.05, plot=T)

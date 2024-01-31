@@ -4,12 +4,14 @@
 # features to predict default risk.
 # ---------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer
+# SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer, Marcel Muller
 
 # DESCRIPTION:
 # This script uses the previously prepared credit dataset fused with macroeconomic
 # variables to create multiple logistic regression models for default. The focus of this
-# script is forward looking information (macroeconomic variables).
+# script is forward looking information (macroeconomic variables). Variables are selected
+# thematically (where the input space is divided into themes) and by using the enitre input
+# space.
 # For all macroeconomic variables, the following engineered variables were created:
 #     - Lag orders of 1-,2-,3-,...,24 months
 #     - Volatility with windows of 1-,2-,3-,...,24 months
@@ -19,10 +21,11 @@
 #   - 0a.CustomFunctions.R
 #
 # -- Inputs:
-#   - datCredit_real | Prepared credit data from script 2f
+#   - datCredit_train | Prepared credit data from script 3b
+#   - datCredit_valid | Prepared credit data from script 3b
 #
 # -- Outputs:
-#   - 
+#   - Sets of macroeconomic variables as selected thematically and using the entire input space.
 # =======================================================================================
 
 
@@ -1014,8 +1017,7 @@ inputs_mac_com_fin_theme <- names(model.frame(logitMod_mac_final_best1))[-1]
 pack.ffdf(paste0(genObjPath, "Mac_Com_Theme_Formula"), inputs_mac_com_fin_theme); gc()
 # - Cleaning up the environment
 datCredit_valid[, prob_mac_final_best1:=NULL]; datCredit_train[, prob_mac_final_best1:=NULL]
-rm(logitMod_mac_final1, logitMod_mac_final_best1, inputs_mac_com_fin_theme)
-
+rm(logitMod_mac_final1, logitMod_mac_final_best1, inputs_mac_com_fin_theme, vif_mac_final1, vif_mac_final_best1)
 
 
 
@@ -1042,44 +1044,56 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_final2)
 ### CONLCUSION: Run a best subset selection to find the "optimal" set of macroeconomic variables.
 ###             Save formula for the combined variable selection script.
 
-# ---- 8.1.2 Best subset selection
+# ---- 8.2.2 Best subset selection
 # - Conducting the best subset procedure
 logitMod_mac_final_best2 <- MASS::stepAIC(logitMod_mac_final2, direction="both")
 # Start AIC = 270879.7
 # End AIC = 270820.3
 # - Deviance and AIC
-summary(logitMod_mac_final_best1) # Null deviance = 274496; Residual deviance = 270737; AIC = 270809
+summary(logitMod_mac_final_best2) # Null deviance = 274496; Residual deviance = 270746; AIC = 270828
 # - Odds Ratio analysis
-varImport_logit(logitMod_mac_final1, method="odds_ratio", same_scales=F, plot=T, sig_level=0.1) # Top 3 variables: [M_RealGDP_Growth_12], [M_RealIncome_Growth_12], and [M_DTI_Growth]
+varImport_logit(logitMod_mac_final_best2, method="odds_ratio", same_scales=F, plot=T, sig_level=0.1) # Top 3 variables: [M_RealGDP_Growth_SD_6], [M_RealGDP_Growth_SD_5], and [M_RealGDP_Growth_SD_9]
+# - FIRM analysis
+varImport_logit(logitMod_mac_final_best2, method="pd", plot=T, pd_plot=T, sig_level=0.1) # Top 3 variables: [M_RealIncome_Growth_12], [M_RealGDP_Growth_12], and [M_RealIncome_Growth_9]
 # - ROC analysis
-datCredit_valid[, prob_mac_final_best1 := predict(logitMod_mac_final_best1, newdata = datCredit_valid, type="response")]
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_final_best1) # 54.91%
-(vif_mac_final_best1 <- car::vif(logitMod_mac_final_best1))
-length(labels(terms(logitMod_mac_final1))); length(labels(terms(logitMod_mac_final_best1)))
-### Results:  All variables are significant, with a few that have p-values close (but over) to the cut-off of 0.05.
-###           The standard errors of the estimated coefficients of the SD variables are higher then the lagged variables.
-###           The AIC value of the best subset selection model is lower than the full model (270809 vs 270883).
-###           The AUC of the best subset selection model is slightly lower than the reduced model (54.91% vs 54.96%).
-###           The best subset selection reduces the total number of variables to 18, down from 28.
+datCredit_train[, prob_mac_final_best2 := predict(logitMod_mac_final_best2, newdata = datCredit_train, type="response")]
+datCredit_valid[, prob_mac_final_best2 := predict(logitMod_mac_final_best2, newdata = datCredit_valid, type="response")]
+auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_mac_final_best2) # 58.99%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_final_best2) # 58.62%
+(vif_mac_final_best2 <- car::vif(logitMod_mac_final_best2))
+length(labels(terms(logitMod_mac_final2))); length(labels(terms(logitMod_mac_final_best2)))
+### Results:    All variables are significant.
+###             The standard errors of the estimated coefficients of the SD variables are higher than the lagged variables (this is quite severe for some SD variables)
+###             The AIC value of the best subset selection model is lower than the full model (270828 vs 270880).
+###             The AUC of the best subset selection model is exactly the same as for the the reduced model on the validation dataset (58.62% vs 58.62%).
+###             The AUCs of the best subset model as obtained by an ROC analysis on the training- and validation datasets are very similar (58.99 vs 58.62%) and thus there doesn't seem to be overfitting
+###             The best subset selection reduces the total number of variables to 72, down from 40.
 
 ### CONCLUSION: Consider the selected variables from the best subset selection model within the combined variable selection.
 ###             Save formula for the combined variable selection script.
 
+# --- 8.2.3 Clean up
+# - Saving the selected variables to the disk
+inputs_mac_com_fin_theme <- names(model.frame(logitMod_mac_final_best1))[-1]
+pack.ffdf(paste0(genObjPath, "Mac_Com_All_Formula"), inputs_mac_com_fin_theme); gc()
+# - Cleaning up the environment
+datCredit_valid[, prob_mac_final_best1:=NULL]; datCredit_train[, prob_mac_final_best1:=NULL]
+rm(logitMod_mac_final1, logitMod_mac_final_best1, inputs_mac_com_fin_theme, vif_mac_final1, vif_mac_final_best1)
 
-# ---- 8.3 Final macroeconomic variables
-# --- Model using variables as selected by the various themes
-form_mac_fin_theme <- logitMod_mac_final_best1$formula
-pack.ffdf(paste0(genObjPath, "Mac_Full_Formula"), form_mac_final1); gc()
-
-# --- Model using all variables
-form_mac_fin_all <- logitMod_mac_final_best1$formula
-pack.ffdf(paste0(genObjPath, "Mac_Full_Sub_Formula"), form_mac_sub_fin1); gc()
-
-
-# --- 8.4 Clean up
+# --- 8.3 Clean up
 datCredit_valid[, `:=` (prob_mac_final1=NULL, prob_mac_final2=NULL, prob_mac_final_best1=NULL, prob_mac_final_best2=NULL)]
-rm(ColNames7, ColNames8, form_mac_final1, form_mac_final2, logitMod_mac_final1, logitMod_mac_final2, inputs_mac_sub_fin1, inputs_mac_sub_fin2,
+rm(ColNames7, ColNames8, form_mac_final1, form_mac_final2, logitMod_mac_final1, logitMod_mac_final2, form_mac_fin_theme, form_mac_fin_all,
    vif_mac_final1, vif_mac_final2, vif_mac_final_best1, vif_mac_final_best2)
+
+
+# --- 8.4 Final comparison and conclusion on thematic variable selection
+### COMPARISON: The best subset model from the thematic variable selection process (thematic model) has a slightly lower AUC than the model using the full input space (full model) (58.4% vs 58.62%)
+###             The thematic model has a higher AIC than the full model (270937 vs 270828)
+###             The thematic model has less variables than the full model (18 vs 40)
+###             All variables are significant in both models, but the thematic model has more reasonable standard errors for the fitted coefficients
+
+### CONCLUSION: Using themes in variable selection can lead to models that are more parsimonious and have more reasonable standard errors of the fitted coeffcients, whilst
+###             having similar predictive power compared to a model built on the full input space.
 
 
 
@@ -1088,24 +1102,27 @@ rm(ColNames7, ColNames8, form_mac_final1, form_mac_final2, logitMod_mac_final1, 
 # --- Loading in the plotting data
 if (!exists('datPlot')) unpack.ffdf(paste0(genObjPath,"Mac_Models_Summary"), tempPath)
 
+# --- Adjusting the dataset to enable easy annotations/labels
+datPlot[, Label:=paste0(sprintf("%.1f",AUC*100),"%")]
+
 # --- Plotting parameters
 col.v <- brewer.pal(9, "Blues")[c(4,7,9)]
 col.v2 <- rep(c(col.v[2], col.v[3], col.v[1]),6)
 col.v3 <- rep("white", 18)
-label.v <- c("Combined", "Lagged", "SD")
+label.v <- c("Combined", '"Best" lag orders', '"Best" window lengths in aggregation (SD)')
 
 # --- Plot
 (g_mac_theme_sum <- ggplot(datPlot, aes(x=Base_Variable, y=AUC, group=Model)) +
-   theme_minimal() +
+   theme_minimal() + theme(legend.position = "bottom") + labs(x="Base Variable", y="AUC(%)") +
    geom_col(aes(colour=Model, fill=Model), position="dodge") +
-   geom_label(aes(label=sprintf("%.3f",AUC)), fill = col.v2, colour = col.v3, position=position_dodge(0.9)) +
-   scale_colour_manual(name="Model", values=col.v, labels=label.v) +
-   scale_fill_manual(name="Model", values=col.v, labels=label.v) +
-   theme(legend.position = "bottom"))
+   geom_label(aes(label=Label), fill = col.v2, colour = col.v3, position=position_dodge(0.9)) +
+   scale_colour_manual(name="Model:", values=col.v, labels=label.v) +
+   scale_fill_manual(name="Model:", values=col.v, labels=label.v) +
+   scale_y_continuous(breaks=pretty_breaks(), label=percent))
 
 # --- Save plot
 dpi<-240
-ggsave(g_mac_theme_sum, file=paste0(genFigPath, "MacroVars_Select_Combined_Themes_Summary.png"), width=2400/dpi, height=1333/dpi, dpi=dpi, bg="white")
+ggsave(g_mac_theme_sum, file=paste0(genFigPath, "MacroVars_Select_Combined_Themes_Summary.png"), width=3000/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
 # --- Clean up
 rm(dpi, col.v, vol.v2, col.v3, label.v, g_mac_theme_sum); gc()
