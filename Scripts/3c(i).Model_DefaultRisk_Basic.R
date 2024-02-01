@@ -23,12 +23,6 @@
 #   - Sets of macroeconomic variables as selected thematically and using the entire input space.
 # =======================================================================================
 
-# GOAL: Series of candidate models, starting with simplest logit-models containing ONLY the most basic of information, e.g., delinquency-themed input spaces.
-# Focus: default risk (PD-model) + most basic input space: delinquency-themed
-# Approach: simple to complex: 1) model-by-input (expanding input space); 2) model-by-segment (expanding segmentation scheme); 3) modelling technique f
-# Aspects to consider include: missing value treatments, interactions, 
-# transformations (Tukey Power, Box-Cox, Yeo-Johnson); ask Marcel, also in sec. 5 in Std-PrinciplesForDataPrep
-
 
 
 
@@ -78,18 +72,18 @@ for(i in 1:(nrow(cor_ali_spear2))) {cat("Absolute correlation above ", cor_thres
 
 
 
-# --- 2.2 Prelimanry experimenting: Using insights from correlation analysis
+# --- 2.2 Preliminary experimenting: Using insights from correlation analysis
 # - [Age_Adj] vs [TimeInPerfSpell]
 logitMod_ali_exp1_1 <- glm(DefaultStatus1_lead_12_max ~ TimeInPerfSpell
                            , data=datCredit_train, family="binomial")
 logitMod_ali_exp1_2 <- glm(DefaultStatus1_lead_12_max ~ Age_Adj
                            , data=datCredit_train, family="binomial")
-summary(logitMod_ali_exp1_1) # Null deviance = 275184; Residual deviance = 274001; AIC = 274005
-summary(logitMod_ali_exp1_2) # Null deviance = 275184; Residual deviance = 274579; AIC = 274583
+summary(logitMod_ali_exp1_1) # Null deviance = 294889  ; Residual deviance = 293589  ; AIC = 293593 
+summary(logitMod_ali_exp1_2) # Null deviance = 588256  ; Residual deviance = 583510  ; AIC = 583514
 datCredit_valid[, prob_ali_exp1_1 := predict(logitMod_ali_exp1_1, newdata = datCredit_valid, type="response")]
 datCredit_valid[, prob_ali_exp1_2 := predict(logitMod_ali_exp1_2, newdata = datCredit_valid, type="response")]
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali_exp1_1) # 60.11%
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali_exp1_2) # 51.12%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali_exp1_1) # 60%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali_exp1_2) # 55.39%
 ### CONCLUSION:   Use [TimeInPerfSpell] as it is has a higher AUC value and has a lower AIC
 
 # - [Balance] vs [Instalment] vs [Principal]
