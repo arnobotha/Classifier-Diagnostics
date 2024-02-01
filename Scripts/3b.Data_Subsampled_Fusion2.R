@@ -158,7 +158,7 @@ cat( (check_input2b == 0) %?% 'SAFE: Grain of {datCredit_smp} confirmed after fu
 pack.ffdf(paste0(genPath, "creditdata_final4c"), datCredit_smp); gc()
 
 # - Clean-up
-rm(datInput.raw, check_input1, check_input2a, check_input2b); gc()
+rm(datInput.raw, check_input2a, check_input2b, overlap_flds); gc()
 
 
 
@@ -326,7 +326,7 @@ cat( ( datCredit_smp[is.na(InterestRate_Margin_imputed_mean), .N] == 0) %?%
 
 
 
-# --- 6. Feature Engineering: ratio-type variables (Period-level)
+# --- 5. Feature Engineering: ratio-type variables (Period-level)
 
 # - Loan age to loan term
 datCredit_smp[, AgeToTerm := Age_Adj/Term] # where the loan is in its lifetime
@@ -351,7 +351,7 @@ cat( ( datCredit_smp[is.na(BalanceToPrincipal), .N] == 0) %?%
 
 
 
-# --- 7. Feature Engineering: Binning and factorisation
+# --- 6. Feature Engineering: Binning and factorisation
 # - Condense the payment group
 datCredit_smp[, pmnt_method_grp := 
                 case_when(slc_pmnt_method == "Debit Order FNB account" | slc_pmnt_method == "Debit Order other bank" ~ "Debit Order",
@@ -373,7 +373,7 @@ datCredit_smp[, InterestRate_Margin_imputed_bin := factor(ntile(InterestRate_Mar
 
 
 
-# --- 8. Featuring Engineering: Portfolio-level information
+# --- 7. Featuring Engineering: Portfolio-level information
 
 # - Creating an aggregated dataset with which to fuse to the full dataset
 dat_g0_Delinq_Aggr <- data.table(datCredit_smp[DefaultStatus1==0, list(sum(g0_Delinq>0, na.rm=T)/.N), by=list(Date)])
@@ -387,10 +387,10 @@ datCredit_smp <- merge(datCredit_smp, dat_g0_Delinq_Aggr, by="Date", all.x=T)
 cat( ( sum(datCredit_smp[DefaultStatus1==0, sum(g0_Delinq_Any_Aggr_Prop + sum(g0_Delinq==0)/.N, na.rm=T), by=Date][,2])==sum(datCredit_smp[DefaultStatus1==0,.N,by=Date][,2]) & (sum(is.na(datCredit_smp$g0_Delinq_Any_Aggr_Prop))==0)) %?% 
        'SAFE: New feature [g0_Delinq_Any_Aggr_Prop] has logical values.\n' %:% 
        'WARNING: New feature [g0_Delinq_Any_Aggr_Prop] has illogical values \n' )
-(var_Info_Num$g0_Delinq_Any_Aggr_Prop <- describe(datCredit_smp$g0_Delinq_Any_Aggr_Prop)); plot(unique(datCredit_smp$g0_Delinq_Any_Aggr_Prop))
+(var_Info_Num$g0_Delinq_Any_Aggr_Prop <- describe(datCredit_smp$g0_Delinq_Any_Aggr_Prop)); plot(unique(datCredit_smp$g0_Delinq_Any_Aggr_Prop), type="b")
 
 
-# - 5 month lagged delinquency proportion (as found to be significant within experimental script 2)
+# - 5 month lagged delinquency proportion (as found to be significant within experimental script 3c(v))
 # Lagging the delinquency proportions by 12-months
 dat_g0_Delinq_Aggr[, g0_Delinq_Any_Aggr_Prop_Lag_5 := shift(g0_Delinq_Any_Aggr_Prop, n=5, type="lag")]
 # Fusing the aggregated variables to the full dataset
@@ -399,7 +399,7 @@ datCredit_smp <- merge(datCredit_smp, dat_g0_Delinq_Aggr[, -c("g0_Delinq_Any_Agg
 cat( ( (datCredit_smp[is.na(g0_Delinq_Any_Aggr_Prop_Lag_5), .N] == datCredit_smp[Date %in% (min(Date) %m+% months(seq(0, round(interval(min(Date), min(Date) %m+% months(4)) / months(1)), 1))), .N])) %?% 
        'SAFE: New feature [g0_Delinq_Any_Aggr_Prop_Lag_5] has logical values.\n' %:% 
        'WARNING: New feature [g0_Delinq_Any_Aggr_Prop_Lag_5] has illogical values \n' )
-(var_Info_Cat$g0_Delinq_Any_Aggr_Prop_Lag_5 <- describe(datCredit_smp$g0_Delinq_Any_Aggr_Prop_Lag_5)); plot(unique(datCredit_smp$g0_Delinq_Any_Aggr_Prop_Lag_5))
+(var_Info_Cat$g0_Delinq_Any_Aggr_Prop_Lag_5 <- describe(datCredit_smp$g0_Delinq_Any_Aggr_Prop_Lag_5)); plot(unique(datCredit_smp$g0_Delinq_Any_Aggr_Prop_Lag_5), type="b")
 
 # - Average pre-default delinquency level
 datCredit_smp[,g0_Delinq_Ave:=mean(ifelse(DefaultStatus1==0,g0_Delinq,0), na.rm=T), by=Date]
@@ -407,7 +407,7 @@ datCredit_smp[,g0_Delinq_Ave:=mean(ifelse(DefaultStatus1==0,g0_Delinq,0), na.rm=
 cat( (sum(datCredit_smp[, sum(is.na(g0_Delinq_Ave)), by=Date][,2])==0) %?% 
        'SAFE: New feature [g0_Delinq_Ave] has logical values.\n' %:% 
        'WARNING: New feature [g0_Delinq_Ave] has illogical values \n' )
-(var_Info_Cat$g0_Delinq_Ave <- describe(datCredit_smp$g0_Delinq_Ave)); plot(unique(datCredit_smp$g0_Delinq_Ave))
+(var_Info_Cat$g0_Delinq_Ave <- describe(datCredit_smp$g0_Delinq_Ave)); plot(unique(datCredit_smp$g0_Delinq_Ave), type="b")
 
 
 # - Ratio type variables (portfolio-level) during performance spells
@@ -426,15 +426,15 @@ cat( (sum(datCredit_smp[, sum(is.na(ArrearsToBalance_Aggr_Prop)), by=Date][,2])=
 cat( (sum(datCredit_smp[, sum(is.na(InstalmentToBalance_Aggr_Prop)), by=Date][,2])==0) %?% 
        'SAFE: New feature [InstalmentToBalance_Aggr_Prop] has logical values.\n' %:% 
        'WARNING: New feature [InstalmentToBalance_Aggr_Prop] has illogical values \n' )
-(var_Info_Cat$InstalmentToBalance_Aggr_Prop <- describe(datCredit_smp$InstalmentToBalance_Aggr_Prop)); plot(unique(datCredit_smp$InstalmentToBalance_Aggr_Prop))
-(var_Info_Cat$ArrearsToBalance_Aggr_Prop <- describe(datCredit_smp$ArrearsToBalance_Aggr_Prop)); plot(unique(datCredit_smp$ArrearsToBalance_Aggr_Prop))
+(var_Info_Cat$InstalmentToBalance_Aggr_Prop <- describe(datCredit_smp$InstalmentToBalance_Aggr_Prop)); plot(unique(datCredit_smp$InstalmentToBalance_Aggr_Prop), type="b")
+(var_Info_Cat$ArrearsToBalance_Aggr_Prop <- describe(datCredit_smp$ArrearsToBalance_Aggr_Prop)); plot(unique(datCredit_smp$ArrearsToBalance_Aggr_Prop), type="b")
 
 # - Proportion of curing loans across performing/default spell type
 datCredit_smp[, CuringEvents_Aggr_Prop := sum(PerfSpell_Counter==1 & PerfSpell_Num>=2, na.rm=T)/.N, by=list(Date)]
 cat( (sum(datCredit_smp[, sum(is.na(CuringEvents_Aggr_Prop)), by=Date][,2])==0) %?% 
        'SAFE: New feature [CuringEvents_Aggr_Prop] has logical values.\n' %:% 
        'WARNING: New feature [CuringEvents_Aggr_Prop] has illogical values \n' )
-(var_Info_Cat$CuringEvents_Aggr_Prop <- describe(datCredit_smp$CuringEvents_Aggr_Prop)); plot(unique(datCredit_smp$CuringEvents_Aggr_Prop))
+(var_Info_Cat$CuringEvents_Aggr_Prop <- describe(datCredit_smp$CuringEvents_Aggr_Prop)); plot(unique(datCredit_smp$CuringEvents_Aggr_Prop), type="b")
 
 
 # - Proportion of new loans vs existing portfolio over time
@@ -468,7 +468,7 @@ for (i in 1:length(list_merge_variables)){
 }
 cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fusion with aggregated data is successful.\n" %:%
        "WARNING: Missingness in certain aggregated fields detected, fusion compromised.\n")
-(var_Info_Num$NewLoans_Aggr <- describe(datCredit_smp$NewLoans_Aggr_Prop)); plot(unique(datCredit_smp$NewLoans_Aggr_Prop)) # Only saving the base variable's descriptive statistics
+(var_Info_Num$NewLoans_Aggr <- describe(datCredit_smp$NewLoans_Aggr_Prop)); plot(unique(datCredit_smp$NewLoans_Aggr_Prop), type="b") # Only saving the base variable's descriptive statistics
 # Clean up
 rm(dat_NewLoans_Aggr, datNewLoans_Aggr_Check1, list_merge_variables, results_missingness, output, lags, ColNames)
 
@@ -478,7 +478,7 @@ datCredit_smp[, AgeToTerm_Aggr_Mean := mean(Age_Adj/Term, na.rm=T), by=Date]
 cat( (sum(datCredit_smp[, sum(is.na(AgeToTerm_Aggr_Mean)), by=Date][,2])==0) %?% 
        'SAFE: New feature [AgeToTerm_Aggr_Mean] has logical values.\n' %:% 
        'WARNING: New feature [AgeToTerm_Aggr_Mean] has illogical values \n' )
-(var_Info_Cat$AgeToTerm_Aggr_Mean <- describe(datCredit_smp$AgeToTerm_Aggr_Mean)); plot(unique(datCredit_smp$AgeToTerm_Aggr_Mean))
+(var_Info_Cat$AgeToTerm_Aggr_Mean <- describe(datCredit_smp$AgeToTerm_Aggr_Mean)); plot(unique(datCredit_smp$AgeToTerm_Aggr_Mean), type="b")
 
 
 # - Aggregate maturity of performance spell ages over time
@@ -486,15 +486,14 @@ datCredit_smp[, PerfSpell_Maturity_Aggr_Mean := mean(PerfSpell_Age, na.rm=T), by
 cat( (sum(datCredit_smp[, sum(is.na(PerfSpell_Maturity_Aggr_Mean)), by=Date][,2])==0) %?% 
        'SAFE: New feature [PerfSpell_Maturity_Aggr_Mean] has logical values.\n' %:% 
        'WARNING: New feature [Perf_SpellMaturity_Aggr_Mean] has illogical values \n' )
-(var_Info_Cat$PerfSpell_Maturity_Aggr_Mean <- describe(datCredit_smp$PerfSpell_Maturity_Aggr_Mean)); plot(unique(datCredit_smp$PerfSpell_Maturity_Aggr_Mean))
+(var_Info_Cat$PerfSpell_Maturity_Aggr_Mean <- describe(datCredit_smp$PerfSpell_Maturity_Aggr_Mean)); plot(unique(datCredit_smp$PerfSpell_Maturity_Aggr_Mean), type="b")
 
 
 # - Median-aggregated interest rate margin
-# NOTE: The median is preferred over the mean since it resulted in a superior model, as investigated in the experimental script (3c(v).Model_DefaultRisk-exp2)
+# NOTE: The median is preferred over the mean since it resulted in a superior model, as investigated in the experimental script 3c(v)
 # Creating an aggregated dataset
-dat_IRM_Aggr <- datCredit_smp[, list(InterestRate_Margin_Aggr_Med = median(InterestRate_Margin_imputed_mean, na.rm=T)/.N), by=list(Date)]
-#dat_IRM_Aggr <- datCredit_smp[, list(InterestRate_Margin_Aggr_Med = median(InterestRate_Margin_imputed_mean, na.rm=T)), by=list(Date)]
-plot(dat_IRM_Aggr$InterestRate_Margin_Aggr_Med)
+dat_IRM_Aggr <- datCredit_smp[, list(InterestRate_Margin_Aggr_Med = median(InterestRate_Margin_imputed_mean, na.rm=T)), by=list(Date)]
+plot(dat_IRM_Aggr$InterestRate_Margin_Aggr_Med, type="b")
 # Applying various lags
 lags <- c(1,2,3) # Lags as found to be significant within the experimental script
 dat_IRM_Aggr_Check1 <- data.table(Variable = NULL, # Dataset for conducting sanity checks
@@ -522,14 +521,13 @@ for (i in 1:length(list_merge_variables)){
 }
 cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fusion with aggregated data is successful.\n" %:%
        "WARNING: Missingness in certain aggregated fields detected, fusion compromised.\n")
-(var_Info_Num$InterestRate_Margin_Aggr_Med <- describe(datCredit_smp$InterestRate_Margin_Aggr_Med)); plot(unique(datCredit_smp$InterestRate_Margin_Aggr_Med)) # Only saving the base variable's descriptive statistics
+(var_Info_Num$InterestRate_Margin_Aggr_Med <- describe(datCredit_smp$InterestRate_Margin_Aggr_Med)); plot(unique(datCredit_smp$InterestRate_Margin_Aggr_Med), type="b") # Only saving the base variable's descriptive statistics
 # Clean up
 rm(dat_IRM_Aggr, dat_IRM_Aggr_Check1, list_merge_variables, results_missingness, output, lags, ColNames)
-#datCredit_smp[, `:=`(InterestRate_Margin_Aggr_Med = NULL, InterestRate_Margin_Aggr_Med_1 = NULL, InterestRate_Margin_Aggr_Med_2 = NULL, InterestRate_Margin_Aggr_Med_3 = NULL)]
 
 
 
-# --- 9. Macroeconomic feature engineering
+# --- 8. Macroeconomic feature engineering
 # - Loading in the raw dataset
 if (!exists('datMV')) unpack.ffdf(paste0(genPath,"datMV"), tempPath)
 
