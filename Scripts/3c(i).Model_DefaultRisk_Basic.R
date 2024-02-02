@@ -125,7 +125,6 @@ coefDeter_glm(logitMod_ali1) # 2.4%
 # - Odds Ratio analysis
 round(exp(cbind(OR = coef(logitMod_ali1), confint.default(logitMod_ali1))), 3)
 ### RESULTS: odds ratios of [Term], [Balance], and [Principal] are all practically 1, which limits their usefulness
-# they do not meaningfully
 # - Residual analysis
 resid_glm(logitMod_ali1)
 ### RESULTS: Max residual > 3, indicating strain
