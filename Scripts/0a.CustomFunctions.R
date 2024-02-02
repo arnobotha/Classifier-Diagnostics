@@ -456,15 +456,15 @@ varImport_logit <- function(logit_model, method="stdCoef", standardise=F, sig_le
     results$data <- copy(coefficients_summary)[names %in% coefficients_sig_model]
     results$data[,Value:=abs(coefficient/se)] # Compute the importance measure
     results$data[,`:=`(coefficient=NULL,se=NULL, sig=NULL)]; colnames(results$data) <- c("Variable", "Value")
-<<<<<<< HEAD
+
   } else if (method=="ac") { # - Variable importance as determined by the absolute values of the variables' coefficients (Rank variables according to the absolute values of the variables' estimated coefficients)
     # Assigning the method to the results
     results$Method <- "Absolute Coefficient"
-=======
+
   } else if (method=="absCoef") { # - Variable importance as determined by the absolute values of the variables' coefficients (Rank variables according to the absolute values of the variables' estimated coefficients)
     # Assigning the method to the results
     results$Method <- "Absolute Coefficients"
->>>>>>> dd84cef4f9d38e7983d1f14205bb43ca55b1bf7b
+
     # Scaling the variables
     if (standardise==T){
       datTrain2 <- copy(datTrain1)
