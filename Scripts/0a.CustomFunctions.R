@@ -380,20 +380,21 @@ transform_yj <- function(x, bound_lower=-2, bound_upper=2, lambda_inc=0.5, verbo
 
 
 # ------------------------- VARIABLE IMPORTANCE FOR LOGIT MODELS ---------------------------
-# A function for assessing the variable importance of a logit model. The absolute size of
-# the coefficients are use to rank the variables from most to least importance.
-# A larger/ smaller absolute value of a coefficient indicates a more/ less important
-# variable. This technique assumes that the variables have the exact same scale.
-# Input:  [logit_model]: A logistic regression model
-#         [datTrain]:    Dataset on which the model is trained
-#         [method]:      The method use for computing the variable importance; either "ac" for the absolute value of the coefficients; "sc" for standardised coefficients; "FIRM" for the FIRM technique that uses partial dependence (a form of explainable AI) (https://arxiv.org/pdf/1904.03959.pdf)
-#         [same_scales]: Are the coefficients the same scales (TRUE), if not (FALSE) then the coefficients will be standardised
-#         [sig_level]:   The threshold under which the variables are considered significant
+# A function for measuring and rank-ordering the variable "importance" given a logit model
+# Three such measures are implemented:
+# 1) standardised coefficients [stdCoef]
+# 2) absolute coefficients [absCoef]
+# 3) partial dependence (an explanable AI measure; see https://arxiv.org/pdf/1904.03959.pdf) [partDep]
+# Regarding measures 1-2, the size of coefficients (or transforms thereof) are used in ranking the 
+# variables from most to least "important". A larger/ smaller measure-value indicates a more/ less important
+# Input:  [logit_model]: A logistic regression model trained using glm()
+#         [method]:      "stdCoef"; "absCoef", "partDep" using the "FIRM"-technique from the vip::vi_firm() function
+#         [standardise]: Whether to standardize each input variable X first using its z-score, i.e., ( X-mean(X) )/sd(X)
+#         [sig_level]:   Significance level or threshold under which the variables are considered as statistically significant using p-values from the Wald-statistic
 #         [plot]:        Should a bar chart be produced which shows the variable importance
 #         [pd_plot]:     Should a partial dependence plot be created for each variable
 # Output: A data table containing the variable importance information
-varImport_logit <- function(logit_model, method="sc", standardise=F, sig_level=0.05, plot=F, pd_plot=F){ ### Use the SC method as standard (get a tutorial on this for "backup")
-  ### Standardise output of function
+varImport_logit <- function(logit_model, method="stdCoef", standardise=F, sig_level=0.05, plot=F, pd_plot=F){
   
   # - Unit testing conditions:
   # datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
@@ -445,16 +446,25 @@ varImport_logit <- function(logit_model, method="sc", standardise=F, sig_level=0
   ### MM: This first technique is under construction. I took a stab at it and I hope that my interpretation of the technique was correct?
   ###     A quick comparison to the "ac" method reveals that the ranking of the variables differ between techniques, but those that are considered "more" important by the one technique are also considers as such bu the other
   # - Computing the variable importance according to the selected technqiue
-  if (method=="sc") { # - Variable importance as determined by the standardised coefficients (Rank variables according to the absolute value of the variables' odd ratios divided by the associated standard error of the estimated coefficient)
-    # Assigning the method to the results
-    results$Method <- "Standardised Coefficient"
+  if (method=="stdCoef") { # - Variable importance based on standardised coefficients ()
+    # B = \beta - mean(X) / sd(x)# for each one-standard deviation icnrease in X, the outcome variable changes by B standard deviations ( see Menard2011; https://www.jstor.org/stable/41290135)
+    # Benefits: 1) comparability across different variables in the entire input space, regardless of differences in the various domains (no need for prior standardisation)
+    # 2) can help identify influential inputs by virtue of size of B-values
+    # 3) can promot "meta-analysis" across different models
+    results$Method <- "Standardised Coefficients"
     # Computing the importance measure and populating the results dataset
     results$data <- copy(coefficients_summary)[names %in% coefficients_sig_model]
     results$data[,Value:=abs(coefficient/se)] # Compute the importance measure
     results$data[,`:=`(coefficient=NULL,se=NULL, sig=NULL)]; colnames(results$data) <- c("Variable", "Value")
+<<<<<<< HEAD
   } else if (method=="ac") { # - Variable importance as determined by the absolute values of the variables' coefficients (Rank variables according to the absolute values of the variables' estimated coefficients)
     # Assigning the method to the results
     results$Method <- "Absolute Coefficient"
+=======
+  } else if (method=="absCoef") { # - Variable importance as determined by the absolute values of the variables' coefficients (Rank variables according to the absolute values of the variables' estimated coefficients)
+    # Assigning the method to the results
+    results$Method <- "Absolute Coefficients"
+>>>>>>> dd84cef4f9d38e7983d1f14205bb43ca55b1bf7b
     # Scaling the variables
     if (standardise==T){
       datTrain2 <- copy(datTrain1)
@@ -481,14 +491,14 @@ varImport_logit <- function(logit_model, method="sc", standardise=F, sig_level=0
       datPlot_odds_ratios <- data.table(Variable=names(coef(logit_model2))[-1],
                                         round(exp(cbind(OR = coef(logit_model2)[names(coef(logit_model2))%in%coefficients_sig_model], confint.default(logit_model2)[names(coef(logit_model2))%in%coefficients_sig_model,])), 3))
       colnames(datPlot_odds_ratios) <- c("Variable","OR","CI_Lower", "CI_Upper")
-       
+      
       (results$plots$Odds_Ratios <- ggplot(datPlot_odds_ratios, aes(x=OR, y=Variable)) + theme_minimal() + labs(x="Odds ratio (log scale)") + geom_vline(aes(xintercept=1), linewidth=0.25, linetype="dashed") +
-                                     geom_errorbarh(aes(xmax=CI_Upper,xmin=CI_Lower), size=0.5, height=0.2) + geom_point(size=3.5, colour="blue") + theme(panel.grid.minor=element_blank()) +
-                                     coord_trans(x="log10") + scale_x_continuous(breaks=c(0,0.1,0.25,0.5,1,2,4,max(datPlot_odds_ratios$CI_Upper))))
+          geom_errorbarh(aes(xmax=CI_Upper,xmin=CI_Lower), size=0.5, height=0.2) + geom_point(size=3.5, colour="blue") + theme(panel.grid.minor=element_blank()) +
+          coord_trans(x="log10") + scale_x_continuous(breaks=c(0,0.1,0.25,0.5,1,2,4,max(datPlot_odds_ratios$CI_Upper))))
     } # if
-   } else if (method=="FIRM") { # - Variable importance as determined by feature importance rank measure (FIRM) (explainable AI technique)
+  } else if (method=="partDep") { # - Variable importance as determined by feature importance rank measure (FIRM) (explainable AI technique)
     # Assigning the method to the results
-    results$Method <- "FIRM"
+    results$Method <- "Partial Dependence (FIRM)"
     # Create the results table
     results$data <- vip::vi_firm(logit_model, feature_names=coefficients_sig_data, method="firm", train=datTrain1)
     # Plotting the partial dependence
@@ -497,7 +507,7 @@ varImport_logit <- function(logit_model, method="sc", standardise=F, sig_level=0
         datPlot_pd <- data.table(attr(results$data, which = "effects")[[i]])
         names(datPlot_pd) <- c("x","y")
         (results$plots[[paste0("pd_",coefficients_sig_model[i])]] <- ggplot(datPlot_pd) + geom_point(aes(x=x,y=y)) + theme_minimal() +
-           labs(x=coefficients_sig_data[i],y="yhat") + theme(plot.title = element_text(hjust=0.5)))
+            labs(x=coefficients_sig_data[i],y="yhat") + theme(plot.title = element_text(hjust=0.5)))
       } # for
     } # if
     # Adding a column to indicate the rank order of the variables' importance and getting the data in the desired format
@@ -521,3 +531,68 @@ varImport_logit <- function(logit_model, method="sc", standardise=F, sig_level=0
 # logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
 # a<-varImport_logit(logit_model = logit_model, method="pd", standardise = F, sig_level = 0.05, plot=T, pd_plot = T)
 # b<-varImport_logit(logit_model = logit_model, method="ac", standardise = T, sig_level = 0.05, plot=T)
+
+
+
+# ------------------------- DIAGNOSTIC FUNCTIONS FOR LOGIT MODELS ---------------------------
+
+# Calculate a generic coefficient of determination (R^2) \in [0,1] based on the "null deviance" in likelihoods
+# between the candidate model and the intercept-only (or "empty/worst/null") model.
+# R^2 = 1 - D/D_0 where D is the deviance of the candidate model (or -2loglik(\beta) ) and D_0
+# is the deviance of the null-model.
+# NOTE: This generic R^2 is NOT equal to the typical R^2 used in linear regression, i.e., it does
+# NOT explain the % of variance explained by the model; but rather it denotes the %-valued degree
+# to which the candidate's fit is to perfection.
+# NOTE 2: This generic R^2 is valid for any generalised linear model, and its intuition can even apply to models outside of GLMs
+# given likelihoods can be obtained (i.e., wherever the underlying MLE-process is used)
+# NOTE 3: Smaller deviance statistic = better fit
+# see https://bookdown.org/egarpor/SSS2-UC3M/logreg-deviance.html
+coefDeter_glm <- function(model) {
+  1 - model$deviance / model$null.deviance
+}
+# - Unit test
+# install.packages("ISLR"); require(ISLR)
+# datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
+# logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
+# coefDeter_glm(logit_model)
+### RESULTS: candidate is 46% better than null-model in terms of its deviance
+
+
+# - Perform residual analysis for a glm-model
+# A standard normal distribution approximates the residual deviance distribution for a well-fitted model (assuming logistic regression)
+# Accordingly, min/max residuals should lie within [-3,3], median should be close to 0, and 1st/3rd quantiles 
+# should be similarly in their absolute value.
+# Deviations from these principles indicate strain in the underlying fit of the model
+# see https://library.virginia.edu/data/articles/understanding-deviance-residuals
+resid_deviance_glm <- function(model) {
+  # - testing conditions
+  # model <- logit_model
+  
+  # -- 1a. Using built-in functionality to calculte deviance residuals and summarise them accordingly
+  quantile(residuals(model))
+  
+  # -- 1b. Manual calculation of the above (for verification purposes)
+  # NOTE: this process uses several types of residuals, which we'll illustrate here assuming logistic regression
+  # 0) get predictions and observations (y)
+  p_hat <- predict(model, type = "response"); y <- model$y
+  # 1) raw residuals: the difference between observed values {0,1} and predictied probabilities of belonging to a binary-valued class
+  e <- residuals(model, type = "response") # or simply e = y - p_hat where y is the observed binary-valued outcome \in {0,1}
+  # 2) Pearson residuals: rescaled version of raw residuals by dividing it with the standard deviation of a binomial distribution (if using logistic regression)
+  r <- e / sqrt(p_hat * (1 - p_hat)) # or simply r <- residuals(m, type = "pearson")
+  # 3) standardised Pearson residuals: adjusting the Pearson residual for leverage (or "hat values"), which is the distance between observations and the mean
+  # NOTE: These residuals are usually standard normally distributed, which can be a useful diagnostic in and of itself; see Agresti2002
+  rs <- r / sqrt(1 - hatvalues(m)) # or simply rs <- rstandard(m, type = "pearson") 
+  # 4) deviance residuals (finally): derived from the likelihood ratio test when comparing a candidate to a saturated/full/perfect model (such that p coefficients = n observations)
+  d <- sign(e)*sqrt(-2*(y*log(p_hat) + (1 - y)*log(1 - p_hat)))
+  
+  # -- cleanup
+  rm(e,d)
+}
+# - Unit test
+# install.packages("ISLR"); require(ISLR)
+# datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
+# logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
+# resid_glm(logit_model)
+### RESULTS: candidate's max residual > 3, which indicates some strain.
+# distributional shape somewhat skew since abs(1st) > abs(3rd) quantiles
+
