@@ -78,12 +78,12 @@ logitMod_ali_exp1_1 <- glm(DefaultStatus1_lead_12_max ~ TimeInPerfSpell
                            , data=datCredit_train, family="binomial")
 logitMod_ali_exp1_2 <- glm(DefaultStatus1_lead_12_max ~ Age_Adj
                            , data=datCredit_train, family="binomial")
-summary(logitMod_ali_exp1_1) # Null deviance = 294889  ; Residual deviance = 293589  ; AIC = 293593 
-summary(logitMod_ali_exp1_2) # Null deviance = 588256  ; Residual deviance = 583510  ; AIC = 583514
+summary(logitMod_ali_exp1_1) # Null deviance = 275184  ; Residual deviance = 274001  ; AIC = 274005 
+summary(logitMod_ali_exp1_2) # Null deviance = 275184  ; Residual deviance = 274579  ; AIC = 274583
 datCredit_valid[, prob_ali_exp1_1 := predict(logitMod_ali_exp1_1, newdata = datCredit_valid, type="response")]
 datCredit_valid[, prob_ali_exp1_2 := predict(logitMod_ali_exp1_2, newdata = datCredit_valid, type="response")]
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali_exp1_1) # 60%
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali_exp1_2) # 55.39%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali_exp1_1) # 60.11%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali_exp1_2) # 51.12%
 ### CONCLUSION:   Use [TimeInPerfSpell] as it is has a higher AUC value and has a lower AIC
 
 # - [Balance] vs [Instalment] vs [Principal]
@@ -111,7 +111,7 @@ datCredit_valid[,`:=` (prob_ali_exp1_1=NULL, prob_ali_exp1_2=NULL, prob_ali_exp2
 
 
 
-# --- 2.3 Best subset selection
+# --- 2.3 Best subset selection | Full analysis
 # - Full logit model with all account-level information - Exclude variables using insights from above analysis: [Age_Adj]; [Instalment]; [AgeToTerm]; [BalanceToPrincipal]
 logitMod_ali1 <- glm(DefaultStatus1_lead_12_max ~ TimeInPerfSpell + Term + Balance +
                        InterestRate_Margin_imputed_mean + Principal
@@ -120,8 +120,15 @@ logitMod_ali1 <- glm(DefaultStatus1_lead_12_max ~ TimeInPerfSpell + Term + Balan
 ### INVESTIGATION :   Model fit seems fine, predictions investigated below (those made on the validation set) and none are exactly 0 or 1.
 # - Deviance and AIC
 summary(logitMod_ali1) # Null deviance = 275184; Residual deviance = 268571; AIC = 268583
+# - Evaluate fit using generic R^2 based on deviance vs null deviance
+coefDeter_glm(logitMod_ali1) # 2.4%
 # - Odds Ratio analysis
 round(exp(cbind(OR = coef(logitMod_ali1), confint.default(logitMod_ali1))), 3)
+### RESULTS: odds ratios of [Term], [Balance], and [Principal] are all practically 1, which limits their usefulness
+# they do not meaningfully
+# - Residual analysis
+resid_glm(logitMod_ali1)
+### RESULTS: Max residual > 3, indicating strain
 # - ROC analysis
 datCredit_valid[, prob_ali1 := predict(logitMod_ali1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali1) # 63.64%
@@ -131,7 +138,7 @@ logitMod_ali_best <- MASS::stepAIC(logitMod_ali1, direction="both")
 ### WARNING       :   glm.fit: fitted probabilities numerically 0 or 1
 # Start AIC = 268582.9
 # End AIC = 268582.9
-### Model inputed is returned as final model
+### Model imputed is returned as final model
 summary(logitMod_ali_best) # No insignificant variables
 ### CONCLUSION:   Use of all specified variables
 
@@ -164,6 +171,8 @@ datCredit_valid[,prob_ali_exp3:=NULL]
 
 
 # --- 2.5 Final account-level information variables
+# -Evaluate fit
+coefDeter_glm(logitMod_ali_best)
 # - FIRM analysis on the final model (which in this case is the variables from the best subset model)
 varImport_logit(logitMod_ali_best, method="pd", plot=T, pd_plot=T, sig_level=0.1) # Top 3 variables: [Balance], [Principal], and [TimeInPerfSpell]
 # - Final variables
