@@ -493,6 +493,7 @@ cat( (sum(datCredit_smp[, sum(is.na(PerfSpell_Maturity_Aggr_Mean)), by=Date][,2]
 # NOTE: The median is preferred over the mean since it resulted in a superior model, as investigated in the experimental script 3c(v)
 # Creating an aggregated dataset
 dat_IRM_Aggr <- datCredit_smp[, list(InterestRate_Margin_Aggr_Med = median(InterestRate_Margin_imputed_mean, na.rm=T)), by=list(Date)]
+# Checking the time series of this variable
 plot(dat_IRM_Aggr$InterestRate_Margin_Aggr_Med, type="b")
 # Applying various lags
 lags <- c(1,2,3) # Lags as found to be significant within the experimental script

@@ -53,7 +53,7 @@ cat( (!any(is.na(dat_g0_Delinq_Aggr[,-1]))) %?% "SAFE: No missingness, aggregate
 lags <- c(1,2,3,4,5,6,9,12)
 # - Creating a dataset with which to check if the lags are applied correctly to the macroeconomic variables
 dat_g0_Check1 <- data.table(Variable = NULL,
-                                     Check = NULL)
+                            Check = NULL)
 # - Getting the column names with which to apply the lags
 ColNames <- colnames(dat_g0_Delinq_Aggr)[-1]
 # - Looping over the specified lags and applying each to each of the specified columns
@@ -105,8 +105,8 @@ cat( ( datCredit_smp[is.na(InterestRate_Margin_imputed_med), .N] == 0) %?%
        'ERROR: Treatment failed for [InterestRate_Margin_imputed_med] \n' )
 
 # - Creating an aggregated dataset
-dat_IRM_Aggr <- merge(datCredit_smp[, list(InterestRate_Margin_mean_Aggr_mean = mean(InterestRate_Margin_imputed_mean, na.rm=T)/.N), by=list(Date)],
-                      datCredit_smp[, list(InterestRate_Margin_mean_Aggr_med = median(InterestRate_Margin_imputed_med, na.rm=T)/.N), by=list(Date)], all.x=T, by="Date")
+dat_IRM_Aggr <- merge(datCredit_smp[, list(InterestRate_Margin_mean_Aggr_mean = mean(InterestRate_Margin_imputed_mean, na.rm=T)), by=list(Date)],
+                      datCredit_smp[, list(InterestRate_Margin_mean_Aggr_med = median(InterestRate_Margin_imputed_med, na.rm=T)), by=list(Date)], all.x=T, by="Date")
 # - Applying various lags
 lags <- c(1,2,3,4,5,6,9,12) # Lags
 dat_IRM_Aggr_Check1 <- data.table(Variable = NULL, # Dataset for conducting sanity checks
@@ -310,7 +310,7 @@ length(inputs_g0_Any_best); length(inputs_g0_Fac_best)
 ### The model with the "any delinquency" variables has an almost identical, but slightly lower, AUC value than the model with the more granular version of the delinquency variable (55.16% vs 55.39%).
 ### The model with the "any delinquency" variables has an higher AIC value compared to the model with the more granular version of the delinquency variable (548315 vs 548193).
 ### The model with the "any delinquency" variable is more parsimonious as it has 3 variables compared to 16 variables of the model with the more granular version of the delinquency variable.
-### CONCLUSION: Use the "any delinquency" variables.
+### CONCLUSION: Use the "any delinquency" variables. More specifically: [g0_Delinq_Any_Aggr_Prop] and [g0_Delinq_Any_Aggr_Prop_5]
 
 # --- Clean up
 rm(logitMod_g0_Any_best, logitMod_g0_Fac_best, logitMod_g0_Fac1, inputs_g0_Any_best, inputs_g0_Fac_best, inputs_g0_Fac1, form_g0_Fac1);
@@ -359,30 +359,30 @@ form_IRM1 <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_IRM1, 
 # - Fit the model
 logitMod_IRM1 <- glm(form_IRM1, data=datCredit_train, family="binomial")
 # - Deviance and AIC
-summary(logitMod_IRM1) # Null deviance = 552507; Residual deviance = 549809; AIC = 549829
+summary(logitMod_IRM1) # Null deviance = 552507; Residual deviance = 549236; AIC = 549256
 # - Variable importance
-varImport(logitMod_IRM1) # Top 3 variables: [InterestRate_Margin_mean_Aggr_mean_1], [InterestRate_Margin_mean_Aggr_mean_12], and [InterestRate_Margin_mean_Aggr_mean_2]
+(varImport_logitMod_IRM1 <- varImport_logit(logitMod_IRM1, method="ac", standardise = F, plot=T)) # Top 3 variables: [InterestRate_Margin_mean_Aggr_mean_12] and [InterestRate_Margin_mean_Aggr_mean_1]
 # - ROC analysis
 datCredit_valid[, prob_IRM1:= predict(logitMod_IRM1, newdata = datCredit_valid, type="response")]
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM1) # 55.54%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM1) # 55.84%
 
 # --- Best subset selection
 # - Conducting the best subset procedure
 logitMod_IRM_best <- MASS::stepAIC(logitMod_IRM1, direction="both")
-# Start AIC = 549828.8
-# End AIC = 549820.6
+# Start AIC = 549256.1
+# End AIC = 549250.6
 # - Deviance and AIC
-summary(logitMod_IRM_best) # Null deviance = 552507; Residual deviance = 549813; AIC = 549821
+summary(logitMod_IRM_best) # Null deviance = 552507; Residual deviance = 549237; AIC = 549251
 # - Variable importance
-varImport(logitMod_IRM_best) # Top 3 variables: [InterestRate_Margin_mean_Aggr_mean_1], [InterestRate_Margin_mean_Aggr_mean_12], and [InterestRate_Margin_mean_Aggr_mean_2]
+(varImport_logitMod_IRM_best <- varImport_logit(logitMod_IRM_best, method="ac", standardise = F, plot=T)) # Top 3 variables: [InterestRate_Margin_mean_Aggr_mean_12], [InterestRate_Margin_mean_Aggr_mean_1], and [InterestRate_Margin_mean_Aggr_mean]
 # - ROC analysis
 datCredit_valid[, prob_IRM_best := predict(logitMod_IRM_best, newdata = datCredit_valid, type="response")]
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM_best) # 55.53%
-### RESULTS:    The final set of variables are [InterestRate_Margin_imputed_Aggr_mean_1], [InterestRate_Margin_imputed_Aggr_mean_2], and [InterestRate_Margin_imputed_Aggr_mean_12]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM_best) # 55.85%
+### RESULTS:    The final set of variables are [InterestRate_Margin_imputed_Aggr_mean], [InterestRate_Margin_imputed_Aggr_mean_1], and [InterestRate_Margin_imputed_Aggr_mean_12]
 ###             All coefficient estimates and the associated standard errors are very large.
 
 # --- Clean up
-rm(ColNames, logitMod_IRM1, logitMod_IRM_best, inputs_IRM1, form_IRM1)
+rm(ColNames, logitMod_IRM1, logitMod_IRM_best, inputs_IRM1, form_IRM1, varImport_logitMod_IRM1, varImport_logitMod_IRM_best)
 datCredit_valid[, `:=` (prob_IRM1=NULL, prob_IRM_best=NULL)]
 
 
@@ -397,29 +397,30 @@ form_IRM2 <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_IRM2, 
 # - Fit the model
 logitMod_IRM2 <- glm(form_IRM2, data=datCredit_train, family="binomial")
 # - Deviance and AIC
-summary(logitMod_IRM2) # Null deviance = 552507; Residual deviance = 548828; AIC = 548848
+summary(logitMod_IRM2) # Null deviance = 552507; Residual deviance = 548523; AIC = 548543
 # - Variable importance
-varImport(logitMod_IRM2) # Top 3 variables: [InterestRate_Margin_mean_Aggr_med_12], [InterestRate_Margin_mean_Aggr_med_1], and [InterestRate_Margin_mean_Aggr_med_2]
+(varImport_logitMod_IRM2 <- varImport_logit(logitMod_IRM2, method="ac", standardise = F, plot=T)) # Top 3 variables: [InterestRate_Margin_mean_Aggr_med_12], [InterestRate_Margin_mean_Aggr_med_1], and [InterestRate_Margin_mean_Aggr_med_2]
 # - ROC analysis
 datCredit_valid[, prob_IRM2:= predict(logitMod_IRM2, newdata = datCredit_valid, type="response")]
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM2) # 56.22%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM2) # 56.33%
 
 # --- Best subset selection3
 # - Conducting the best subset procedure
 logitMod_IRM_best <- MASS::stepAIC(logitMod_IRM2, direction="both")
 # Start AIC = 548847.9
-# End AIC = 548843.5
+# End AIC = 548524
 # - Deviance and AIC
-summary(logitMod_IRM_best) # Null deviance = 552507; Residual deviance = 548830; AIC = 548844
+summary(logitMod_IRM_best) # Null deviance = 552507; Residual deviance = 548524; AIC = 548540
 # - Variable importance
-varImport(logitMod_IRM_best) # Top 3 variables: [InterestRate_Margin_mean_Aggr_med_12], [InterestRate_Margin_mean_Aggr_med_1], and [InterestRate_Margin_mean_Aggr_med_2]
+(varImport_logitMod_IRM_best <- varImport_logit(logitMod_IRM_best, method="ac", standardise = F, plot=T)) # Top 3 variables: [InterestRate_Margin_mean_Aggr_med_12], [InterestRate_Margin_mean_Aggr_med_1], and [InterestRate_Margin_mean_Aggr_med_2]
 # - ROC analysis
 datCredit_valid[, prob_IRM_best := predict(logitMod_IRM_best, newdata = datCredit_valid, type="response")]
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM_best) # 56.21%
-### RESULTS:    The final set of variables are [InterestRate_Margin_mean_Aggr_med], [InterestRate_Margin_mean_Aggr_med_1], [InterestRate_Margin_mean_Aggr_med_2], [InterestRate_Margin_mean_Aggr_med_3], [InterestRate_Margin_mean_Aggr_med_9], [InterestRate_Margin_mean_Aggr_med_12]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM_best) # 56.33%
+### RESULTS:    The final set of variables are [InterestRate_Margin_mean_Aggr_med], [InterestRate_Margin_mean_Aggr_med_1], [InterestRate_Margin_mean_Aggr_med_2], [InterestRate_Margin_mean_Aggr_med_3], [InterestRate_Margin_mean_Aggr_med_4],
+###                                            [InterestRate_Margin_mean_Aggr_med_9], and [InterestRate_Margin_mean_Aggr_med_12]
 ###             All coefficient estimates and the associated standard errors are very large.
 
-### Conclusion: Aggregation using the median results in a superior model (AUC of 56.21% vs 55.53%)
+### Conclusion: Median aggregation results in a superior model (AUC of 56.33% vs 55.85%). The median aggregation model does however have more variables (3 vs 7).
 
 # --- Assessing the impact of missing values when fitting the logit model with these various windows from the best subset selection
 sum(is.na(datCredit_train$InterestRate_Margin_mean_Aggr_med_1))/datCredit_train[,.N]; unique(datCredit_train[is.na(InterestRate_Margin_mean_Aggr_med_1),Date])
@@ -428,25 +429,26 @@ sum(is.na(datCredit_train$InterestRate_Margin_mean_Aggr_med_3))/datCredit_train[
 sum(is.na(datCredit_train$InterestRate_Margin_mean_Aggr_med_9))/datCredit_train[,.N]; unique(datCredit_train[is.na(InterestRate_Margin_mean_Aggr_med_9),Date])
 sum(is.na(datCredit_train$InterestRate_Margin_mean_Aggr_med_12))/datCredit_train[,.N]; unique(datCredit_train[is.na(InterestRate_Margin_mean_Aggr_med_12),Date])
 ### RESULTS:    The 1 month variable omits 0.5% of the observations; the 2 month variable omits 0.1% of the observations; the 3 month variable omits 1.5% of the observations; the 9 month variable omits 4.7% of the observations; the 12 month variable omits 6.5% of the observations
-### CONCLUSION: Refit the logit model and omit the 9- and 12 month aggregated variables; although the missing values aren't necessarily too large, the period in which there is missingness is troublesome since it is the start of an economic downturn (2007)
+###             Fit another median aggregation model using the top three variables, excluding lags larger than 6 months, and compare to mean aggregation model.
 
 # --- Reduced model
-inputs_IRM3 <- c("InterestRate_Margin_mean_Aggr_med", "InterestRate_Margin_mean_Aggr_med_1", "InterestRate_Margin_mean_Aggr_med_2", "InterestRate_Margin_mean_Aggr_med_3")
+inputs_IRM3 <- c("InterestRate_Margin_mean_Aggr_med_1", "InterestRate_Margin_mean_Aggr_med_2", "InterestRate_Margin_mean_Aggr_med_3")
 form_IRM3 <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_IRM3, collapse="+")))
 # - Fit the model
 logitMod_IRM3 <- glm(form_IRM3, data=datCredit_train, family="binomial")
 # - Deviance and AIC
-summary(logitMod_IRM3) # Null deviance = 581581; Residual deviance = 578732; AIC = 578742
+summary(logitMod_IRM3) # Null deviance = 581581; Residual deviance = 578352; AIC = 578360
 # - Variable importance
-varImport(logitMod_IRM3) # Top 3 variables: [InterestRate_Margin_mean_Aggr_med_3], [InterestRate_Margin_mean_Aggr_med_1], and [InterestRate_Margin_mean_Aggr_med]
+(varImport_logitMod_IRM3 <- varImport_logit(logitMod_IRM3, method="ac", standardise = F, plot=T, sig_level = 0.1)) # Top 3 variables: [InterestRate_Margin_mean_Aggr_med_1], [InterestRate_Margin_mean_Aggr_med_3], [InterestRate_Margin_mean_Aggr_med_2]
 # - ROC analysis
 datCredit_valid[, prob_IRM3:= predict(logitMod_IRM3, newdata = datCredit_valid, type="response")]
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM3) # 55.6%
-
-### CONCLUSION: Use [InterestRate_Margin_mean_Aggr_med], [InterestRate_Margin_mean_Aggr_med_1], [InterestRate_Margin_mean_Aggr_med_2], and [InterestRate_Margin_mean_Aggr_med_3]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM3) # 56%
+### RESULTS:    AUC drops slightly from the best subset model (56% vs 55.63%), but is still larger than the mean aggregation model (55.85%).
+### CONCLUSION: Use [InterestRate_Margin_mean_Aggr_med_1], [InterestRate_Margin_mean_Aggr_med_2], and [InterestRate_Margin_mean_Aggr_med_3]
 
 # --- Clean up
-rm(ColNames, logitMod_IRM2,logitMod_IRM3, logitMod_IRM_best, inputs_IRM2, inputs_IRM3, form_IRM2, form_IRM3)
+rm(ColNames, logitMod_IRM2,logitMod_IRM3, logitMod_IRM_best, inputs_IRM2, inputs_IRM3, form_IRM2, form_IRM3,
+   varImport_logitMod_IRM2, varImport_logitMod_IRM_best, varImport_logitMod_IRM3)
 datCredit_valid[, `:=` (prob_IRM2=NULL, prob_IRM_best=NULL, prob_IRM3=NULL)]
 
 
