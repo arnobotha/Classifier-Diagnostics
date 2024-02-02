@@ -131,3 +131,5 @@ source(paste0(path_cust,'DelinqM.R'))
 
 # - Compile the TruEnd-suite of evaluation (and auxiliary) functions
 source(paste0(path_cust,'TruEnd.R'))
+
+### GARBAGE TEXT TEST
