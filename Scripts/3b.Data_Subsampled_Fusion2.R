@@ -32,6 +32,8 @@
 
 # ------ 1. Preliminaries
 
+ptm <- proc.time() # for runtime calculations (ignore)
+
 # - Confirm prepared datasets are loaded into memory
 if (!exists('datCredit_real')) unpack.ffdf(paste0(genPath,"creditdata_final4a"), tempPath)
 if (!exists('datExclusions')) unpack.ffdf(paste0(genObjPath,"Exclusions-TruEnd-Enriched"), tempPath)
@@ -95,7 +97,7 @@ if (diag.real_subsamp_5a > 0) {
 
 
 
-# ------ 2. Subsampled resampling scheme with 2-way stratified random sampling
+# ------ 2. Subsampling scheme with 2-way stratified random sampling
 
 # - Preliminaries
 smp_perc <- smp_size / ( datCredit_real[complete.cases(mget(stratifiers)), mget(stratifiers)][,.N] ) # Implied sampling fraction for downsampling step
@@ -620,6 +622,8 @@ pack.ffdf(paste0(genPath, "creditdata_valid"), datCredit_valid); gc()
 
 # --- Clean up
 rm(varList_Cat, varList_Num, var_Info_Cat, var_Info_Num, datExcl, datExclusions,
-   stratifiers, smp_perc, smp_size, targetVar, timeVar, train_prop, overlap_flds,
+   stratifiers, smp_perc, smp_size, targetVar, timeVar, train_prop,
    dat_Aggr, dat_g0_Delinq_Aggr, datMV_Check1, datMV_Check2, list_merge_variables, results_missingness,
    ColNames, lags, confLevel, datCredit_smp)
+
+proc.time() - ptm # IGNORE: elapsed runtime
