@@ -399,7 +399,7 @@ varImport_logit <- function(logit_model, method="stdCoef", standardise=F, sig_le
   # - Unit testing conditions:
   # datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
   # logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
-  # method <- "pd"; same_scales=F; sig_level<-0.05; plot<-T; pd_plot<-T; standardise<-T
+  # method <- "pd"; sig_level<-0.05; plot<-T; pd_plot<-T; standardise<-T
   
   # - Get the data the model was trained on
   datTrain1 <- subset(logit_model$data, select = names(logit_model$data)[names(logit_model$data) %in% names(model.frame(logit_model))])
@@ -413,18 +413,17 @@ varImport_logit <- function(logit_model, method="stdCoef", standardise=F, sig_le
   coefficients_sig_data_index <- 0 # Index showing if the variable in the model is significant or not
   coefficients_sig_data <- 0 # Names of the significant variable's associated column name in the training dataset
   sig_level <- ifelse(is.na(sig_level),1,sig_level) # The significance level against which each variable must be tested
-  k <- 0 # Counter
+  k <- 1 # Counter
   for (i in 1:length(coefficients_data$names)){ # Main loop - looping through all the relevant variables in the training dataset
     if(class(datTrain1[,get(coefficients_data$names[i])]) %in% c("numeric", "integer")){ # Do the following if variable i is numeric
-      k<-k+1
-      coefficients_sig_data_index[k] <- ifelse(coefficients_summary$sig[k]<=sig_level,T,F)
+      coefficients_sig_data_index[k] <- coefficients_summary$sig[k]<=sig_level
       coefficients_sig_data[k] <- as.character(coefficients_data[i,])
-    } else { # Do the following if variable i is numeric
       k<-k+1
+    } else { # Do the following if variable i is numeric
       levels_n <- length(unique(datTrain1[,get(coefficients_data$names[i])]))-1
-      coefficients_sig_data_index[k:(k+levels_n-1)] <- ifelse(any(coefficients_summary$sig[k:(k+levels_n-1)]<=sig_level),T,F) # Checking if any levels of this variable is significant
+      coefficients_sig_data_index[k:(k+levels_n-1)] <- rep(ifelse(any(coefficients_summary$sig[k:(k+levels_n-2)]<=sig_level),T,F),levels_n) # Checking if any levels of this variable is significant
       coefficients_sig_data[k:(k+levels_n-1)] <- as.character(coefficients_data[i,])
-      k<-k+levels_n-1
+      k<-k+levels_n
     }
   }
   
@@ -456,10 +455,6 @@ varImport_logit <- function(logit_model, method="stdCoef", standardise=F, sig_le
     results$data <- copy(coefficients_summary)[names %in% coefficients_sig_model]
     results$data[,Value:=abs(coefficient/se)] # Compute the importance measure
     results$data[,`:=`(coefficient=NULL,se=NULL, sig=NULL)]; colnames(results$data) <- c("Variable", "Value")
-
-  } else if (method=="ac") { # - Variable importance as determined by the absolute values of the variables' coefficients (Rank variables according to the absolute values of the variables' estimated coefficients)
-    # Assigning the method to the results
-    results$Method <- "Absolute Coefficient"
 
   } else if (method=="absCoef") { # - Variable importance as determined by the absolute values of the variables' coefficients (Rank variables according to the absolute values of the variables' estimated coefficients)
     # Assigning the method to the results
@@ -518,8 +513,8 @@ varImport_logit <- function(logit_model, method="stdCoef", standardise=F, sig_le
     (results$plots[["Ranking"]] <- ggplot(results$data, aes(x=reorder(Variable, Value))) + geom_col(aes(y=Value), col='blue', fill='blue') +
        coord_flip() + theme_minimal() + theme(plot.title = element_text(hjust=0.5)) +
        xlab("Variable name") + ylab(ifelse(method=="sc", "Absolute value of standardised coefficient",
-                                           ifelse(method=="ac","Absolute value of fitted coefficient",
-                                                  "FIRM Value"))))
+                                           ifelse(method=="absCoef","Absolute value of fitted coefficient",
+                                                  "Absolute Value of Coefficient"))))
   } # if
   # - Return results
   return(results)

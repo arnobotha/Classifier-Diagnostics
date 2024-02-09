@@ -1,21 +1,21 @@
-# ======================= MODEL DEFAULT RISK - MACROECOMIC ==============================
-# Develop several forward looking (containing macroeconomic variables)
-# logistic regression models ranging from models with few features to models with more
-# features to predict default risk.
-# ---------------------------------------------------------------------------------------
+# ======================= MODEL DEFAULT RISK - INTERMEDIATE ==============================
+# Develop several logit models using delinquency- and forward looking information.
+# ----------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
 # SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer, Marcel Muller
 
 # DESCRIPTION:
 # This script uses the previously prepared credit dataset fused with macroeconomic
 # variables to create multiple logistic regression models for default. The focus of this
-# script is forward looking information (macroeconomic variables). Variables are selected
-# thematically (where the input space is divided into themes) and by using the enitre input
-# space.
+# script is on delinquency- and forward looking information (macroeconomic variables).
+# Variables are selected thematically (where the input space is divided into themes)
+# and by using the combined input space.
+# For the delinquency variables, existing variables (the ones with "slc_" in their name)
+# are considered along with spell- and delinquency (arrear)-level variables.
 # For all macroeconomic variables, the following engineered variables were created:
 #     - Lag orders of 1-,2-,3-,...,24 months
 #     - Volatility with windows of 1-,2-,3-,...,24 months
-# ---------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
 #   - 0a.CustomFunctions.R
@@ -25,7 +25,7 @@
 #   - datCredit_valid | Prepared credit data from script 3b
 #
 # -- Outputs:
-#   - Sets of macroeconomic variables as selected thematically and using the entire input space.
+#   - Sets of delinquency- and macroeconomic variables.
 # =======================================================================================
 
 
@@ -1074,15 +1074,15 @@ length(labels(terms(logitMod_mac_final2))); length(labels(terms(logitMod_mac_fin
 
 # --- 8.2.3 Clean up
 # - Saving the selected variables to the disk
-inputs_mac_com_fin_theme <- names(model.frame(logitMod_mac_final_best1))[-1]
-pack.ffdf(paste0(genObjPath, "Mac_Com_All_Formula"), inputs_mac_com_fin_theme); gc()
+inputs_mac_com_fin_all <- names(model.frame(logitMod_mac_final_best2))[-1]
+pack.ffdf(paste0(genObjPath, "Mac_Com_All_Formula"), inputs_mac_com_fin_all); gc()
 # - Cleaning up the environment
 datCredit_valid[, prob_mac_final_best1:=NULL]; datCredit_train[, prob_mac_final_best1:=NULL]
 rm(logitMod_mac_final1, logitMod_mac_final_best1, inputs_mac_com_fin_theme, vif_mac_final1, vif_mac_final_best1)
 
 # --- 8.3 Clean up
 datCredit_valid[, `:=` (prob_mac_final1=NULL, prob_mac_final2=NULL, prob_mac_final_best1=NULL, prob_mac_final_best2=NULL)]
-rm(ColNames7, ColNames8, form_mac_final1, form_mac_final2, logitMod_mac_final1, logitMod_mac_final2, form_mac_fin_theme, form_mac_fin_all,
+rm(ColNames7, ColNames8, form_mac_final1, form_mac_final2, logitMod_mac_final1, logitMod_mac_final2, inputs_mac_com_fin_theme, inputs_mac_com_fin_all,
    vif_mac_final1, vif_mac_final2, vif_mac_final_best1, vif_mac_final_best2)
 
 
@@ -1125,9 +1125,304 @@ dpi<-240
 ggsave(g_mac_theme_sum, file=paste0(genFigPath, "MacroVars_Select_Combined_Themes_Summary.png"), width=3000/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
 # --- Clean up
-rm(dpi, col.v, vol.v2, col.v3, label.v, g_mac_theme_sum); gc()
+rm(dpi, col.v, vol.v2, col.v3, label.v, datPlot, g_mac_theme_sum); gc()
 
 
 
+
+# ------ 10. Modelling & Feature Selection by theme "Delinquency information"
+# --- 10.1 Correlation analysis using spearman correlation
+# - Correlation threshold
+cor_thresh <- 0.6
+# - Computing the correlation matrix
+cor_del_spear <-cor(x=datCredit_train[!is.na(g0_Delinq_SD_6),list(PrevDefaults=as.numeric(PrevDefaults), TimeInPerfSpell,
+                                                                  PerfSpell_Num, g0_Delinq, g0_Delinq_Num, g0_Delinq_SD_4, g0_Delinq_SD_6,
+                                                                  PerfSpell_g0_Delinq_Num, # PerfSpell_g0_Delinq_SD is excluded since it is forward looking (it uses all information in a performance spell...predictions made before the end of that spell are thus using information of the future)
+                                                                  slc_acct_roll_ever_24_imputed_mean, slc_past_due_amt_imputed_med)], # slc_acct_arr_dir_3 excluded since it is a categorical variable
+                    method = "spearman")
+# - Creating a correlalogram
+corrplot(cor_del_spear, type="upper")
+# - Setting the bottom halve of the correlation matrix to zero, since the matrix is symmetrical around the diagonal
+cor_del_spear[lower.tri(cor_del_spear)] <- 0
+# - Printing all correlations above the specified threshold
+ind_row_spear <- which(abs(cor_del_spear)>cor_thresh & abs(cor_del_spear)<1)
+ind_col_spear <- ind_row_spear %% ncol(cor_del_spear) + ncol(cor_del_spear)*(ind_row_spear %% ncol(cor_del_spear) == 0)
+cor_del_spear2 <- data.table(x=rownames(cor_del_spear)[floor((ind_row_spear-1)/ncol(cor_del_spear)) + 1],
+                             y=colnames(cor_del_spear)[ind_col_spear])
+for(i in 1:(nrow(cor_del_spear2))) {cat("Absolute correlation above ", cor_thresh, " found for ", cor_del_spear2[i,1][[1]], " and ", cor_del_spear2[i,2][[1]], "\n")}
+### RESULTS: High-correlation detected within [PerfSpell_Num], [Prev_Defaults], [g0_Delinq], [g0_Delinq_SD_4], [g0_Delinq_SD_6], [PerfSpell_g0_Delinq_Num], [g0_Delinq_Num], and [slc_past_due_amt_imputed]
+
+### Conclusion:
+###   Remove either [PrevDefaults] or [PerfSpell_Num]
+###   Remove either [g0_Delinq_Num] or [PerfSpell_g0_Delinq_Num]
+###   Keep [g0_Delinq], [g0_Delinq_SD_4], and [g0_Delinq_SD_6] as these variables are expected to have a high correlation
+###   Keep [slc_past_due_amt_imputed_med]; even though [g0_Delinq] has high correlation with [slc_past_due_amt_imputed_med] (0.8996), it is not as granular | This variable also serves as a proxy for [Arrears], which in of itself has missing values for all accounts over the last 6 month period within the sampling window (July - December 2022)
+
+
+
+# --- 10.2 Prelimanry experimenting: Using insights from correlation analysis
+# - [PrevDefaults] vs [PerfSpell_Num] - From the insights of the correlation analysis
+# Model fitting
+logitMod_del_exp1_1 <- glm(DefaultStatus1_lead_12_max ~ PrevDefaults
+                           , data=datCredit_train, family="binomial")
+logitMod_del_exp1_2 <- glm(DefaultStatus1_lead_12_max ~ PerfSpell_Num
+                           , data=datCredit_train, family="binomial")
+# Deviance and AIC
+summary(logitMod_del_exp1_1) # Null deviance = 275184; Residual deviance = 226130; AIC = 226134
+summary(logitMod_del_exp1_2) # Null deviance = 275184; Residual deviance = 263639; AIC = 263643
+# ROC analysis
+datCredit_valid[, prob_del_exp1_1 := predict(logitMod_del_exp1_1, newdata = datCredit_valid, type="response")]
+datCredit_valid[, prob_del_exp1_2 := predict(logitMod_del_exp1_2, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp1_1) # 75.45%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp1_2) # 60.04%
+### CONCLUSION:   Use [PrevDefaults] in the modelling process as it results in a model with higher predictive power
+###               In a PD modelling context, which is less dynamic than a SICR model, the less dynamic variable is more useful given the 12-month horizon of the typical PD model.
+
+# - [g0_Delinq_Num] or [PerfSpell_g0_Delinq_Num] - From the insights of the correlation analysis
+# Model fitting
+logitMod_del_exp2_1 <- glm(DefaultStatus1_lead_12_max ~ g0_Delinq_Num
+                           , data=datCredit_train, family="binomial")
+logitMod_del_exp2_2 <- glm(DefaultStatus1_lead_12_max ~ PerfSpell_g0_Delinq_Num
+                           , data=datCredit_train, family="binomial")
+# Deviance and AIC
+summary(logitMod_del_exp2_1) # Null deviance = 275184; Residual deviance = 258669; AIC = 258673
+summary(logitMod_del_exp2_2) # Null deviance = 275184; Residual deviance = 265999; AIC = 266003
+# ROC analysis
+datCredit_valid[, prob_del_exp2_1 := predict(logitMod_del_exp2_1, newdata = datCredit_valid, type="response")]
+datCredit_valid[, prob_del_exp2_2 := predict(logitMod_del_exp2_2, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp2_1) # 77.24%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp2_2) # 73.89%
+### CONCLUSION:   Use [g0_Delinq_Num] as it results in a model with higher predictive power
+
+# - Missing value indicator for [slc_acct_roll_ever_24_imputed_mean] - From suggested sub-themes
+# Model fitting
+logitMod_del_exp3_1 <- glm(DefaultStatus1_lead_12_max ~ slc_acct_roll_ever_24_imputed_mean
+                           , data=datCredit_train, family="binomial")
+
+logitMod_del_exp3_2 <- glm(DefaultStatus1_lead_12_max ~ slc_acct_roll_ever_24_imputed_mean/value_ind_slc_acct_roll_ever_24
+                           , data=datCredit_train, family="binomial")
+# Deviance and AIC
+summary(logitMod_del_exp3_1) # Null deviance = 255631; Residual deviance = 234505; AIC = 234509
+summary(logitMod_del_exp3_2) # Null deviance = 255631; Residual deviance = 233237; AIC = 233243
+# ROC analysis
+datCredit_valid[, prob_del_exp3_1 := predict(logitMod_del_exp3_1, newdata = datCredit_valid, type="response")]
+datCredit_valid[, prob_del_exp3_2 := predict(logitMod_del_exp3_2, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp3_1) # 78.61%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp3_2) # 78.14%
+### RESULTS   : Model with missing value indicators has lower AIC (233243 vs 234509) but lower AUC (78.14% vs 78.14%) than the model without the missing value indicators (although the difference is very small)
+### COMCLUSION: Use [slc_acct_roll_ever_24_imputed_mean] without its missing value indicators as it results in a model with higher predictive power
+
+# - Missing value indicator for [slc_past_due_amount_imputed_med] - From suggested sub-themes
+# Model fitting
+logitMod_del_exp4_1 <- glm(DefaultStatus1_lead_12_max ~ slc_past_due_amt_imputed_med
+                           , data=datCredit_train, family="binomial")
+### WARNING       :   glm.fit: fitted probabilities numerically 0 or 1
+### INVESTIGATION :   Model fit seems fine, predictions investigated below (those made on the validation set) and none are exactly 0 or 1.
+logitMod_del_exp4_2 <- glm(DefaultStatus1_lead_12_max ~ slc_past_due_amt_imputed_med/value_ind_slc_past_due_amt
+                           , data=datCredit_train, family="binomial")
+### WARNING       :   glm.fit: fitted probabilities numerically 0 or 1
+# Deviance and AIC
+summary(logitMod_del_exp4_1) # Null deviance = 255631; Residual deviance = 247218; AIC = 247222
+summary(logitMod_del_exp4_2) # Null deviance = 255631; Residual deviance = 247218; AIC = 247222
+### RESULTS   : Estimated coefficient for the interaction betwee the raw variable and the missing value indicator results in an estimated coefficient that is "NA"
+### COMCLUSION: Use [slc_past_due_amount_imputed_med] only
+
+# - Non-linear relationships within [g0_Delinq] - From suggested sub-themes
+# - Fitting the model
+logitMod_del_exp5_1 <- glm(DefaultStatus1_lead_12_max ~ g0_Delinq
+                         , data=datCredit_train, family="binomial")
+logitMod_del_exp5_2 <- glm(DefaultStatus1_lead_12_max ~ g0_Delinq_fac
+                           , data=datCredit_train, family="binomial")
+# - Deviance and AIC
+summary(logitMod_del_exp5_1) # Null deviance = 255631; Residual deviance = 215930; AIC = 215934
+summary(logitMod_del_exp5_2) # Null deviance = 255631; Residual deviance = 215109; AIC = 215115
+# - ROC analysis
+datCredit_valid[, prob_del_exp5_1 := predict(logitMod_del_exp5_1, newdata = datCredit_valid, type="response")]
+datCredit_valid[, prob_del_exp5_2 := predict(logitMod_del_exp5_2, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp5_1) # 74.03%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp5_2) # 74.03%
+### RESULTS   : Model with factorised delinquency variable has lower AIC (215115 vs 215934) abut the same AUC (74.03% vs 74.03%) than the model with the raw variable 
+### COMCLUSION: Use [g0_Delinq] as it has equal predictive power and results in a slightly more parsimonious model (1- vs 2 variables)
+
+# - Clean up
+rm(logitMod_del_exp1_1, logitMod_del_exp1_2, logitMod_del_exp2_1, logitMod_del_exp2_2, logitMod_del_exp3_1, logitMod_del_exp3_2, logitMod_del_exp4_1, logitMod_del_exp4_2, logitMod_del_exp5_1, logitMod_del_exp5_2); gc()
+datCredit_valid[, `:=` (prob_del_exp1_1=NULL, prob_del_exp1_2=NULL, prob_del_exp2_1=NULL, prob_del_exp2_2=NULL, prob_del_exp3_1=NULL, prob_del_exp3_2=NULL, prob_del_exp5_1, prob_del_exp5_2)]
+
+
+# --- 10.3 Best subset selection
+# - Full logit model with all account-level information - Exclude variables using insights from correlation analysis:  [PerfSpell_Num]
+logitMod_del1 <- glm(inputs_del1 <- DefaultStatus1_lead_12_max ~ PrevDefaults + TimeInPerfSpell + g0_Delinq + g0_Delinq_Num + g0_Delinq_SD_4 + g0_Delinq_SD_6 + 
+                       slc_acct_roll_ever_24_imputed_mean + slc_acct_arr_dir_3 + slc_past_due_amt_imputed_med
+                     , data=datCredit_train, family="binomial")
+# - Assess full model
+# Deviance and AIC
+summary(logitMod_del1) # Null deviance = 255631; Residual deviance = 171760; AIC = 171784
+# Evaluate fit using generic R^2 based on deviance vs null deviance
+coefDeter_glm(logitMod_del1) # 32.92%
+# Odds Ratio analysis 
+round(exp(cbind(OR = coef(logitMod_del1), confint.default(logitMod_del1))), 3)
+### [slc_past_due_amt_imputed_med] has a ratio close to 1, but this might not give an accurate indication because of the range of this variable
+# - Variable importance
+varImport_logit(logitMod_del1, method="absCoef", standardise=T, sig_level=0.1, plot=T) # Top three variables: [PrevDefaultsTRUE], [slc_acct_arr_dirMISSING_DATA], and [g0_Delinq]
+# ROC analysis
+datCredit_valid[, prob_del1 := predict(logitMod_del1, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del1) # 87.87%
+
+# - Best subset selection
+logitMod_del_best <- MASS::stepAIC(logitMod_del1, direction="both")
+# Start AIC = 171501.4
+# End AIC = 171501.4
+### Model inputed is returned as final model
+
+### CONCLUSION: No insignificant variables, all variables specified here
+### NOTE      : [g0_Delinq_Num] has the wrong sign (negative); might be corrected in the final model with the combination of additional variables
+
+
+# --- 10.4 Final delinquency-level information variables
+# - Final variables
+### CONCLUSION: Use [PrevDefaults], [TimeInPerfSpell], [g0_Delinq], [g0_Delinq_Num], [g0_Delinq_SD_4], [g0_Delinq_SD_6], [g0_Delinq_Num],
+###                 [slc_acct_roll_ever_24_imputed_mean], [slc_acct_arr_dir_3], [slc_past_due_amt_imputed_med]
+# - Save variables
+inputs_del_fin <- DefaultStatus1_lead_12_max ~ PrevDefaults + TimeInPerfSpell + g0_Delinq + g0_Delinq_Num + g0_Delinq_SD_4 + g0_Delinq_SD_6 + g0_Delinq_Num +
+                  slc_acct_roll_ever_24_imputed_mean + slc_acct_arr_dir_3 + slc_past_due_amt_imputed_med
+pack.ffdf(paste0(genObjPath, "Del_Formula"), inputs_del_fin); gc()
+
+# --- 10.5 Clean up
+rm(cor_del_spear, ind_row_spear, ind_col_spear, cor_del_spear2, logitMod_del_best, logitMod_del1, inputs_del1, inputs_del_fin); gc()
+
+
+
+
+# ------ 11. Combined input space - Macroeconomic information + delinquency information
+# --- 11.1 Preliminaries
+# - Loading in variables
+unpack.ffdf(paste0(genObjPath, "Del_Formula"), tempPath) # Delinquency variables
+unpack.ffdf(paste0(genObjPath, "Mac_Com_Full_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Mac_Com_Theme_Formula"), tempPath) # Macroeconomic variables
+# - Getting the inputs in the correct format
+inputs_del_fin <- labels(terms(inputs_del_fin))
+
+
+# --- 11.2 Thematically chosen macroeconomic variables + delinquency variables
+# - Full logit model with all account-level information - Exclude variables using insights from correlation analysis:  [PerfSpell_Num]
+logitMod_full1 <- glm(as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_del_fin, collapse="+"), "+", paste(inputs_mac_com_fin_theme, collapse="+")))
+                     , data=datCredit_train, family="binomial")
+# - Assess full model
+summary(logitMod_full1)
+### RESULTS:    Insignificant variables: [M_DTI_Growth]
+### CONCLUSION: Remove insignificant variables and refit model
+
+# - Refited model excluding insignificant variables: [M_DTI_Growth]
+logitMod_full2 <- glm(as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_del_fin, collapse="+"), "+", paste(inputs_mac_com_fin_theme[-which(inputs_mac_com_fin_theme=="M_DTI_Growth")], collapse="+")))
+                      , data=datCredit_train, family="binomial")
+### RESULTS:    Insignificant variables: None
+### CONCLUSION: Continue with assessment
+# - Assess full model
+# Deviance and AIC
+summary(logitMod_full2) # Null deviance = 254945; Residual deviance = 169837; AIC = 169895
+# Evaluate fit using generic R^2 based on deviance vs null deviance
+coefDeter_glm(logitMod_full2) # 33.38%
+# Odds Ratio analysis 
+round(exp(cbind(OR = coef(logitMod_full2), confint.default(logitMod_full2))), 3)
+### [slc_past_due_amt_imputed_med] has a ratio close to 1, but this might not give an accurate indication because of the range of this variable
+# Variable importance
+varImport_logit(logitMod_full2, method="absCoef", standardise=T, sig_level=0.1, plot=T) # Top three variables: [PrevDefaultsTRUE], [M_RealIncome_Growth_12], and [M_RealGDP_Growth_12]
+varImport_logit(logitMod_full2, method="stdCoef", standardise=T, sig_level=0.1, plot=T) # Top three variables: [PrevDefaultsTRUE], [g0_Delinq], and [slc_acct_roll_ever_imputed_mean]
+# ROC analysis
+datCredit_train[, prob_full2 := predict(logitMod_full2, newdata = datCredit_train, type="response")]
+datCredit_valid[, prob_full2 := predict(logitMod_full2, newdata = datCredit_valid, type="response")]
+auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_full2) # 89.36%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full2) # 89.2%
+# VIF analysis
+car::vif(logitMod_full2)
+### RESULTS:  The delinquency variables have low VIF values (<10), but most macroeconomic variables have large  VIF values (>10); which is expected
+
+# - Clean up
+rm(logitMod_full1)
+datCredit_train[,prob_full2:=NULL]; datCredit_valid[,prob_full2:=NULL]
+
+# - Results & Conclusion
+### RESULTS:    All variables are significant and have reasonable standard errors; except for the SD variables which have large standard errors
+###             Model is not overfitted as evidenced by the small change in AUC when a ROC analysis is conducted on the training- and validation datasets (74.6% vs 74.39%)
+###             The VIF values are as expected, with most macroeconomic variables having high VIF values (>10) compared to the delinquency variables that have low VIF values (<10)
+
+### CONCLUSION: Reperform model fitting and analysis process for the macroeconomic variables as chosen by the best subset sleection on the entire macroeconomic input space.
+
+
+# --- 11.3 Macroeconomic variables chosen from full inputs space using best subset selection + delinquency variables
+# - Full logit model with all account-level information - Exclude variables using insights from correlation analysis:  [PerfSpell_Num]
+logitMod_full3 <- glm(as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_del_fin, collapse="+"), "+", paste(inputs_mac_com_fin_all, collapse="+")))
+                      , data=datCredit_train, family="binomial")
+# - Assess full model
+summary(logitMod_full3)
+### RESULTS:    Insignificant variables: [M_Inflation_Growth_3], [M_RealIncome_Growth_6], [M_Repo_Rate_12], [M_Inflation_Growth_SD_4], [M_RealIncome_Growth_SD_4], [M_Inflation_Growth_SD_6], [M_Inflation_Growth_SD_12], and [M_Emp_Growth_SD_12]
+### CONCLUSION: Remove insignificant variables and refit model
+
+# - Refited model excluding insignificant variables
+logitMod_full4 <- glm(as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_del_fin, collapse="+"), "+",
+                                       paste(inputs_mac_com_fin_all[-unlist(lapply(c("M_Inflation_Growth_3", "M_RealIncome_Growth_6", "M_Repo_Rate_12", "M_Inflation_Growth_SD_4", "M_RealIncome_Growth_SD_4", "M_Inflation_Growth_SD_6", "M_Inflation_Growth_SD_12", "M_Emp_Growth_SD_12"), function(X) which(X==inputs_mac_com_fin_all)))], collapse="+")))
+                      , data=datCredit_train, family="binomial")
+# - Assess full model
+summary(logitMod_full4)
+### RESULTS:    Insignificant variables: [M_DTI_Growth_9], and [M_Repo_Rate_SD_9]
+### CONCLUSION: Remove insignificant variables and refit model
+
+# - Refited model excluding insignificant variables
+logitMod_full5 <- glm(as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_del_fin, collapse="+"), "+",
+                                       paste(inputs_mac_com_fin_all[-unlist(lapply(c("M_Inflation_Growth_3", "M_RealIncome_Growth_6", "M_Repo_Rate_12", "M_Inflation_Growth_SD_4", "M_RealIncome_Growth_SD_4", "M_Inflation_Growth_SD_6", "M_Inflation_Growth_SD_12", "M_Emp_Growth_SD_12", "M_DTI_Growth_9", "M_Repo_Rate_SD_9"), function(X) which(X==inputs_mac_com_fin_all)))], collapse="+")))
+                      , data=datCredit_train, family="binomial")
+# - Assess full model
+summary(logitMod_full5)
+### RESULTS:    Insignificant variables: None
+### CONCLUSION: Continue with assessment
+
+# - Assess full model
+# Deviance and AIC
+summary(logitMod_full5) # Null deviance = 254945; Residual deviance = 169678; AIC = 169760
+# Evaluate fit using generic R^2 based on deviance vs null deviance
+coefDeter_glm(logitMod_full5) # 33.44%
+# Odds Ratio analysis 
+round(exp(cbind(OR = coef(logitMod_full5), confint.default(logitMod_full5))), 3)
+### [slc_past_due_amt_imputed_med] has a ratio close to 1, but this might not give an accurate indication because of the range of this variable
+# Variable importance
+varImport_logit(logitMod_full5, method="absCoef", standardise=T, sig_level=0.1, plot=T) # Top three variables: [PrevDefaultsTRUE], [M_RealGDP_Growth_SD_6], and [M_RealGDP_Growth_SD_9]
+varImport_logit(logitMod_full5, method="stdCoef", standardise=T, sig_level=0.1, plot=T) # Top three variables: [PrevDefaultsTRUE], [g0_Delinq], and [slc_acct_roll_ever_imputed_mean]
+# ROC analysis
+datCredit_train[, prob_full5 := predict(logitMod_full5, newdata = datCredit_train, type="response")]
+datCredit_valid[, prob_full5 := predict(logitMod_full5, newdata = datCredit_valid, type="response")]
+auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_full5) # 89.38%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full5) # 89.17%
+# VIF analysis
+car::vif(logitMod_full5)
+### RESULTS:  The delinquency variables have low VIF values (<10), but most macroeconomic variables have large  VIF values (>10); which is expected
+
+# - Clean up
+rm(logitMod_full3, logitMod_full4)
+datCredit_train[,prob_full5:=NULL]; datCredit_valid[,prob_full5:=NULL]
+
+# - Results & Conclusion
+### RESULTS:    All variables are significant and have reasonable standard errors; except for the SD variables which have large standard errors
+###             Model is not overfitted as evidenced by the small change in AUC when a ROC analysis is conducted on the training- and validation datasets (74.6% vs 74.39%)
+###             The VIF values are as expected, with most macroeconomic variables having high VIF values (>10) compared to the delinquency variables that have low VIF values (<10)
+
+### CONCLUSION: Compare model to the one with the combined delinquency and macroeconomic variables that were thematically
+
+# - Comparison
+length(labels(terms(logitMod_full2))); length(labels(terms(logitMod_full5)))
+### COMPARISON: Both models' SD variables have large standard errors.
+###             The "full" model has an higher AIC compared to the "thematic" model (169760 vs 169895).
+###             The "full" model has a slightly higher AUC on the training dataset compared to the "thematic" model (89.38% vs 89.36%).
+###             The "full" model has a slightly lower AUC on the validation dataset compared to the "thematic" model (89.17% vs 89.2%).
+###             The "full" model has 38 variables compares to the "thematic" model which has 40 variables.
+
+### CONCLUSION: Both models are similar in all considered metrics, either one can be used
+
+# - Save formulas
+inputs_int_theme <- formula(logitMod_full2)
+inputs_int_full <- formula(logitMod_full5)
+pack.ffdf(paste0(genObjPath, "Int_Theme_Formula"), inputs_int_theme); gc()
+pack.ffdf(paste0(genObjPath, "Int_Full_Formula"), inputs_int_full); gc()
+
+# - Clean up
+rm(logitMod_full2, logitMod_full5, inputs_int_theme, inputs_int_full)
 
 
