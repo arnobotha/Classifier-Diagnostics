@@ -111,8 +111,8 @@ datCredit_valid[,`:=` (prob_ali_exp1_1=NULL, prob_ali_exp1_2=NULL, prob_ali_exp2
 
 
 
-# --- 2.3 Best subset selection | Full analysis
-# - Full logit model with all account-level information - Exclude variables using insights from above analysis: [Age_Adj]; [Instalment]; [AgeToTerm]; [BalanceToPrincipal]
+# --- 2.3a Full logit model with all account-level information | Full analysis
+# NOTE: Certain variables are excluded using insights from previous analysis: [Age_Adj]; [Instalment]; [AgeToTerm]; [BalanceToPrincipal]
 logitMod_ali1 <- glm(DefaultStatus1_lead_12_max ~ TimeInPerfSpell + Term + Balance +
                        InterestRate_Margin_imputed_mean + Principal
                        , data=datCredit_train, family="binomial")
@@ -125,13 +125,25 @@ coefDeter_glm(logitMod_ali1) # 2.4%
 # - Odds Ratio analysis
 round(exp(cbind(OR = coef(logitMod_ali1), confint.default(logitMod_ali1))), 3)
 ### RESULTS: odds ratios of [Term], [Balance], and [Principal] are all practically 1, which limits their usefulness
-# - Residual analysis
-resid_glm(logitMod_ali1)
-### RESULTS: Max residual > 3, indicating strain
+# - Residual deviance analysis
+resid_deviance_glm(logitMod_ali1)
+### RESULTS: Model fit is somewhat strained (all 3 diagnostics gave warnings)
 # - ROC analysis
 datCredit_valid[, prob_ali1 := predict(logitMod_ali1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali1) # 63.64%
 
+
+# - Variable importance analysis
+### SCRATCH-start
+logit_model <- logitMod_ali1
+rm(logit_model,)
+### SCRATCH-end
+varImport_logit(logitMod_ali1, plot=T) 
+
+
+
+# --- 2.3b Best subset selection | Full analysis
+### AB: Marcel, please perform full analysis on this model as well, in mirroring what we did in sec. 2.3a above
 # - Best subset selection
 logitMod_ali_best <- MASS::stepAIC(logitMod_ali1, direction="both")
 ### WARNING       :   glm.fit: fitted probabilities numerically 0 or 1
