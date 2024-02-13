@@ -156,7 +156,7 @@ round(exp(cbind(OR = coef(logitMod_ali1), confint.default(logitMod_ali1))), 3)
 resid_deviance_glm(logitMod_ali1)
 ### RESULTS: Model fit is somewhat strained (all 3 diagnostics gave warnings)
 # - Variable importance
-varImport_logit(logitMod_ali1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)
+varImport <- varImport_logit(logitMod_ali1, method="stdCoef_ZScores", impPlot=T)
 ### RESULTS: Top three variables: [Principal], [Balance], and [Age_Adj]
 # - ROC analysis
 datCredit_valid[, prob_ali1 := predict(logitMod_ali1, newdata = datCredit_valid, type="response")]
