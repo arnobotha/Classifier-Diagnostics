@@ -414,6 +414,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   # --- 1. Filtering input space for statistically significant input variables
   coefficients_summary <- data.table(names=names(summary(logit_model)$coefficients[,4][-1]), sig=summary(logit_model)$coefficients[,4][-1],
                                      coefficient=summary(logit_model)$coefficients[,1][-1], se=summary(logit_model)$coefficients[,2][-1]) %>% arrange(names) # Names of variables in the model
+  coefficients_sig_model_level <- as.list(rep(0,coefficients_summary[,.N])) # Corresponding level name of the categorical variable; NULL in the case of a numeric or integer variable
   coefficients_data <-  data.table(names=names(datTrain1)[-which(names(datTrain1) %in% names(model.frame(logit_model))[1])]) %>% arrange(names) # Names of variables training dataset
   coefficients_sig_data_index <- 0 # Index showing if the variable in the model is significant or not
   coefficients_sig_data <- 0 # Names of the significant variable's associated column name in the training dataset
@@ -441,8 +442,6 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     stop("ERROR: Variable importance not conducted since there are no significant variables.")
   }
   
-  # - Initiating the dataset to be returned (results dataset)
-  results <- list(data = data.table(Variable = coefficients_sig_model, Value = 0, Rank = 0))
   
   
   # --- 2. Calculating variable importance based on specified method
@@ -474,13 +473,12 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   } else if (method=="stdCoef_Goodman") { 
     # -- Variable importance based on standardised coefficients from Goodman
     # B = \beta - mean(X) / sd(x)# for each one-standard deviation increase in X, the outcome variable changes by B standard deviations (see Menard2011; https://www.jstor.org/stable/41290135)
-    
-    # Populating result set
-    results$Method <- "Standardised Coefficients"
+    # Assigning the method to the results
+    results$Method <- "Standardised coefficients using t-values"
+    # Computing the importance measure and populating the results dataset
     results$data <- copy(coefficients_summary)[names %in% coefficients_sig_model]
-    results$data[,Value:=abs(coefficient/se)] # Compute the importance measure
+    results$data[,Value:=coefficient/se] # Compute the importance measure
     results$data[,`:=`(coefficient=NULL,se=NULL, sig=NULL)]; colnames(results$data) <- c("Variable", "Value")
-<<<<<<< HEAD
 
 =======
   
