@@ -49,8 +49,155 @@ unpack.ffdf(paste0(genObjPath, "Int_Theme_Formula"), tempPath); unpack.ffdf(past
 
 
 
-# ------ 2. Modelling & Feature Selection by theme "Portfolio-level information"
-# --- 2.1 Correlation analysis using Spearman correlation
+# ------ 2. Modelling & Feature Selection by theme "Delinquency information" - This excludes the basic variable [g0_Delinq]
+# --- 2.1 Correlation analysis using spearman correlation
+# - Correlation threshold
+cor_thresh <- 0.6
+# - Computing the correlation matrix
+cor_del_spear <-cor(x=datCredit_train[!is.na(g0_Delinq_SD_6),list(PrevDefaults=as.numeric(PrevDefaults), TimeInPerfSpell,
+                                                                  PerfSpell_Num, g0_Delinq_Num, g0_Delinq_SD_4, g0_Delinq_SD_6,
+                                                                  PerfSpell_g0_Delinq_Num, # PerfSpell_g0_Delinq_SD is excluded since it is forward looking (it uses all information in a performance spell...predictions made before the end of that spell are thus using information of the future)
+                                                                  slc_acct_roll_ever_24_imputed_mean, slc_past_due_amt_imputed_med)], # slc_acct_arr_dir_3 excluded since it is a categorical variable
+                    method = "spearman")
+# - Creating a correlalogram
+corrplot(cor_del_spear, type="upper")
+# - Setting the bottom halve of the correlation matrix to zero, since the matrix is symmetrical around the diagonal
+cor_del_spear[lower.tri(cor_del_spear)] <- 0
+# - Printing all correlations above the specified threshold
+ind_row_spear <- which(abs(cor_del_spear)>cor_thresh & abs(cor_del_spear)<1)
+ind_col_spear <- ind_row_spear %% ncol(cor_del_spear) + ncol(cor_del_spear)*(ind_row_spear %% ncol(cor_del_spear) == 0)
+cor_del_spear2 <- data.table(x=rownames(cor_del_spear)[floor((ind_row_spear-1)/ncol(cor_del_spear)) + 1],
+                             y=colnames(cor_del_spear)[ind_col_spear])
+for(i in 1:(nrow(cor_del_spear2))) {cat("Absolute correlation above ", cor_thresh, " found for ", cor_del_spear2[i,1][[1]], " and ", cor_del_spear2[i,2][[1]], "\n")}
+### RESULTS: High-correlation detected within [PerfSpell_Num], [Prev_Defaults], [g0_Delinq], [g0_Delinq_SD_4], [g0_Delinq_SD_6], [PerfSpell_g0_Delinq_Num], [g0_Delinq_Num], and [slc_past_due_amt_imputed]
+
+### Conclusion:
+###   Remove either [PrevDefaults] or [PerfSpell_Num]
+###   Remove either [g0_Delinq_Num] or [PerfSpell_g0_Delinq_Num]
+###   Keep [g0_Delinq], [g0_Delinq_SD_4], and [g0_Delinq_SD_6] as these variables are expected to have a high correlation
+###   Keep [slc_past_due_amt_imputed_med]; even though [g0_Delinq] has high correlation with [slc_past_due_amt_imputed_med] (0.8996), it is not as granular | This variable also serves as a proxy for [Arrears], which in of itself has missing values for all accounts over the last 6 month period within the sampling window (July - December 2022)
+
+
+
+# --- 2.2 Prelimanry experimenting: Using insights from correlation analysis
+# - [PrevDefaults] vs [PerfSpell_Num] - From the insights of the correlation analysis
+# Model fitting
+logitMod_del_exp1_1 <- glm(DefaultStatus1_lead_12_max ~ PrevDefaults
+                           , data=datCredit_train, family="binomial")
+logitMod_del_exp1_2 <- glm(DefaultStatus1_lead_12_max ~ PerfSpell_Num
+                           , data=datCredit_train, family="binomial")
+# Deviance and AIC
+summary(logitMod_del_exp1_1) # Null deviance = 275184; Residual deviance = 226130; AIC = 226134
+summary(logitMod_del_exp1_2) # Null deviance = 275184; Residual deviance = 263639; AIC = 263643
+# ROC analysis
+datCredit_valid[, prob_del_exp1_1 := predict(logitMod_del_exp1_1, newdata = datCredit_valid, type="response")]
+datCredit_valid[, prob_del_exp1_2 := predict(logitMod_del_exp1_2, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp1_1) # 75.45%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp1_2) # 60.04%
+### CONCLUSION:   Use [PrevDefaults] in the modelling process as it results in a model with higher predictive power
+###               In a PD modelling context, which is less dynamic than a SICR model, the less dynamic variable is more useful given the 12-month horizon of the typical PD model.
+
+# - [g0_Delinq_Num] or [PerfSpell_g0_Delinq_Num] - From the insights of the correlation analysis
+# Model fitting
+logitMod_del_exp2_1 <- glm(DefaultStatus1_lead_12_max ~ g0_Delinq_Num
+                           , data=datCredit_train, family="binomial")
+logitMod_del_exp2_2 <- glm(DefaultStatus1_lead_12_max ~ PerfSpell_g0_Delinq_Num
+                           , data=datCredit_train, family="binomial")
+# Deviance and AIC
+summary(logitMod_del_exp2_1) # Null deviance = 275184; Residual deviance = 258669; AIC = 258673
+summary(logitMod_del_exp2_2) # Null deviance = 275184; Residual deviance = 265999; AIC = 266003
+# ROC analysis
+datCredit_valid[, prob_del_exp2_1 := predict(logitMod_del_exp2_1, newdata = datCredit_valid, type="response")]
+datCredit_valid[, prob_del_exp2_2 := predict(logitMod_del_exp2_2, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp2_1) # 77.24%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp2_2) # 73.89%
+### CONCLUSION:   Use [g0_Delinq_Num] as it results in a model with higher predictive power
+
+# - Missing value indicator for [slc_acct_roll_ever_24_imputed_mean] - From suggested sub-themes
+# Model fitting
+logitMod_del_exp3_1 <- glm(DefaultStatus1_lead_12_max ~ slc_acct_roll_ever_24_imputed_mean
+                           , data=datCredit_train, family="binomial")
+
+logitMod_del_exp3_2 <- glm(DefaultStatus1_lead_12_max ~ slc_acct_roll_ever_24_imputed_mean/value_ind_slc_acct_roll_ever_24
+                           , data=datCredit_train, family="binomial")
+# Deviance and AIC
+summary(logitMod_del_exp3_1) # Null deviance = 255631; Residual deviance = 234505; AIC = 234509
+summary(logitMod_del_exp3_2) # Null deviance = 255631; Residual deviance = 233237; AIC = 233243
+# ROC analysis
+datCredit_valid[, prob_del_exp3_1 := predict(logitMod_del_exp3_1, newdata = datCredit_valid, type="response")]
+datCredit_valid[, prob_del_exp3_2 := predict(logitMod_del_exp3_2, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp3_1) # 78.61%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del_exp3_2) # 78.14%
+### RESULTS   : Model with missing value indicators has lower AIC (233243 vs 234509) but lower AUC (78.14% vs 78.14%) than the model without the missing value indicators (although the difference is very small)
+### COMCLUSION: Use [slc_acct_roll_ever_24_imputed_mean] without its missing value indicators as it results in a model with higher predictive power
+
+# - Missing value indicator for [slc_past_due_amount_imputed_med] - From suggested sub-themes
+# Model fitting
+logitMod_del_exp4_1 <- glm(DefaultStatus1_lead_12_max ~ slc_past_due_amt_imputed_med
+                           , data=datCredit_train, family="binomial")
+### WARNING       :   glm.fit: fitted probabilities numerically 0 or 1
+### INVESTIGATION :   Model fit seems fine, predictions investigated below (those made on the validation set) and none are exactly 0 or 1.
+logitMod_del_exp4_2 <- glm(DefaultStatus1_lead_12_max ~ slc_past_due_amt_imputed_med/value_ind_slc_past_due_amt
+                           , data=datCredit_train, family="binomial")
+### WARNING       :   glm.fit: fitted probabilities numerically 0 or 1
+# Deviance and AIC
+summary(logitMod_del_exp4_1) # Null deviance = 255631; Residual deviance = 247218; AIC = 247222
+summary(logitMod_del_exp4_2) # Null deviance = 255631; Residual deviance = 247218; AIC = 247222
+### RESULTS   : Estimated coefficient for the interaction betwee the raw variable and the missing value indicator results in an estimated coefficient that is "NA"
+### COMCLUSION: Use [slc_past_due_amount_imputed_med] only
+
+# - Clean up
+rm(logitMod_del_exp1_1, logitMod_del_exp1_2, logitMod_del_exp2_1, logitMod_del_exp2_2, logitMod_del_exp3_1, logitMod_del_exp3_2, logitMod_del_exp4_1, logitMod_del_exp4_2); gc()
+datCredit_valid[, `:=` (prob_del_exp1_1=NULL, prob_del_exp1_2=NULL, prob_del_exp2_1=NULL, prob_del_exp2_2=NULL, prob_del_exp3_1=NULL, prob_del_exp3_2=NULL)]
+
+
+# --- 2.3 Best subset selection
+# - Full logit model with all account-level information - Exclude variables using insights from correlation analysis:  [PerfSpell_Num]
+logitMod_del1 <- glm(inputs_del1 <- DefaultStatus1_lead_12_max ~ PrevDefaults + TimeInPerfSpell + g0_Delinq + g0_Delinq_Num + g0_Delinq_SD_4 + g0_Delinq_SD_6 + 
+                       slc_acct_roll_ever_24_imputed_mean + slc_acct_arr_dir_3 + slc_past_due_amt_imputed_med
+                     , data=datCredit_train, family="binomial")
+# - Assess full model
+# Deviance and AIC
+summary(logitMod_del1) # Null deviance = 255631; Residual deviance = 171760; AIC = 171784
+# Evaluate fit using generic R^2 based on deviance vs null deviance
+coefDeter_glm(logitMod_del1) # 32.92%
+# Odds Ratio analysis 
+round(exp(cbind(OR = coef(logitMod_del1), confint.default(logitMod_del1))), 3)
+### [slc_past_due_amt_imputed_med] has a ratio close to 1, but this might not give an accurate indication because of the range of this variable
+# - Variable importance
+varImport_logit(logitMod_del1, method="absCoef", standardise=T, sig_level=0.1, plot=T) # Top three variables: [PrevDefaultsTRUE], [slc_acct_arr_dirMISSING_DATA], and [g0_Delinq]
+# ROC analysis
+datCredit_valid[, prob_del1 := predict(logitMod_del1, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del1) # 87.87%
+
+# - Best subset selection
+logitMod_del_best <- MASS::stepAIC(logitMod_del1, direction="both")
+# Start AIC = 171501.4
+# End AIC = 171501.4
+### Model inputed is returned as final model
+
+### CONCLUSION: No insignificant variables, all variables specified here
+### NOTE      : [g0_Delinq_Num] has the wrong sign (negative); might be corrected in the final model with the combination of additional variables
+
+
+# --- 2.4 Final delinquency-level information variables
+# - Final variables
+### CONCLUSION: Use [PrevDefaults], [TimeInPerfSpell], [g0_Delinq], [g0_Delinq_Num], [g0_Delinq_SD_4], [g0_Delinq_SD_6], [g0_Delinq_Num],
+###                 [slc_acct_roll_ever_24_imputed_mean], [slc_acct_arr_dir_3], [slc_past_due_amt_imputed_med]
+# - Save variables
+inputs_del_fin <- DefaultStatus1_lead_12_max ~ PrevDefaults + TimeInPerfSpell + g0_Delinq + g0_Delinq_Num + g0_Delinq_SD_4 + g0_Delinq_SD_6 + g0_Delinq_Num +
+  slc_acct_roll_ever_24_imputed_mean + slc_acct_arr_dir_3 + slc_past_due_amt_imputed_med
+pack.ffdf(paste0(genObjPath, "Del_Formula"), inputs_del_fin); gc()
+### Can move g0_Delinq
+
+# --- 2.5 Clean up
+rm(cor_del_spear, ind_row_spear, ind_col_spear, cor_del_spear2, logitMod_del_best, logitMod_del1, inputs_del1, inputs_del_fin); gc()
+
+
+
+
+# ------ 3. Modelling & Feature Selection by theme "Portfolio-level information"
+# --- 3.1 Correlation analysis using Spearman correlation
 # - Correlation threshold
 cor_thresh <- 0.6
 # - Computing the correlation matrix
@@ -81,7 +228,7 @@ for(i in 1:(nrow(cor_por_spear2))) {cat("Absolute correlation above ", cor_thres
 ###     - Remove [ArrearsToBalance_Aggr_Prop] as this variable is created with the problematic [Arrears] variable (which has zero values for all accounts for the last six months of the sampling window, i.e., July - December 2022)
 
 
-# --- 2.2 Prelimanry experimenting: Using insights from correlation analysis
+# --- 3.2 Prelimanry experimenting: Using insights from correlation analysis
 # - [AgeToTerm_Aggr_Mean] vs [PerfSpell_Maturity_Aggr_Mean]
 # Model fitting
 logitMod_por_exp1_1 <- glm(DefaultStatus1_lead_12_max ~ AgeToTerm_Aggr_Mean
@@ -103,7 +250,7 @@ rm(logitMod_por_exp1_1, logitMod_por_exp1_2); gc()
 datCredit_valid[, `:=` (prob_por_exp1_1=NULL, prob_por_exp1_2=NULL)]
 
 
-# --- 2.3 Best subset selection
+# --- 3.3 Best subset selection
 # - Full logit model with all account-level information - Exclude variables using insights from correlation analysis:  [g0_Delinq_Ave]; [PerfSpell_Maturity_Aggr_Mean]
 logitMod_por1 <- glm(inputs_por1 <- DefaultStatus1_lead_12_max ~ g0_Delinq_Any_Aggr_Prop + g0_Delinq_Any_Aggr_Prop_Lag_5 +
                        InstalmentToBalance_Aggr_Prop + CuringEvents_Aggr_Prop +
@@ -141,7 +288,7 @@ length(all.vars(getCall(logitMod_por1)$formula)); length(all.vars(getCall(logitM
 ### CONCLUSION:   Use the specified variables of the best subset selection in the dynamic variable selection process.
 
 
-# --- 2.4 Final portfolio-level information variables
+# --- 3.4 Final portfolio-level information variables
 # - FIRM analysis on the final model (which in this case is the variables from the best subset model)
 # Variable importance
 varImport_logit(logitMod_por_best, method="ac", standardise=T, plot=T, sig_level=0.15) # Top 3 variables: [InteresstRate_Margin_Aggr_Med_3], [InteresstRate_Margin_Aggr_Med_2], and [NewLoans_Aggr_Prop_1]
@@ -155,7 +302,7 @@ pack.ffdf(paste0(genObjPath, "Por_Formula"), inputs_por_fin); gc()
 ###  CONCLUSION:    Use [inputs_por_fin] as set of portfolio-level information variables
 
 
-# --- 2.5 Clean up
+# --- 3.5 Clean up
 datCredit_valid[, `:=` (prob_por1=NULL, prob_por_best=NULL)]
 rm(cor_por_spear, ind_row_spear, ind_col_spear, cor_por_spear2,
    logitMod_por_best, logitMod_por1); gc()
@@ -163,10 +310,10 @@ rm(cor_por_spear, ind_row_spear, ind_col_spear, cor_por_spear2,
 
 
 
-# ------ 3. Combing the basic variables with the basic-, intermediate-, and advanced variables
+# ------ 4. Combing the basic variables with the basic-, intermediate-, and advanced variables
 unpack.ffdf(paste0(genObjPath, "Por_Formula"), tempPath)
 
-# --- 3.1 Basic-, thematic intermediate-, and advanced variables 
+# --- 4.1 Basic-, thematic intermediate-, and advanced variables 
 # - Formula compilation
 inputs_adv1 <- as.formula(paste0("DefaultStatus1_lead_12_max~", paste(labels(terms(inputs_fin_bas)), collapse="+"), "+", paste(labels(terms(inputs_int_theme)), collapse="+"), "+", paste(labels(terms(inputs_por_fin)), collapse="+")))
 # - Fitting the full model
@@ -225,7 +372,7 @@ datCredit_train[,prob_adv3:=NULL]; datCredit_valid[,prob_adv3:=NULL]
 
 ### CONCLUSION: Compare model to the one with the intermediate variables that were selected from the full input space
 
-# --- 3.2 Basic-, full intermediate-, and advanced variables 
+# --- 4.2 Basic-, full intermediate-, and advanced variables 
 # - Formula compilation
 inputs_adv4 <- as.formula(paste0("DefaultStatus1_lead_12_max~", paste(labels(terms(inputs_fin_bas)), collapse="+"), "+", paste(labels(terms(inputs_int_full)), collapse="+"), "+", paste(labels(terms(inputs_por_fin)), collapse="+")))
 # - Fitting the full model
@@ -299,7 +446,7 @@ rm(logitMod_adv3, logitMod_adv5)
 
 
 
-# ------ 7. Clean up
+# ------ 5. Clean up
 # --- Clean up
 rm(logitMod_com1, logitMod_com2, logitMod_com3, logitMod_com4, form_com1, form_com2, form_com3, form_com4)
 datCredit_train[, prob_com4:=NULL]; datCredit_valid[, prob_com4:=NULL]

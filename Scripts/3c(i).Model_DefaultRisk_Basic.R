@@ -138,71 +138,48 @@ rm(logitMod_ali_exp1_1, logitMod_ali_exp1_2, logitMod_ali_exp2_1, logitMod_ali_e
 datCredit_valid[,`:=` (prob_ali_exp1_1=NULL, prob_ali_exp1_2=NULL, prob_ali_exp2_1=NULL, prob_ali_exp2_2=NULL, prob_ali_exp2_3=NULL, prob_ali_exp3_1=NULL, prob_ali_exp3_2=NULL)]
 
 
-<<<<<<< HEAD
-# --- 2.3 Best subset selection | Full analysis
-# - Full logit model with all account-level information - Exclude variables using insights from above analysis: [Age_Adj]; [Instalment]; [AgeToTerm]; [BalanceToPrincipal]
-logitMod_ali1 <- glm(DefaultStatus1_lead_12_max ~ AgeToTerm + Term + Balance +
-                       Principal + InterestRate_Margin_imputed_mean
-=======
 # --- 2.3a Full logit model with all account-level information | Full analysis
 # NOTE: Certain variables are excluded using insights from previous analysis: [Age_Adj]; [Instalment]; [AgeToTerm]; [BalanceToPrincipal]
-logitMod_ali1 <- glm(DefaultStatus1_lead_12_max ~ TimeInPerfSpell + Term + Balance +
+logitMod_ali1 <- glm(DefaultStatus1_lead_12_max ~ Age_Adj + Term + Balance +
                        InterestRate_Margin_imputed_mean + Principal
->>>>>>> 8f91472be449deaececf574d398a79db846076eb
                        , data=datCredit_train, family="binomial")
 ### WARNING       :   glm.fit: fitted probabilities numerically 0 or 1
 ### INVESTIGATION :   Model fit seems fine, predictions investigated below (those made on the validation set) and none are exactly 0 or 1.
 # - Deviance and AIC
 summary(logitMod_ali1) # Null deviance = 275184; Residual deviance = 269438; AIC = 269450
 # - Evaluate fit using generic R^2 based on deviance vs null deviance
-coefDeter_glm(logitMod_ali1) # 2.4%
+coefDeter_glm(logitMod_ali1) # 2.23%
 # - Odds Ratio analysis
 round(exp(cbind(OR = coef(logitMod_ali1), confint.default(logitMod_ali1))), 3)
-### RESULTS: odds ratios of [Term], [Balance], and [Principal] are all practically 1, which limits their usefulness
+### RESULTS: odds ratios of [Term], [Balance], and [Principal] are all practically 1, which limits their usefulness (however, the range of these variables may be influencing this result; a standardised odds ratio may be more insightful)
 # - Residual deviance analysis
 resid_deviance_glm(logitMod_ali1)
 ### RESULTS: Model fit is somewhat strained (all 3 diagnostics gave warnings)
+# - Variable importance
+varImport_logit(logitMod_ali1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)
+### RESULTS: Top three variables: [Principal], [Balance], and [Age_Adj]
 # - ROC analysis
 datCredit_valid[, prob_ali1 := predict(logitMod_ali1, newdata = datCredit_valid, type="response")]
-<<<<<<< HEAD
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali1)# datCredit_valid[prob_ali1==0,.N]; datCredit_valid[prob_ali1==1,.N] # There are no probabilities that are exactly equal to 0 or 1 # 63.22%
-=======
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali1) # 63.64%
-
-
-# - Variable importance analysis
-### SCRATCH-start
-logit_model <- logitMod_ali1
-rm(logit_model,)
-### SCRATCH-end
-varImport_logit(logitMod_ali1, plot=T) 
-
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali1)# datCredit_valid[prob_ali1==0,.N]; datCredit_valid[prob_ali1==1,.N] # There are no probabilities that are exactly equal to 0 or 1
+### RESULTS: 63.11%
 
 
 # --- 2.3b Best subset selection | Full analysis
 ### AB: Marcel, please perform full analysis on this model as well, in mirroring what we did in sec. 2.3a above
->>>>>>> 8f91472be449deaececf574d398a79db846076eb
 # - Best subset selection
 logitMod_ali_best <- MASS::stepAIC(logitMod_ali1, direction="both")
 ### WARNING:   glm.fit: fitted probabilities numerically 0 or 1
-# Start AIC = 269449.9
+# Start AIC = 68930.8
 # End AIC = 269449.9
-### Entire input space returned after have been run through the best subset selection
-# - Deviance and AIC
-summary(logitMod_ali_best) # Null deviance = 275184; Residual deviance = 269438; AIC = 269450
-# - Evaluate fit using generic R^2 based on deviance vs null deviance
-coefDeter_glm(logitMod_ali_best) # 2.09%
-# - Odds Ratio analysis
-round(exp(cbind(OR = coef(logitMod_ali_best), confint.default(logitMod_ali_best))), 3)
-### RESULTS: odds ratios of [Term], [Balance], and [Principal] are all practically 1, however the range of these variables might not give the full picture
-# - Variable importance
-varImport_logit(logitMod_ali_best, method="absCoef", standardise=T, sig_level=0.1, plot=T) # Top three variables: [InterestRate_Margin_imputed_mean], [AgeToTerm], and [Term]
+summary(logitMod_ali_best)
+### RESULTS:    Entire input space returned after have been run through the best subset selection
+### CONCLUSION: Use analysis of full model in 2.3a.
 # - Clean up
-rm(logit_ali1)
-datCredit_valid[,`:=`(prob_ali1=NULL, prob_ali_best1)]
+rm(logitMod_ali1, logitMod_ali_best)
+datCredit_valid[,`:=`(prob_ali1=NULL)]
 
 
-# --- 2.5 Final account-level information variables
+# --- 2.4 Final account-level information variables
 # - Final variables
 ### CONCLUSION: Use [AgeToTerm], [Term], [Balance], [Principal], and [InterestRate_Margin_imputed_mean] as the account-level information variables.
 # - Save variables
@@ -301,17 +278,25 @@ datCredit_valid[, `:=` (prob_beh_exp1_1=NULL, prob_beh_exp1_2=NULL, prob_beh_exp
 logitMod_beh1 <- glm(DefaultStatus1_lead_12_max ~ slc_acct_pre_lim_perc_imputed_med + slc_pmnt_method
                            , data=datCredit_train, family = "binomial")
 # - Deviance and AIC
-summary(logitMod_beh1) # Null deviance = 275184; Residual deviance = 252143; AIC = 252159
-# - ROC analysis
-datCredit_valid[, prob_beh1 := predict(logitMod_beh1, newdata = datCredit_valid, type="response")]
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_beh1)# 73.06%
+summary(logitMod_beh1)
+### RESULTS: Null deviance = 275184; Residual deviance = 252143; AIC = 252159
 # - Evaluate fit using generic R^2 based on deviance vs null deviance
-coefDeter_glm(logitMod_beh1) # 8.37%
+coefDeter_glm(logitMod_beh1)
+### RESULTS: 8.37%
 # - Odds Ratio analysis
 round(exp(cbind(OR = coef(logitMod_beh1), confint.default(logitMod_beh1))), 3)
 ### RESULTS: Both the numerical and the categorical, along with all associated levels of that variable have odds ratio that are "quite" larger/smaller than 1
+# - Residual deviance analysis
+resid_deviance_glm(logitMod_beh1)
+### RESULTS: Model fit is somewhat strained (2 diagnostics gave warnings)
 # - Variable importance
-varImport_logit(logitMod_beh1, method="absCoef", standardise=F, sig_level=0.1, plot=T) # Top three variables: [slc_acct_pre_lim_perc_imputed_med], [slc_pmnt_methodSuspense], and [slc_pmnt_methodStatement]
+varImport_logit(logitMod_beh1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)
+### RESULTS: Top three variables: [slc_acct_pre_lim_perc_imputed_med], [slc_pmnt_methodSuspense], and [slc_pmnt_methodStatement]
+# - ROC analysis
+datCredit_valid[, prob_beh1 := predict(logitMod_beh1, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_beh1)
+### RESTULS:    73.06%
+### CONCLUSION: Do not run a best subset selection as there are only two variables in the model that are both significant
 
 # --- 3.4 Final account-level information variables
 # - Final variables
@@ -339,32 +324,38 @@ form_com_full <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_fu
 # - Full logit model with all combined thematically selected variables
 logitMod_full1 <- glm(form_com_full, data=datCredit_train, family="binomial")
 # Deviance and AIC
-summary(logitMod_full1) # Null deviance = 275184; Residual deviance = 250081; AIC = 250107
+summary(logitMod_full1)
+### RESULTS: Null deviance = 275184; Residual deviance = 250081; AIC = 250107
+# Evaluate fit using generic R^2 based on deviance vs null deviance
+coefDeter_glm(logitMod_full1)
+### RESULTS: 9.12%
 # Odds Ratio analysis
 round(exp(cbind(OR = coef(logitMod_full1), confint.default(logitMod_full1))), 3)
+# Residual deviance analysis
+resid_deviance_glm(logitMod_full1)
+### RESULTS: Model fit is somewhat strained (3 diagnostics gave warnings)
+# Variable importance
+varImport_logit(logitMod_full1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)
+### RESULTS: Top three variables: [slc_acct_pre_lim_perc_imputed_med], [Balance], and [Principal]
 # ROC analysis
 datCredit_train[, prob_full1 := predict(logitMod_full1, newdata = datCredit_train, type="response")]
 datCredit_valid[, prob_full1 := predict(logitMod_full1, newdata = datCredit_valid, type="response")]
-auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_full1) # 74.6%
-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full1) # 74.39%
+auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_full1)
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full1)
+### RESULTS: Training dataset = 74.6%
+###          Validation dataset = 74.39%
 # VIF analysis
 car::vif(logitMod_full1)
 ### RESULTS:  Both [Principal] and [Balance] have VIFs that are larger than 10, but this is expected since they are both highly correlated
-# Evaluate fit using generic R^2 based on deviance vs null deviance
-coefDeter_glm(logitMod_full1) # 9.12%
-# Odds Ratio analysis
-round(exp(cbind(OR = coef(logitMod_full1), confint.default(logitMod_full1))), 3)
-### RESULTS: [Balance] and [Principal] have odds ratios that are very close to one, but this is due to the range of the variables. Run variable importance to get a clearer picture
-# Variable importance
-varImport_logit(logitMod_full1, method="absCoef", standardise=F, sig_level=0.1, plot=T) # Top three variables: [InterestRate_Margin_imputed_mean], [slc_acct_pre_lim_perc_imputed_med], and [slc_pmnt_methodSuspense]
-
 
 ### RESULTS:  All variables are significant and have reasonable standard errors.
-###           Model is not overfitted as evidenced by the small change in AUC when a ROC analysis is conducted on the training- and validaiton datasets (74.6% vs 74.39%)
-###           Number of variables is reduced from xx in the full model to xx in the best subset model
+###           The coefficient of determination is relatively low at 9.12%.
+###           The residual deviance analysis indicates that the model fit is strenuous.
 ###           Some VIFs are over 10, but majority are not; thus no cause for concern.
+###           Model is not overfitted as evidenced by the small change in AUC when a ROC analysis is conducted on the training- and validaiton datasets (74.6% vs 74.39%)
 
 ### CONCLUSION: Use all the variables from the resulting account-level information and behavioral variables themes.
+###             These models on their own are not strong predictors and it is recommended that they are at least used with the intermediate variables.
 
 # --- Save model formula to disk
 # - Final variables
