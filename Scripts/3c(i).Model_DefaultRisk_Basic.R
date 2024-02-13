@@ -147,6 +147,14 @@ logitMod_ali1 <- glm(DefaultStatus1_lead_12_max ~ AgeToTerm + Term + Balance +
 ### INVESTIGATION :   Model fit seems fine, predictions investigated below (those made on the validation set) and none are exactly 0 or 1.
 # - Deviance and AIC
 summary(logitMod_ali1) # Null deviance = 275184; Residual deviance = 269438; AIC = 269450
+# - Evaluate fit using generic R^2 based on deviance vs null deviance
+coefDeter_glm(logitMod_ali1) # 2.4%
+# - Odds Ratio analysis
+round(exp(cbind(OR = coef(logitMod_ali1), confint.default(logitMod_ali1))), 3)
+### RESULTS: odds ratios of [Term], [Balance], and [Principal] are all practically 1, which limits their usefulness
+# - Residual analysis
+resid_glm(logitMod_ali1)
+### RESULTS: Max residual > 3, indicating strain
 # - ROC analysis
 datCredit_valid[, prob_ali1 := predict(logitMod_ali1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali1)# datCredit_valid[prob_ali1==0,.N]; datCredit_valid[prob_ali1==1,.N] # There are no probabilities that are exactly equal to 0 or 1 # 63.22%
