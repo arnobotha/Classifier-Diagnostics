@@ -478,27 +478,6 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     results$data[,Value:=abs(coefficient/se)] # Compute the importance measure
     results$data[,`:=`(coefficient=NULL,se=NULL, sig=NULL)]; colnames(results$data) <- c("Variable", "Value")
   
-  } else if (method=="absCoef") { # - Variable importance as determined by the absolute values of the variables' coefficients (Rank variables according to the absolute values of the variables' estimated coefficients)
-    # Assigning the method to the results
-    results$Method <- "Absolute Coefficients"
-    
-    # Populating the results dataset
-    results$data[,Std_Coefficient := data.table(names=names(logit_model$coefficients[which(names(logit_model$coefficients) %in% coefficients_sig_model)]),
-                                                Std_Coefficient=logit_model$coefficients[which(names(logit_model$coefficients) %in% coefficients_sig_model)]) %>% arrange(names) %>% subset(select="Std_Coefficient")]
-    results$data[,Value:=abs(Std_Coefficient)]
-    results$data <- results$data %>% arrange(desc(abs(Std_Coefficient))) %>% mutate(Rank=row_number())
-    results$data[,Std_Coefficient:=NULL]
-    # Plotting the odds ratios (if specified)
-    if (impPlot==T){ 
-      # Computing the odds ratios and the corresponding confidence interval
-      datPlot_odds_ratios <- data.table(Variable=names(coef(logit_model))[-1],
-                                        round(exp(cbind(OR = coef(logit_model)[names(coef(logit_model))%in%coefficients_sig_model], confint.default(logit_model)[names(coef(logit_model))%in%coefficients_sig_model,])), 3))
-      colnames(datPlot_odds_ratios) <- c("Variable","OR","CI_Lower", "CI_Upper")
-      
-      (results$plots$Odds_Ratios <- ggplot(datPlot_odds_ratios, aes(x=OR, y=Variable)) + theme_minimal() + labs(x="Odds ratio (log scale)") + geom_vline(aes(xintercept=1), linewidth=0.25, linetype="dashed") +
-          geom_errorbarh(aes(xmax=CI_Upper,xmin=CI_Lower), size=0.5, height=0.2) + geom_point(size=3.5, colour="blue") + theme(panel.grid.minor=element_blank()) +
-          coord_trans(x="log10") + scale_x_continuous(breaks=c(0,0.1,0.25,0.5,1,2,4,max(datPlot_odds_ratios$CI_Upper))))
-    } # if
   } else if (method=="partDep") { # - Variable importance as determined by feature importance rank measure (FIRM) (explainable AI technique)
     # Assigning the method to the results
     results$Method <- "Partial Dependence (FIRM)"
@@ -520,7 +499,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   
   # --- 3. Creating a general plot of the variable importance (if desired)
   if (impPlot==T){
-    (results$plots[["Ranking"]] <- ggplot(results$data, aes(x=reorder(Variable, abs(Value)))) + geom_col(aes(y=Value, fill=Value)) +
+    (results$plots[["Ranking"]] <- ggplot(results$data, aes(x=reorder(Variable, abs(Value)))) + geom_col(aes(y=abs(Value), fill=Value)) +
        coord_flip() + theme_minimal() + theme(text=element_text(family=chosenFont)) +
        labs(x="Variable name", y=results$Method)  )
   }
