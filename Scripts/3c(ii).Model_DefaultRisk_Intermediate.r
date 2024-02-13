@@ -1286,6 +1286,7 @@ logitMod_del_best <- MASS::stepAIC(logitMod_del1, direction="both")
 inputs_del_fin <- DefaultStatus1_lead_12_max ~ PrevDefaults + TimeInPerfSpell + g0_Delinq + g0_Delinq_Num + g0_Delinq_SD_4 + g0_Delinq_SD_6 + g0_Delinq_Num +
                   slc_acct_roll_ever_24_imputed_mean + slc_acct_arr_dir_3 + slc_past_due_amt_imputed_med
 pack.ffdf(paste0(genObjPath, "Del_Formula"), inputs_del_fin); gc()
+### Can move g0_Delinq
 
 # --- 10.5 Clean up
 rm(cor_del_spear, ind_row_spear, ind_col_spear, cor_del_spear2, logitMod_del_best, logitMod_del1, inputs_del1, inputs_del_fin); gc()
@@ -1293,7 +1294,7 @@ rm(cor_del_spear, ind_row_spear, ind_col_spear, cor_del_spear2, logitMod_del_bes
 
 
 
-# ------ 11. Combined input space - Macroeconomic information + delinquency information
+# ------ 11. Combined input space - Macroeconomic information + delinquency information | Final model (intermediate)
 # --- 11.1 Preliminaries
 # - Loading in variables
 unpack.ffdf(paste0(genObjPath, "Del_Formula"), tempPath) # Delinquency variables
@@ -1426,3 +1427,24 @@ pack.ffdf(paste0(genObjPath, "Int_Full_Formula"), inputs_int_full); gc()
 rm(logitMod_full2, logitMod_full5, inputs_int_theme, inputs_int_full)
 
 
+### NOTE:~ Make another subsection at the end of the final model selection - Refit model with a subsampled dataset and investigate the signifigance of the variables
+###        Take a subset of the training dataset (don't use validation dataset to fit model)
+###        Consider +/- 25% of orginal dataset size in subsampled dataset | This can differ according to the input space size - Test interactively
+
+
+### TEST
+model_scratch <- glm(DefaultStatus1_lead_12_max ~  
+                       g0_Delinq + M_DTI_Growth + M_Repo_Rate_1 + 
+                       M_RealIncome_Growth_2 + M_DTI_Growth_3 + 
+                       M_RealGDP_Growth_3 + M_RealIncome_Growth_3 + M_Repo_Rate_6 + 
+                       M_Inflation_Growth_6 +  
+                       M_Emp_Growth_9 + 
+                       M_DTI_Growth_12 + 
+                       M_DTI_Growth_SD_4 + M_RealGDP_Growth_SD_4 + 
+                       M_RealGDP_Growth_SD_5 + M_RealIncome_Growth_SD_5 + M_RealGDP_Growth_SD_6 + 
+                       M_RealIncome_Growth_SD_6 + M_RealGDP_Growth_SD_9 + 
+                       M_RealIncome_Growth_SD_9 + M_Repo_Rate_SD_12 + M_DTI_Growth_SD_12 + 
+                       M_RealGDP_Growth_SD_12 + M_RealIncome_Growth_SD_12, data=datCredit_train, family="binomial")
+summary(model_scratch)
+datCredit_valid[, prob_full := predict(model_scratch, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full) # 86.72% (macro included) vs 77.25% (exl PrevDefaults)

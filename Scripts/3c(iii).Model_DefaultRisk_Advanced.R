@@ -204,7 +204,7 @@ round(exp(cbind(OR = coef(logitMod_adv3), confint.default(logitMod_adv3))), 3)
 ### [Balance], [Principal], and [slc_past_due_amt_imputed_med] have ratios close to 1, but this might not give an accurate indication because of the range of these variables
 # Variable importance
 varImport_logit(logitMod_adv3, method="absCoef", standardise=T, sig_level=0.1, plot=T) # Top three variables: [PrevDefaultsTRUE], [M_RealGDP_Growth_SD_6], and [M_RealGDP_Growth_SD_9]
-varImport_logit(logitMod_adv3, method="stdCoef", standardise=T, sig_level=0.1, plot=T) # Top three variables: [PrevDefaultsTRUE], [g0_Delinq], and [TimeInPerfSpell]
+varImport_logit(logitMod_adv3, method="stdCoef_Adv", standardise=T, sig_level=0.1, plot=T) # Top three variables: [PrevDefaultsTRUE], [g0_Delinq], and [TimeInPerfSpell]
 # ROC analysis
 datCredit_train[, prob_adv3 := predict(logitMod_adv3, newdata = datCredit_train, type="response")]
 datCredit_valid[, prob_adv3 := predict(logitMod_adv3, newdata = datCredit_valid, type="response")]
@@ -306,4 +306,43 @@ datCredit_train[, prob_com4:=NULL]; datCredit_valid[, prob_com4:=NULL]
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# --- Testing
+# - Loading in thematic advanced model inputs
+unpack.ffdf(paste0(genObjPath, "Adv_Theme_Formula"), tempPath)
+# - Fit model
+logitMod_adv <- glm(inputs_adv_theme, data=datCredit_train, family="binomial")
+# - Deviance and AIC
+summary(logitMod_adv) # Null deviance = 254945; Residual deviance = 167554; AIC = 167668
+coefDeter_glm(logitMod_adv) # 34.28%
+# Variable importance
+varImport_logit1 <- varImport_logit(logitMod_adv, method="absCoef", sig_level=0.1, plot=T) # Top three variables: [M_RealGDP_Growth_SD_6], [M_RealIncome_Growth_SD_6], and [InterestRate_Margin_Aggr_Med_3]
+varImport_logit2 <- varImport_logit(logitMod_adv, method="t_vals", sig_level=0.1, plot=T) # Top three variables: [PrevDefaultsTRUE], [g0_Delinq], and [TimeInPerfSpell]
+varImport_logit3 <- varImport_logit(logitMod_adv, method="stdCoef_prior", sig_level=0.1, plot=T) # Top three variables: [PrevDefaultsTRUE], [M_RealGDP_Growth_SD_6], and [M_RealGDP_Growth_SD_9]
+varImport_logit4 <- varImport_logit(logitMod_adv, method="stdCoef_post", sig_level=0.1, plot=T) # Top three variables: [M_RealGDP_Growth_SD_6], [M_RealGDP_Growth_SD_9], and [slc_acct_pre_lim_perc_imputed_med]
+# ROC analysis
+datCredit_train[, prob_adv := predict(logitMod_adv, newdata = datCredit_train, type="response")]
+datCredit_valid[, prob_adv := predict(logitMod_adv, newdata = datCredit_valid, type="response")]
+auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_adv) # 90.58%
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_adv) # 90.46
 
