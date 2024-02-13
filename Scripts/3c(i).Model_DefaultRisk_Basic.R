@@ -138,6 +138,7 @@ rm(logitMod_ali_exp1_1, logitMod_ali_exp1_2, logitMod_ali_exp2_1, logitMod_ali_e
 datCredit_valid[,`:=` (prob_ali_exp1_1=NULL, prob_ali_exp1_2=NULL, prob_ali_exp2_1=NULL, prob_ali_exp2_2=NULL, prob_ali_exp2_3=NULL, prob_ali_exp3_1=NULL, prob_ali_exp3_2=NULL)]
 
 
+<<<<<<< HEAD
 # --- 2.3 Best subset selection | Full analysis
 # - Full logit model with all account-level information - Exclude variables using insights from above analysis: [Age_Adj]; [Instalment]; [AgeToTerm]; [BalanceToPrincipal]
 logitMod_ali1 <- glm(DefaultStatus1_lead_12_max ~ AgeToTerm + Term + Balance +

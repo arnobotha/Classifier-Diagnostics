@@ -399,14 +399,16 @@ varImport_logit <- function(logit_model, method="stdCoef", standardise=F, sig_le
   # - Unit testing conditions:
   # datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
   # logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
+<<<<<<< HEAD
   # method <- "pd"; sig_level<-0.05; plot<-T; pd_plot<-T; standardise<-T
+=======
+>>>>>>> 8f91472be449deaececf574d398a79db846076eb
   
   # - Get the data the model was trained on
   datTrain1 <- subset(logit_model$data, select = names(logit_model$data)[names(logit_model$data) %in% names(model.frame(logit_model))])
   # Getting the names of the original training dataset
   datTrain1_names <- names(datTrain1)
 
-  # - Filtering for significant variables
   coefficients_summary <- data.table(names=names(summary(logit_model)$coefficients[,4][-1]), sig=summary(logit_model)$coefficients[,4][-1],
                                      coefficient=summary(logit_model)$coefficients[,1][-1], se=summary(logit_model)$coefficients[,2][-1]) %>% arrange(names) # Names of variables in the model
   coefficients_data <-  data.table(names=names(datTrain1)[-which(names(datTrain1) %in% names(model.frame(logit_model))[1])]) %>% arrange(names) # Names of variables training dataset
@@ -455,7 +457,11 @@ varImport_logit <- function(logit_model, method="stdCoef", standardise=F, sig_le
     results$data <- copy(coefficients_summary)[names %in% coefficients_sig_model]
     results$data[,Value:=abs(coefficient/se)] # Compute the importance measure
     results$data[,`:=`(coefficient=NULL,se=NULL, sig=NULL)]; colnames(results$data) <- c("Variable", "Value")
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 8f91472be449deaececf574d398a79db846076eb
   } else if (method=="absCoef") { # - Variable importance as determined by the absolute values of the variables' coefficients (Rank variables according to the absolute values of the variables' estimated coefficients)
     # Assigning the method to the results
     results$Method <- "Absolute Coefficients"
@@ -507,6 +513,7 @@ varImport_logit <- function(logit_model, method="stdCoef", standardise=F, sig_le
     } # if
     # Adding a column to indicate the rank order of the variables' importance and getting the data in the desired format
     results$data <- data.table(results$data) %>% rename(Value = Importance) %>% arrange(desc(Value)) %>% mutate(Rank=row_number())
+<<<<<<< HEAD
   } else {stop(paste0('"', method,'" is not supported. Please use either "sc", "ac", or "pd" as method.'))}# if else (method)
   # - Creating a general plot of the variable importance (if desired)
   if (plot==T){
