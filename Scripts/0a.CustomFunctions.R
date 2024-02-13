@@ -577,7 +577,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
 
   # - Return results
   return(results)
-  # rm(logit_model, datTrain1, datTrain2, method, impPlot, coefficients_sig_model, coefficients_sig_data, sumVarImport, limitVars)
+  # rm(logit_model, datTrain1, datTrain2, method, impPlot, coefficients_sig_model, coefficients_sig_data, sumVarImport, limitVars, coefficients_data, coefficients_sig_data, coefficients_summary, coefficients_sig_model_level)
 }
 # - Unit test
 # install.packages("ISLR"); require(ISLR)
