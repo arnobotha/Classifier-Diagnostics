@@ -74,7 +74,8 @@ TruEnd_inner <- function(vGiven, thres=0, retType, minLength=2, nonTZB_Val=-1, o
 # [thres2]: threshold corresponding to the secondary control variable
 # [controlVar2VoidVal]: threshold value for voiding the secondary control variable (as if its influence is ignored)
 # [matBalance]: balance matrix from which M1 and M2 measures are calculated in evaluating thresholds
-# [vecMaturity]: vector of observed maturities (total loan ages) up to the 'false'/untreated account termination time points
+# [vMaturity]: vector of observed maturities (total loan ages) up to the 'false'/untreated account termination time points
+# [vSize]: vector of element sizes per loan within matControl
 # [tau]; length of preceding non-TZB period, [it]: current threshold iteration within broader setup;
 # [numThresh]: number of thresholds being tested within broader setup.
 # [minLength]: passable argument denoting the minimum length of a TZB-regime, by definition
@@ -82,7 +83,7 @@ TruEnd_inner <- function(vGiven, thres=0, retType, minLength=2, nonTZB_Val=-1, o
 # [logName]: "filename for log"
 # [objFunc]: Given objective function that accepts arguments in [args]
 # [args]: any external arguments required by [objFunc]; internally-calculated arguments include vM1, vM2, vT_z, vTruEnd_points, vTZB_len, vTruEnd_bal
-TruEnd_outer <- function(matControl, thres=0, controlVar, matBalance, vecMaturity, tau=6, it=1, numThres=1, minLength=1, 
+TruEnd_outer <- function(matControl, thres=0, controlVar, matBalance, vMaturity, vSize, tau=6, it=1, numThres=1, minLength=1, 
                          matControl2, thres2=0, controlVar2=NA, controlVar2VoidVal=0, reportFlag=F,logName="General",objFunc, args, ...) {
   
   
@@ -157,17 +158,17 @@ TruEnd_outer <- function(matControl, thres=0, controlVar, matBalance, vecMaturit
     # i <- 1
     if (is.na(controlVar2) | thres2==controlVar2VoidVal) {  # only primary control variable
       if (nAcc > 1) {
-        TruEnd_inner(vGiven=matControl[,i], thres=thres, retType="t_z-1", minLength=minLength, observedAge=vecMaturity[i])
+        TruEnd_inner(vGiven=matControl[,i], thres=thres, retType="t_z-1", minLength=minLength, observedAge=vMaturity[i])
       } else {
-        TruEnd_inner(vGiven=matControl, thres=thres, retType="t_z-1", minLength=minLength, observedAge=vecMaturity)
+        TruEnd_inner(vGiven=matControl, thres=thres, retType="t_z-1", minLength=minLength, observedAge=vMaturity)
       }
     } else { # 2 control variables given, use minimum to coalesce signals
       if (nAcc > 1) {
-        min(TruEnd_inner(vGiven=matControl[,i], thres=thres, retType="t_z-1", minLength=minLength, observedAge=vecMaturity[i]),
-            TruEnd_inner(vGiven=matControl2[,i], thres=thres2, retType="t_z-1", minLength=minLength, observedAge=vecMaturity[i]))
+        min(TruEnd_inner(vGiven=matControl[,i], thres=thres, retType="t_z-1", minLength=minLength, observedAge=vMaturity[i]),
+            TruEnd_inner(vGiven=matControl2[,i], thres=thres2, retType="t_z-1", minLength=minLength, observedAge=vMaturity[i]))
       } else {
-        min(TruEnd_inner(vGiven=matControl, thres=thres, retType="t_z-1", minLength=minLength, observedAge=vecMaturity),
-            TruEnd_inner(vGiven=matControl2, thres=thres2, retType="t_z-1", minLength=minLength, observedAge=vecMaturity))
+        min(TruEnd_inner(vGiven=matControl, thres=thres, retType="t_z-1", minLength=minLength, observedAge=vMaturity),
+            TruEnd_inner(vGiven=matControl2, thres=thres2, retType="t_z-1", minLength=minLength, observedAge=vMaturity))
       }
     }
   })
@@ -205,7 +206,7 @@ TruEnd_outer <- function(matControl, thres=0, controlVar, matBalance, vecMaturit
       meanBal <- mean(matBalance[t_z[i]:m[i],i],na.rm=T)
     } else {meanBal <- NA}
     return(meanBal)
-  }, t_z=vT_z, m=vecMaturity)
+  }, t_z=vT_z, m=vSize)
   
   # - Measure 2: non-TZB mean balance
   vM2 <- sapply(1:nAcc, function(i, tru, tau){
@@ -234,7 +235,7 @@ TruEnd_outer <- function(matControl, thres=0, controlVar, matBalance, vecMaturit
   # --- 4. Concatenate results
   datResults.interim <- data.table(ResultSet = logName, Control = controlVar, Threshold = thres, Control2 = controlVar2, Threshold2 = thres2,
                                    Accs_Count = nAcc,
-                                   FalseEnd_mean = mean(vecMaturity, na.rm=T), FalseEnd_sd = sd(vecMaturity, na.rm=T),
+                                   FalseEnd_mean = mean(vMaturity, na.rm=T), FalseEnd_sd = sd(vMaturity, na.rm=T),
                                    TruEnd_mean = mean(vTruEnd_points, na.rm=T), TruEnd_sd = sd(vTruEnd_points, na.rm=T),
                                    TruEndPos_mean = mean(vTruEnd_positions, na.rm=T), TruEndPos_sd = sd(vTruEnd_positions, na.rm=T),
                                    TZB_Length_mean = mean(vTZB_len, na.rm=T), TZB_Length_sd = sd(vTZB_len, na.rm=T),
