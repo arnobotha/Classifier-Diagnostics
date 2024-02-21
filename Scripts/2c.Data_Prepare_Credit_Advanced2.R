@@ -69,16 +69,14 @@ test <- subset(datCredit_real, ExclusionID==0,
 test[, ZeroBal_Start := TruEnd_inner(vecGive=Balance, thres=currThresh, retType="t_z", 
                                      minLength=TZB_length, nonTZB_Val=0), by=list(LoanID)]
 # - Indicate affected accounts for easier traversal
-test[, HasTrailingZeroBalances := 
-       ifelse(ZeroBal_Start > 0, TRUE, FALSE),
+test[, HasTrailingZeroBalances := ifelse(ZeroBal_Start > 0, TRUE, FALSE),
      by=list(LoanID)]
 
 # [DIAGNOSTIC] Prevalence of accounts with trailing zero-valued balances
-# that suffered a terminal event later in loan life?
-diag.real1a <- test[Counter==1 & HasTrailingZeroBalances==T & (HasWOff==1 | HasSettle==1), .N] / 
-  test[Counter == 1, .N] * 100
-### RESULTS: For (currThresh=250, TZB_length=1), TZB-prevalence = 19.0%
-# For (currThresh=250, TZB_length=2), TZB-prevalence = 14.2%
+diag.real1a <- test[Counter==1 & HasTrailingZeroBalances==T, .N] / test[Counter == 1, .N] * 100
+### RESULTS: For (currThresh=250, TZB_length=1), TZB-prevalence = 22.8%
+# For (currThresh=250, TZB_length=2), TZB-prevalence = 17.5%
+# For (currThresh=300, TZB_length=1), TZB-prevalence = 23%
 diag.real1a_abs <- test[HasTrailingZeroBalances==T & (HasWOff==1 | HasSettle==1) & 
                           Counter>=ZeroBal_Start, .N]
 diag.real1a_rec <-  diag.real1a_abs / test[, .N] * 100
