@@ -62,7 +62,7 @@ cat(paste0("Detecting Trailing Zero-valued Balances (TZB) cases with ZAR <= ",
 
 # - Sample data for testing purposes without contaminating the original dataset
 test <- subset(datCredit_real, ExclusionID==0, 
-               select=c("LoanID", "Date", "Counter", "Max_Counter", "Balance",
+               select=c("LoanID", "Date", "Counter", "Max_Counter", "Age_Adj", "Balance",
                         "HasWOff", "HasSettle", "HasRepaid", "ExclusionID", "TreatmentID"))
 
 # - Find preliminary t_z points as the start of a TZB-regime, if found
@@ -77,13 +77,11 @@ diag.real1a <- test[Counter==1 & HasTrailingZeroBalances==T, .N] / test[Counter 
 ### RESULTS: For (currThresh=250, TZB_length=1), TZB-prevalence = 22.8%
 # For (currThresh=250, TZB_length=2), TZB-prevalence = 17.5%
 # For (currThresh=300, TZB_length=1), TZB-prevalence = 23%
-diag.real1a_abs <- test[HasTrailingZeroBalances==T & (HasWOff==1 | HasSettle==1) & 
-                          Counter>=ZeroBal_Start, .N]
+diag.real1a_abs <- test[HasTrailingZeroBalances==T & Counter>=ZeroBal_Start, .N]
 diag.real1a_rec <-  diag.real1a_abs / test[, .N] * 100
 
 # - Conditional treatment
 if (diag.real1a > 0) {
-  
   # - Calculate mean balance from the true ending point up to the available ending point
   test[HasTrailingZeroBalances==T & Counter>=ZeroBal_Start, 
        Balance_Mean := mean(Balance,na.rm=T), by=list(LoanID)]
@@ -91,6 +89,13 @@ if (diag.real1a > 0) {
   # - Calculate length of trailing zero-valued balances
   test[HasTrailingZeroBalances==T & Counter>=ZeroBal_Start, 
        ZeroBal_Length := Max_Counter - ZeroBal_Start + 1, by=list(LoanID)]
+  
+  # - Calculate true end point (age) per account
+  test[, TruEnd := ifelse(HasTrailingZeroBalances, Age_Adj[ZeroBal_Start-1], Age_Adj[.N]), by=list(LoanID)]
+  
+  # [DIAGNOSTIC] Mean account age | Same as mean(vTruEnd_points) in TruEnd_outer()
+  diag.real1_5a <- mean(test[Counter==1, TruEnd], na.rm=T)
+  diag.real1_5b <- median(test[Counter==1, TruEnd], na.rm=T)
   
   # - Get last observation date of each loan
   test[, LastDate := Date[.N], by=list(LoanID)]
@@ -107,11 +112,11 @@ if (diag.real1a > 0) {
   diag.real1_2c <- test_samp[HasWOff==0 & HasSettle==0 & HasRepaid==0 & LastDate == maxDate_observed, .N] / 
     test_samp[HasWOff==0 & HasSettle==0 & HasRepaid==0, .N] * 100 
   
-  # [DIAGNOSTIC] Mean of [Balance_Mean], should be very low
+  # [DIAGNOSTIC] Mean of [Balance_Mean], should be very low | Same as mean(vM1[vT_z>1]) in TruEnd_outer()
   diag.real1_3a <- mean(test_samp$Balance_Mean, na.rm=T)
   diag.real1_3b <- median(test_samp$Balance_Mean, na.rm=T)
   
-  # [DIAGNOSTIC] Mean of [ZeroBal_Length]
+  # [DIAGNOSTIC] Mean of [ZeroBal_Length] | Same as mean(vTZB_len[vT_z>-1]) in TruEnd_outer()
   diag.real1_4a <- mean(test_samp$ZeroBal_Length, na.rm=T)
   diag.real1_4b <- median(test_samp$ZeroBal_Length, na.rm=T)
   
@@ -119,15 +124,12 @@ if (diag.real1a > 0) {
       "% of accounts, of which ", round(diag.real1_2,digits=1), "% suffered a terminal event.",
       "\n\tOf those accounts that did not terminate, ", round(diag.real1_2c,digits=1), 
       "% are right-censored at the study-end [", format(maxDate_observed, "%d-%b-%Y"), "].", 
-      "\n\tThe grand mean balance across TZB-histories is ZAR", round(diag.real1_3a,digits=0), "(median:",
-      round(diag.real1_3b,digits=0), ") and the mean length of TZB-histories ",
-      "\n\tis", round(diag.real1_4a,digits=0),"months (median:", round(diag.real1_4b,digits=0), 
-      "). These excessive records will be removed during treatment, after having timed ",
-      "\n\tterminal events correctly to the point preceding the isolated TZB-histories.",
-      "\n\tTreating ...\n")
-  
-  # - Cleanup in optimising memory use
-  rm(test_samp)
+      "\n\tThe grand mean balance across TZB-histories is ZAR", round(diag.real1_3a,digits=2), "(median:",
+      round(diag.real1_3b,digits=2), ") and the mean length of TZB-histories ",
+      "\n\tis", round(diag.real1_4a,digits=1),"months (median:", round(diag.real1_4b,digits=1), 
+      "). These excessive TZB-periods (records) will be removed during treatment, whereafter the true age",
+      "\n\tshould have a mean of", round(diag.real1_5a, digits=1), "(median:", round(diag.real1_5b, digits=1),
+      ") months.\n\tTreating ...\n")
   
   # - Fuse account-level indicator back into main longitudinal dataset
   datCredit_real <- merge(datCredit_real, test[,list(LoanID, Counter, 
