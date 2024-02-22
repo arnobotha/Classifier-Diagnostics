@@ -79,6 +79,8 @@ diag.real1a <- test[Counter==1 & HasTrailingZeroBalances==T, .N] / test[Counter 
 # For (currThresh=300, TZB_length=1), TZB-prevalence = 23%
 diag.real1a_abs <- test[HasTrailingZeroBalances==T & Counter>=ZeroBal_Start, .N]
 diag.real1a_rec <-  diag.real1a_abs / test[, .N] * 100
+diag.real1a_terminal <- test[Counter==1 & HasTrailingZeroBalances==T & (HasWOff==1 | HasSettle==1), .N] /
+  test[Counter == 1, .N] * 100
 
 # - Conditional treatment
 if (diag.real1a > 0) {
@@ -171,10 +173,10 @@ if (diag.real1a > 0) {
   
   check_advTreat5 <- datCredit_real[ExclusionID==0 & HasTrailingZeroBalances==T & 
                                       (HasWOff==1 | HasSettle==1) & Counter==Max_Counter, .N] / 
-    datCredit_real[ExclusionID==0 & Counter == 1, .N] * 100 == diag.real1a
+    datCredit_real[ExclusionID==0 & Counter == 1, .N] * 100 == diag.real1a_terminal
   cat( check_advTreat5 %?% paste0('SAFE: Accounts with trailing zero-valued balances (<= ZAR', currThresh, 
                                   ') and a terminal event were successfully treated.\n') %:% 
-         paste0('SAFE: Failed to treat accounts with trailing zero-valued balances (<= ZAR', currThresh, 
+         paste0('WARNING: Failed to treat accounts with trailing zero-valued balances (<= ZAR', currThresh, 
                 ') and a terminal event.\n'))
 }
 

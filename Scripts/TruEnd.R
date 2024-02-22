@@ -20,7 +20,7 @@
 # [nonTZB_Val]: optional parameter that is assigned to the TZB-start t_z for non-TZB accounts
 TruEnd_inner <- function(vGiven, thres=0, retType, minLength=2, nonTZB_Val=-1, observedAge=NA) {
   # - testing conditions
-  # vGiven <- matControl[,i] ; observedAge=NA
+  # vGiven <- matControl[,i] ; observedAge=vMaturity[i]
   
   # - Setup 
   # Retain only NAs in given vector
@@ -44,10 +44,12 @@ TruEnd_inner <- function(vGiven, thres=0, retType, minLength=2, nonTZB_Val=-1, o
   if(length(vFound) > 0 & !is.na(lastNotTrig) &
      (lastNotTrig-vFound[1]-1) >= minLength) {logiCheck <- T} else {logiCheck <- F}
   
-  # - Find start of TZB-regime, i.e., the t_z point
+  # - Find starting position of TZB-regime, i.e., the t_z point
   # Note: 1st parenthesis (A) is the last position where control variable > [thres]
   # Therefore, the "true end" would be (A) + 1, while the TZB-regime starts at (A) + 2
-  if (logiCheck) {t_z <- (observedAge - lastNotTrig+1) + 2} else {t_z <- nonTZB_Val}
+  if (logiCheck) {t_z <- (length(vGiven) - lastNotTrig+1) + 2} else {t_z <- nonTZB_Val}
+  # If applicable, then convert this position to the respective loan age, but only if t_z-point is defined
+  if (length(vGiven) != observedAge & t_z != nonTZB_Val) {t_z <- vAge[t_z]}
   # Possible return point: starting point (as index in given vector) of TZB-regime (if found)
   if (retType == "t_z") {return(t_z)}
   
@@ -90,7 +92,7 @@ TruEnd_outer <- function(matControl, thres=0, controlVar, matBalance, vMaturity,
   # --- 1. Preliminaries 
   
   # - testing conditions
-  # it <- 9; reportFlag <- F; thres <- vThres[it %% length(vThres) + (it %% length(vThres) == 0)*length(vThres)]
+  # it <- 10; reportFlag <- F; thres <- vThres[it %% length(vThres) + (it %% length(vThres) == 0)*length(vThres)]
   # thres2 <- vThres2[(floor((it-1) / length(vThres))+1)]
   
   
@@ -111,10 +113,10 @@ TruEnd_outer <- function(matControl, thres=0, controlVar, matBalance, vMaturity,
   
   # - Find preliminary t_z points (position only, not age) as the start of a TZB-regime, if found
   vT_z <- sapply(1:nAcc, function(i){
-    # testing: i <- 1
+    # testing: i <- 53   
     if (is.na(controlVar2) | thres2==controlVar2VoidVal) { # only primary control variable
       if (nAcc > 1) {
-        TruEnd_inner(vGiven=matControl[,i], thres=thres, retType="t_z", minLength=minLength)  
+        TruEnd_inner(vGiven=matControl[,i], thres=thres, retType="t_z", minLength=minLength)
       } else {
         TruEnd_inner(vGiven=matControl, thres=thres, retType="t_z", minLength=minLength)
       }
@@ -133,7 +135,7 @@ TruEnd_outer <- function(matControl, thres=0, controlVar, matBalance, vMaturity,
   # - Find preliminary "true end" positions within history vectors
   vTruEnd_positions <- sapply(1:nAcc, function(i){
     # testing conditions
-    # i <- 1
+    # i <- 53   
     if (is.na(controlVar2) | thres2==controlVar2VoidVal) {  # only primary control variable
       if (nAcc > 1) {
         TruEnd_inner(vGiven=matControl[,i], thres=thres, retType="t_z-1", minLength=minLength)
@@ -155,7 +157,7 @@ TruEnd_outer <- function(matControl, thres=0, controlVar, matBalance, vMaturity,
   # NOTE: Useful for summarising true loan ages only, not in finding respective balances or other quantities
   vTruEnd_points <- sapply(1:nAcc, function(i){
     # testing conditions
-    # i <- 1
+    # i <- 53   
     if (is.na(controlVar2) | thres2==controlVar2VoidVal) {  # only primary control variable
       if (nAcc > 1) {
         TruEnd_inner(vGiven=matControl[,i], thres=thres, retType="t_z-1", minLength=minLength, observedAge=vMaturity[i])
@@ -201,6 +203,7 @@ TruEnd_outer <- function(matControl, thres=0, controlVar, matBalance, vMaturity,
   
   # - Measure 1: mean TZB-balance, where found
   vM1 <- sapply(1:nAcc, function(i, t_z, m){
+    # testing: i <- 53   
     if (t_z[i] > 0) {
       # Isolate entire TZB-regime and calculate mean
       meanBal <- mean(matBalance[t_z[i]:m[i],i],na.rm=T)
@@ -232,17 +235,18 @@ TruEnd_outer <- function(matControl, thres=0, controlVar, matBalance, vMaturity,
   ### NOTE: If TRUE, then logic is deemed validated
   
   
+  
   # --- 4. Concatenate results
   datResults.interim <- data.table(ResultSet = logName, Control = controlVar, Threshold = thres, Control2 = controlVar2, Threshold2 = thres2,
                                    Accs_Count = nAcc,
                                    FalseEnd_mean = mean(vMaturity, na.rm=T), FalseEnd_sd = sd(vMaturity, na.rm=T),
                                    TruEnd_mean = mean(vTruEnd_points, na.rm=T), TruEnd_sd = sd(vTruEnd_points, na.rm=T),
                                    TruEndPos_mean = mean(vTruEnd_positions, na.rm=T), TruEndPos_sd = sd(vTruEnd_positions, na.rm=T),
-                                   TZB_Length_mean = mean(vTZB_len, na.rm=T), TZB_Length_sd = sd(vTZB_len, na.rm=T),
+                                   TZB_Length_mean = mean(vTZB_len[vT_z>=0], na.rm=T), TZB_Length_sd = sd(vTZB_len[vT_z>=0], na.rm=T),
                                    TruBal_mean = mean(vTruEnd_bal, na.rm=T), TruBal_sd = sd(vTruEnd_bal, na.rm=T),
                                    M1_mean = mean(vM1, na.rm=T), M1_sd = sd(vM1, na.rm=T),
                                    M2_mean = mean(vM2, na.rm=T), M2_sd = sd(vM2, na.rm=T),
-                                   TZB_prevalence = sum(vT_z>=0)/nAcc,Objective = vObjFunc[1]
+                                   TZB_prevalence = sum(vT_z>=0)/nAcc, Objective = vObjFunc[1]
   )
   
   return (datResults.interim)
