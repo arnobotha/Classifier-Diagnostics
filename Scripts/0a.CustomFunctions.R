@@ -2,7 +2,7 @@
 # Defining custom functions used across various projects
 # ------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha
+# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller
 
 # DESCRIPTION:
 # This script defines various functions that are used elsewhere in this project
