@@ -475,10 +475,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   } else if (method=="stdCoef_Goodman") { 
     # -- Variable importance based on standardised coefficients from Goodman
     # B = \beta - mean(X) / sd(x)# for each one-standard deviation increase in X, the outcome variable changes by B standard deviations (see Menard2011; https://www.jstor.org/stable/41290135)
-<<<<<<< HEAD
-=======
-    
->>>>>>> c918c24df0db547da310bdc3f93009cc6efc7f19
+
     # Assigning the method to the results
     results$Method <- "Standardised coefficients: Goodman"
     # Computing the importance measure and populating the results dataset
@@ -554,12 +551,10 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   
   # --- 3. Creating a general plot of the variable importance (if desired)
   if (impPlot==T){
-<<<<<<< HEAD
     # Generic variable importance plot
     (results$plots[["Ranking"]] <- ggplot(results$data, aes(x=reorder(Variable, Value_Abs))) + geom_col(aes(y=Value_Abs, fill=Value_Abs)) +
        coord_flip() + theme_minimal() + theme(text=element_text(family=chosenFont)) +
        labs(x="Variable name", y=results$Method))
-=======
     
     # - create graphing object based on the top [limitVars]-number of variables
     datGraph <- results$data[1:min(.N, limitVars), ]
@@ -582,7 +577,6 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     # - Save graph
     ggsave(results$plots[["Ranking"]] , file=plotName, width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
     
->>>>>>> c918c24df0db547da310bdc3f93009cc6efc7f19
   }
 
   # - Return results

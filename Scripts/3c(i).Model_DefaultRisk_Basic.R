@@ -210,9 +210,7 @@ rm(cor_ali_spear, ind_row_spear, ind_col_spear, cor_ali_spear2,
 
 # --- 2.7 Saving selected inputs
 # - Save variables
-<<<<<<< HEAD
 inputs_fin_bas <- inputs_ali_fin
-=======
 inputs_beh_fin <-  DefaultStatus1_lead_12_max ~ slc_acct_pre_lim_perc_imputed_med + slc_pmnt_method
 pack.ffdf(paste0(genObjPath, "Beh_Formula"), inputs_beh_fin); gc()
 
@@ -273,7 +271,6 @@ car::vif(logitMod_full1)
 ### CONCLUSION: Use [AgeToTerm], [Term], [Balance],, [Principal], [InterestRate_Margin_imputed_mean], [slc_acct_pre_lim_perc_imputed_med], [slc_pmnt_method]
 # - Save variables
 inputs_fin_bas <- formula(logitMod_full1)
->>>>>>> c918c24df0db547da310bdc3f93009cc6efc7f19
 pack.ffdf(paste0(genObjPath, "Basic_Com_Formula"), inputs_fin_bas); gc()
 
 
