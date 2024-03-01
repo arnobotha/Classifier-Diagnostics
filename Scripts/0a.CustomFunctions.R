@@ -2,7 +2,7 @@
 # Defining custom functions used across various projects
 # ------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha
+# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller
 
 # DESCRIPTION:
 # This script defines various functions that are used elsewhere in this project
@@ -393,12 +393,13 @@ transform_yj <- function(x, bound_lower=-2, bound_upper=2, lambda_inc=0.5, verbo
 #         [impPlot]:     Switch for producing a bar chart that shows the variable importance according to the specified measure
 #         [pd_plot]:     Should a partial dependence plot be created for each variable
 # Output: A data table containing the variable importance information
-varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.05, impPlot=F, pd_plot=F, chosenFont="Cambria"){
+varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.05, impPlot=F, pd_plot=F, chosenFont="Cambria", 
+                            colPalette="BrBG", colPaletteDir=1, plotName=paste0(genFigPath, "VariableImportance_", method,".png"), limitVars=10){
   
   # - Unit testing conditions:
-  # datTrain1 <- data.table(ISLR::Default); datTrain1[, `:=`(default=as.factor(default), student=as.factor(student))]
   # logit_model <- glm(default ~ student + balance + income, data=datTrain1, family="binomial")
-  # method <- "pd"; sig_level<-0.05; impPlot<-T; pd_plot<-T; chosenFont="Cambria"
+  # method <- "stdCoef_ZScores"; sig_level<-0.05; impPlot<-T; pd_plot<-T; chosenFont="Cambria"; colPalette="BrBG"; colPaletteDir=1
+  # plotName=paste0(genFigPath, "VariableImportance_", method,".png"); limitVars=10
   
   # --- 0. Setup
   # - Get the data the model was trained on
@@ -444,9 +445,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   
   
   # - Initiating the dataset to be returned (results dataset)
-  results <- list(data = data.table(Variable = coefficients_sig_model,
-                                    Value = 0,
-                                    Rank = 0))
+  results <- list(data = data.table(Variable = coefficients_sig_model,Value = 0,Rank = 0))
   
   # --- 2. Calculating variable importance based on specified method
   
@@ -466,20 +465,22 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
       } # if
     }
     # Re-training the model on the scaled data
-    logit_model2 <- glm(logit_model$formula, data=datTrain2, family="binomial")
+    suppressWarnings( logit_model <- glm(logit_model$formula, data=datTrain2, family="binomial") )
     
     # Populating the results dataset
-    results$data[,Std_Coefficient := data.table(names=names(logit_model2$coefficients[which(names(logit_model2$coefficients) %in% coefficients_sig_model)]),
-                                                Std_Coefficient=logit_model2$coefficients[which(names(logit_model2$coefficients) %in% coefficients_sig_model)]) %>% arrange(names) %>% subset(select="Std_Coefficient")]
+    results$data[,Std_Coefficient := data.table(names=names(logit_model$coefficients[which(names(logit_model$coefficients) %in% coefficients_sig_model)]),
+                                                Std_Coefficient=logit_model$coefficients[which(names(logit_model$coefficients) %in% coefficients_sig_model)]) %>% arrange(names) %>% subset(select="Std_Coefficient")]
     results$data[,Value:=Std_Coefficient]; results$data[,Std_Coefficient:=NULL]
-    
-    logit_model <- logit_model2; rm(logit_model2)
     
   } else if (method=="stdCoef_Goodman") { 
     # -- Variable importance based on standardised coefficients from Goodman
     # B = \beta - mean(X) / sd(x)# for each one-standard deviation increase in X, the outcome variable changes by B standard deviations (see Menard2011; https://www.jstor.org/stable/41290135)
+<<<<<<< HEAD
+=======
+    
+>>>>>>> c918c24df0db547da310bdc3f93009cc6efc7f19
     # Assigning the method to the results
-    results$Method <- "Standardised coefficients using t-values"
+    results$Method <- "Standardised coefficients: Goodman"
     # Computing the importance measure and populating the results dataset
     results$data <- copy(coefficients_summary)[names %in% coefficients_sig_model]
     results$data[,Value:=coefficient/se] # Compute the importance measure
@@ -488,7 +489,6 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   } else if (method=="stdCoef_Menard"){ # - Standardising the coefficient estimates using the unstandardised coefficients (see Menard2004: https://www.jstor.org/stable/27643560)
     # -- Standardising the coefficient estimates using the unstandardised coefficients (see Menard2004: https://www.jstor.org/stable/27643560)
     # Assigning the method to the results
-    results$Method <- "Standardised coefficients using Menard's method"
     
     # Computing the standard deviations for each x (this requires a loop to ensure that categorical vairables are correctly accounted for)
     sd_x <- rep(0, length(coefficients_sig_model))
@@ -515,7 +515,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     results$data$Value <- coefficients_summary$coefficient[coefficients_sig_data_index==1] * r2 * (sd_x/sd_y)
     
     # Populating result set
-    results$Method <- "Standardised Coefficients"
+    results$Method <- "Standardised Coefficients: Menard"
     results$data <- copy(coefficients_summary)[names %in% coefficients_sig_model]
     results$data[,Value:=abs(coefficient/se)] # Compute the importance measure
     results$data[,`:=`(coefficient=NULL,se=NULL, sig=NULL)]; colnames(results$data) <- c("Variable", "Value")
@@ -541,20 +541,53 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   
   # - Ranking the variables according to their associated importance measure values
   results$data[,Value_Abs:=abs(Value)]
-  results$data <- results$data %>% arrange(desc(Value_Abs)) %>% mutate(Rank=row_number())
+  results$data <- results$data %>% arrange(desc(Value_Abs)) %>% mutate(Rank=row_number()) %>% as.data.table()
+  
+  # - Calculate contribution degrees to sum of importance measure across all variables
+  # NOTE: These contributions are merely ancillary and for graphing purposes.
+  # They should not considered too seriously, unless studied more extensively.
+  sumVarImport <- sum(results$data$Value_Abs, na.rm=T)
+  results$data[, Contribution := Value_Abs / sumVarImport]
+  
+  # - Post results to console
+  print(results$data)
   
   # --- 3. Creating a general plot of the variable importance (if desired)
   if (impPlot==T){
+<<<<<<< HEAD
     # Generic variable importance plot
     (results$plots[["Ranking"]] <- ggplot(results$data, aes(x=reorder(Variable, Value_Abs))) + geom_col(aes(y=Value_Abs, fill=Value_Abs)) +
        coord_flip() + theme_minimal() + theme(text=element_text(family=chosenFont)) +
        labs(x="Variable name", y=results$Method))
+=======
+    
+    # - create graphing object based on the top [limitVars]-number of variables
+    datGraph <- results$data[1:min(.N, limitVars), ]
+    
+    # - cull away lengthy names that will otherwise ruin the graph
+    datGraph[, Variable_Short := ifelse(str_length(Variable) >= 18, paste0(substr(Variable, 1, 18),".."), Variable)]
+    
+    # Generic variable importance plot
+    results$plots[["Ranking"]] <- ggplot(datGraph, aes(x=reorder(Variable_Short, Value_Abs))) + theme_minimal() + theme(text=element_text(family=chosenFont)) + 
+       geom_col(aes(y=Value_Abs, fill=Value_Abs)) + geom_label(aes(y=sumVarImport*0.05, label=paste(percent(Contribution, accuracy=0.1)), fill=Value_Abs), family=chosenFont) + 
+       annotate(geom="text", x=datGraph[.N, Variable_Short], y=sumVarImport*0.3, label=paste0("Variable Importance (sum): ", comma(sumVarImport, accuracy=0.1)), family=chosenFont, size=3) + 
+       coord_flip() + scale_fill_distiller(palette=colPalette, name="Absolute value", direction=colPaletteDir) +
+       scale_colour_distiller(palette=colPalette, name="Absolute value", direction=colPaletteDir) + 
+       labs(x="Variable name", y=results$Method)
+      
+    # Show plot to current display device
+    print(results$plots[["Ranking"]])
+    
+    cat("Saving plot of variable importance at: ", plotName, "\n")
+    # - Save graph
+    ggsave(results$plots[["Ranking"]] , file=plotName, width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
+    
+>>>>>>> c918c24df0db547da310bdc3f93009cc6efc7f19
   }
-  
 
   # - Return results
   return(results)
-  # rm(logit_model, logit_model2, datTrain1, datTrain2, method, impPlot, coefficients_sig_model, coefficients_sig_data)
+  # rm(logit_model, datTrain1, datTrain2, method, impPlot, coefficients_sig_model, coefficients_sig_data, sumVarImport, limitVars, coefficients_data, coefficients_sig_data, coefficients_summary, coefficients_sig_model_level)
 }
 # - Unit test
 # install.packages("ISLR"); require(ISLR)

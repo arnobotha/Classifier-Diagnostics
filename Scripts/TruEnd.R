@@ -119,50 +119,60 @@ TruEnd_outer <- function(matControl, thres=0, controlVar, matBalance, vecMaturit
     }
   })
   
-  # - Find balance at the "true end" points, if found
-  TruBal.v <- sapply(1:nAcc, function(i, t){
-    return(matBalance[t[i],i])}, t=true_end.v)
+  # - Find balance at the "true end" positions, if found
+  vTruEnd_bal <- sapply(1:nAcc, function(i, t){
+    return(matBalance[t[i],i])}, t=vTruEnd_positions)
+  
+  
+  # --- 3. Calculate 2 counter measures: M1 and M2
   
   # - Measure 1: mean TZB-balance, where found
-  M1.v <- sapply(1:nAcc, function(i, t_z, m){
+  vM1 <- sapply(1:nAcc, function(i, t_z, m){
+    # testing: i <- 53   
     if (t_z[i] > 0) {
       # Isolate entire TZB-regime and calculate mean
       meanBal <- mean(matBalance[t_z[i]:m[i],i],na.rm=T)
     } else {meanBal <- NA}
     return(meanBal)
-  }, t_z=t_z.v, m=vecMaturity)
+  }, t_z=vT_z, m=vSize)
   
   # - Measure 2: non-TZB mean balance
-  M2.v <- sapply(1:nAcc, function(i, tru, tau){
+  vM2 <- sapply(1:nAcc, function(i, tru, tau){
     # Isolate the [tau] values in the vector that precede the TZB-regime (if found), and calculate mean
     if (tru[i]-tau > 0) { # sufficient history exists
       mean(matBalance[(tru[i]-tau):tru[i],i], na.rm=T)
     } else { # insufficient history exists, therefore start from element 1
       mean(matBalance[1:tru[i],i], na.rm=T)
     }
-  }, tru=true_end.v, tau=tau)
-  
+  }, tru=vTruEnd_positions, tau=tau)
 
+  
   # --- 3. Evaluate objective function, given measures M1 and M2
-  # Calculate gien objective function
-  obj.v <- do.call(f.obj, args=args)
+  # Calculate given objective function
+  vObjFunc <- do.call(objFunc, args= setNames( lapply(1:length(args), function(i) {get(args[i])} ), args) ) 
+  
+  # - Validate R's internal logic by calculating sample variance manually only for those TZB-accounts, i \in S_T
+  #sum( (w2*vM2 - w1*vM1) / sd(w2*vM2 - w1*vM1, na.rm=T), na.rm=T ) == 
+  #  sum( (w2*vM2 - w1*vM1), na.rm=T ) / sd(w2*vM2 - w1*vM1, na.rm=T)
+  #nonNA <- (w2*vM2 - w1*vM1)[!is.na(w2*vM2 - w1*vM1)]
+  #sd(nonNA) == sqrt( sum( (nonNA-mean(nonNA))^2 ) / (NROW(nonNA)-1) )
+  #sd(nonNA) == sqrt( (sum(nonNA^2) - sum(nonNA)^2/NROW(nonNA)) / (NROW(nonNA)-1) )
+  ### NOTE: If TRUE, then logic is deemed validated
+  
   
   
   # --- 4. Concatenate results
   datResults.interim <- data.table(ResultSet = logName, Control = controlVar, Threshold = thres, Control2 = controlVar2, Threshold2 = thres2,
-                                   FalseEnd_mean = mean(vecMaturity, na.rm=T), FalseEnd_sd = sd(vecMaturity, na.rm=T),
-                                   TruEnd_mean = mean(true_end.v, na.rm=T), TruEnd_sd = sd(true_end.v, na.rm=T),
-                                   TZB_Length_mean = mean(tzb_len.v, na.rm=T), TZB_Length_sd = sd(tzb_len.v, na.rm=T),
-                                   TruBal_mean = mean(TruBal.v, na.rm=T), TruBal_sd = sd(TruBal.v, na.rm=T),
-                                   M1_mean = mean(M1.v, na.rm=T), M1_sd = sd(M1.v, na.rm=T),
-                                   M2_mean = mean(M2.v, na.rm=T), M2_sd = sd(M2.v, na.rm=T),
-                                   TZB_prevalence = sum(t_z.v>=0)/nAcc, Objective = obj.v[1]
+                                   Accs_Count = nAcc,
+                                   FalseEnd_mean = mean(vMaturity, na.rm=T), FalseEnd_sd = sd(vMaturity, na.rm=T),
+                                   TruEnd_mean = mean(vTruEnd_points, na.rm=T), TruEnd_sd = sd(vTruEnd_points, na.rm=T),
+                                   TruEndPos_mean = mean(vTruEnd_positions, na.rm=T), TruEndPos_sd = sd(vTruEnd_positions, na.rm=T),
+                                   TZB_Length_mean = mean(vTZB_len[vT_z>=0], na.rm=T), TZB_Length_sd = sd(vTZB_len[vT_z>=0], na.rm=T),
+                                   TruBal_mean = mean(vTruEnd_bal, na.rm=T), TruBal_sd = sd(vTruEnd_bal, na.rm=T),
+                                   M1_mean = mean(vM1, na.rm=T), M1_sd = sd(vM1, na.rm=T),
+                                   M2_mean = mean(vM2, na.rm=T), M2_sd = sd(vM2, na.rm=T),
+                                   TZB_prevalence = sum(vT_z>=0)/nAcc, Objective = vObjFunc[1]
   )
   
   return (datResults.interim)
-  
 }
-
-
-
-

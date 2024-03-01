@@ -172,7 +172,7 @@ round(exp(cbind(OR = coef(logitMod_ali1), confint.default(logitMod_ali1))), 3)
 resid_deviance_glm(logitMod_ali1)
 ### RESULTS: Model fit is somewhat strained (all 3 diagnostics gave warnings)
 # - Variable importance
-varImport_logit(logitMod_ali1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)
+varImport <- varImport_logit(logitMod_ali1, method="stdCoef_ZScores", impPlot=T)
 ### RESULTS: Top three variables: [Principal], [Balance], and [Age_Adj]
 # - ROC analysis
 datCredit_valid[, prob_ali1 := predict(logitMod_ali1, newdata = datCredit_valid, type="response")]
@@ -210,7 +210,70 @@ rm(cor_ali_spear, ind_row_spear, ind_col_spear, cor_ali_spear2,
 
 # --- 2.7 Saving selected inputs
 # - Save variables
+<<<<<<< HEAD
 inputs_fin_bas <- inputs_ali_fin
+=======
+inputs_beh_fin <-  DefaultStatus1_lead_12_max ~ slc_acct_pre_lim_perc_imputed_med + slc_pmnt_method
+pack.ffdf(paste0(genObjPath, "Beh_Formula"), inputs_beh_fin); gc()
+
+# --- 3.5 Clean up
+rm(cor_beh_spear, ind_row_spear, ind_col_spear, cor_beh_spear2, inputs_beh_fin, logitMod_beh1); gc()
+datCredit_valid[,`:=`(prob_beh1=NULL)]
+
+
+
+
+# ------ 4. Modelling & Feature Selection by combining all previous themes
+# --- Create full model formula
+# - Load in all thematic variables
+unpack.ffdf(paste0(genObjPath, "ALI_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Beh_Formula"), tempPath)
+# - Create formula
+inputs_full <- c(labels(terms(inputs_ali_fin)), labels(terms(inputs_beh_fin)))
+form_com_full <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_full, collapse="+")))
+
+# --- Full model
+# - Full logit model with all combined thematically selected variables
+logitMod_full1 <- glm(form_com_full, data=datCredit_train, family="binomial")
+# Deviance and AIC
+summary(logitMod_full1)
+### RESULTS: Null deviance = 275184; Residual deviance = 250081; AIC = 250107
+# Evaluate fit using generic R^2 based on deviance vs null deviance
+coefDeter_glm(logitMod_full1)
+### RESULTS: 9.12%
+# Odds Ratio analysis
+round(exp(cbind(OR = coef(logitMod_full1), confint.default(logitMod_full1))), 3)
+# Residual deviance analysis
+resid_deviance_glm(logitMod_full1)
+### RESULTS: Model fit is somewhat strained (3 diagnostics gave warnings)
+# Variable importance
+varImport_logit(logitMod_full1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)
+### RESULTS: Top three variables: [slc_acct_pre_lim_perc_imputed_med], [Balance], and [Principal]
+# ROC analysis
+datCredit_train[, prob_full1 := predict(logitMod_full1, newdata = datCredit_train, type="response")]
+datCredit_valid[, prob_full1 := predict(logitMod_full1, newdata = datCredit_valid, type="response")]
+auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_full1)
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full1)
+### RESULTS: Training dataset = 74.6%
+###          Validation dataset = 74.39%
+# VIF analysis
+car::vif(logitMod_full1)
+### RESULTS:  Both [Principal] and [Balance] have VIFs that are larger than 10, but this is expected since they are both highly correlated
+
+### RESULTS:  All variables are significant and have reasonable standard errors.
+###           The coefficient of determination is relatively low at 9.12%.
+###           The residual deviance analysis indicates that the model fit is strenuous.
+###           Some VIFs are over 10, but majority are not; thus no cause for concern.
+###           Model is not overfitted as evidenced by the small change in AUC when a ROC analysis is conducted on the training- and validaiton datasets (74.6% vs 74.39%)
+
+### CONCLUSION: Use all the variables from the resulting account-level information and behavioral variables themes.
+###             These models on their own are not strong predictors and it is recommended that they are at least used with the intermediate variables.
+
+# --- Save model formula to disk
+# - Final variables
+### CONCLUSION: Use [AgeToTerm], [Term], [Balance],, [Principal], [InterestRate_Margin_imputed_mean], [slc_acct_pre_lim_perc_imputed_med], [slc_pmnt_method]
+# - Save variables
+inputs_fin_bas <- formula(logitMod_full1)
+>>>>>>> c918c24df0db547da310bdc3f93009cc6efc7f19
 pack.ffdf(paste0(genObjPath, "Basic_Com_Formula"), inputs_fin_bas); gc()
 
 
