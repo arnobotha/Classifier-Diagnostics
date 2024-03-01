@@ -107,13 +107,13 @@ if (Sys.getenv("USERNAME") == "WRQ") {
   
 } else if (Sys.getenv("USERNAME") == "R5532132") {
   # - Custom path where R-scripts are saved
-  path_cust <- "C:/Users/R5532132/OneDrive - FRG/Classifier-Diagnostics/Scripts/"
+  path_cust <- "C:/Users/R5532132/OneDrive - FRG/GCRM/Classifier-Diagnostics/Scripts/"
   
   # - Common path for storing important R-objects as back-up
-  genObjPath <- "C:/Users/R5532132/OneDrive - FRG/Classifier-Diagnostics/Objects/"
+  genObjPath <- "C:/Users/R5532132/OneDrive - FRG/GCRM/Classifier-Diagnostics/Objects/"
   
   # - Common path for saving important analytics (e.g., sampling)
-  genFigPath <- "C:/Users/R5532132/OneDrive - FRG/Classifier-Diagnostics/Figures/"
+  genFigPath <- "C:/Users/R5532132/OneDrive - FRG/GCRM/Classifier-Diagnostics/Figures/"
 }  else {
   stop("User-specific paths not set for current user: ", Sys.getenv("USERNAME"), ". Please fix in Setup script (0.Setup.R) before continuing")
 }

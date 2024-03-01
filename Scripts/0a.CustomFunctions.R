@@ -478,7 +478,6 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   } else if (method=="stdCoef_Goodman") { 
     # -- Variable importance based on standardised coefficients from Goodman
     # B = \beta - mean(X) / sd(x)# for each one-standard deviation increase in X, the outcome variable changes by B standard deviations (see Menard2011; https://www.jstor.org/stable/41290135)
-<<<<<<< HEAD
     # Assigning the method to the results
     results$Method <- "Standardised coefficients using t-values"
     # Computing the importance measure and populating the results dataset
@@ -515,16 +514,12 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     # Computing the variable importance
     results$data$Value <- coefficients_summary$coefficient[coefficients_sig_data_index==1] * r2 * (sd_x/sd_y)
     
-    
-=======
-    
     # Populating result set
     results$Method <- "Standardised Coefficients"
     results$data <- copy(coefficients_summary)[names %in% coefficients_sig_model]
     results$data[,Value:=abs(coefficient/se)] # Compute the importance measure
     results$data[,`:=`(coefficient=NULL,se=NULL, sig=NULL)]; colnames(results$data) <- c("Variable", "Value")
   
->>>>>>> 280476da7e101f9043abbb5e3702460bc29417d1
   } else if (method=="partDep") { # - Variable importance as determined by feature importance rank measure (FIRM) (explainable AI technique)
     # Assigning the method to the results
     results$Method <- "Partial Dependence (FIRM)"
@@ -550,12 +545,8 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   
   # --- 3. Creating a general plot of the variable importance (if desired)
   if (impPlot==T){
-<<<<<<< HEAD
     # Generic variable importance plot
     (results$plots[["Ranking"]] <- ggplot(results$data, aes(x=reorder(Variable, Value_Abs))) + geom_col(aes(y=Value_Abs, fill=Value_Abs)) +
-=======
-    (results$plots[["Ranking"]] <- ggplot(results$data, aes(x=reorder(Variable, abs(Value)))) + geom_col(aes(y=abs(Value), fill=Value)) +
->>>>>>> 280476da7e101f9043abbb5e3702460bc29417d1
        coord_flip() + theme_minimal() + theme(text=element_text(family=chosenFont)) +
        labs(x="Variable name", y=results$Method))
   }
