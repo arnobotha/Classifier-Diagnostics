@@ -81,6 +81,15 @@ imputeFirstKnown <- function(x) {
 }
 
 
+# Custom Function by which to adjust for inflation
+# Assumes a monthly macroeconomic dataset [macro_data_hist] to exist with [Date_T] and [Inflation] fields
+adjInflation <- function(g_start, g_stop) {
+  compFact <- macro_data_hist[Date_T >= g_start & Date_T <= g_stop, list(Factor = prod(1 + (Inflation/100)/12))]
+  return(compFact)
+}
+
+
+
 
 
 # -------------------------- INTERLEAVING FUNCTION ------------------------------
