@@ -2,7 +2,7 @@
 # Apply various advanced data treatments, in preparation for applyin the TruEnd-procedure
 # ---------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Roelinde Bester
+# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller
 # ---------------------------------------------------------------------------------------
 # DESCRIPTION:
 # In continuing with script 2a, this script applies the following Advanced Data Treatments:

@@ -1,8 +1,8 @@
 # ===================================== DATA IMPORT =====================================
 # Import credit dataset (SAS) into R, containing loan performance data (longitudinal)
 # ---------------------------------------------------------------------------------------
-# PROJECT TITLE: TruEnd-procedure
-# SCRIPT AUTHOR(S): Dr Arno Botha, Roelinde Bester
+# PROJECT TITLE: Classifier Diagnostics
+# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller
 # ---------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
