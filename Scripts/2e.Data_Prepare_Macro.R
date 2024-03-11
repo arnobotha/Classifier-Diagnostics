@@ -35,7 +35,7 @@
 #   - datMV | enriched macroeconomic dataset, with various features
 # ---------------------------------------------------------------------------------------
 # NOTE: This script predominantly comes from another project (SICR-modelling), 
-# but with a few changes to create more features
+# but with a few changes to create more features, and enriched by the "C-FLI" project (Botha2020)
 # =======================================================================================
 
 
@@ -195,15 +195,10 @@ cat( check3 %?% 'SAFE: Interpolation successful with no residual missingness whe
 
 
 
-# --------- 4. Feature engineering: Lags & Volatilities
-# Create lead an lagged variables
-# Create moving averages
-# Create various ratios
-# Create features using the Yeo Johnson transformation (Yeo and Johnson, 2000)
-
-
-# --- a. Subset macroeconomic fields and carry out light data preparation
-# We only want the following macroeconomic variables (MVs), as found to be significant by Botha et al. (2020):
+# --------- 4. Subsetting
+# Subset macroeconomic fields and carry out light data preparation
+# We only want the following macroeconomic variables (MVs), as found to be significant by Botha et al. (2020) during 
+# the "C-FLI" project
 # - Real income growth rate
 # - Real GDP growth rate
 # - Repo rate (not scaled as we want to use it for a new variable)
