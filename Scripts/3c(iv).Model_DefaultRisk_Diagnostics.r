@@ -70,21 +70,23 @@ logitMod_Adv <- glm(inputs_adv, data=datCredit_train, family="binomial")
 ### RESULTS: 34.16%
 
 # --- ROC analysis
+# - Set confidende interval level
+alpha <- 0.05
 # - Basic model
 datCredit_valid[, prob_basic := predict(logitMod_Basic, newdata = datCredit_valid, type="response")]
-roc_obj_basic <- roc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_basic)
-roc_obj_basic$auc
-### RESULTS: 63.22%
+roc_obj_basic <- pROC::roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_basic, ci.method="bootstrap", ci=T, conf.level = 1-alpha, percent=T)
+roc_obj_basic$auc; paste0(sprintf("%.2f",(roc_obj_basic$ci[3]-roc_obj_basic$ci[1])/2),"%")
+### RESULTS: 63.22% +- 0.46%
 # - Intermediate model
 datCredit_valid[, prob_int := predict(logitMod_Int, newdata = datCredit_valid, type="response")]
-roc_obj_int <- roc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_int)
-roc_obj_int$auc
-### RESULTS: 77.62%
+roc_obj_int <- roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_int, ci.method="bootstrap", ci=T, conf.level = 1-alpha, percent=T)
+roc_obj_int$auc; paste0(sprintf("%.2f",(roc_obj_int$ci[3]-roc_obj_int$ci[1])/2),"%")
+### RESULTS: 77.62% +- 48%
 # - Advanced model
 datCredit_valid[, prob_adv := predict(logitMod_Adv, newdata = datCredit_valid, type="response")]
-roc_obj_adv <- roc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_adv)
-roc_obj_adv$auc
-### RESULTS: 90.04%
+roc_obj_adv <- roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_adv, ci.method="bootstrap", ci=T, conf.level = 1-alpha, percent=T)
+roc_obj_adv$auc; paste0(sprintf("%.2f",(roc_obj_adv$ci[3]-roc_obj_adv$ci[1])/2),"%")
+### RESULTS: 90.04% +- 0.29%
 
 ### CONCLUSION: Use the basic model, the thematic intermediate model, and the thematic advanced model (the choice between the thematic- and full models are completely subjective as the predictive performance is near identical)
 
@@ -100,7 +102,10 @@ datPlot_diag <- rbind(data.table(Statistic=c("Coef_Deter", "AUC"),
                       data.table(Statistic=c("Coef_Deter","AUC"),
                                  Value = c(coefDeter_Adv,roc_obj_adv$auc),
                                  Model=rep("c_Advanced",2)))
-datPlot_diag[,Label:=paste0(sprintf("%.2f", Value*100),"%")]
+datPlot_diag[, Label:=paste0(sprintf("%.2f", Value),"%")]
+datPlot_diag[Statistic=="AUC" & Model=="a_Basic",Label:=paste0(sprintf("%.2f", Value),"% ± ", sprintf("%.2f", (roc_obj_basic$ci[3]-roc_obj_basic$ci[1])/2), "%")]
+datPlot_diag[Statistic=="AUC" & Model=="b_Intermediate",Label:=paste0(sprintf("%.2f", Value),"% ± ", sprintf("%.2f", (roc_obj_int$ci[3]-roc_obj_int$ci[1])/2), "%")]
+datPlot_diag[Statistic=="AUC" & Model=="c_Advanced",Label:=paste0(sprintf("%.2f", Value),"% ± ", sprintf("%.2f", (roc_obj_adv$ci[3]-roc_obj_adv$ci[1])/2), "%")]
 # - Plotting parameters
 chosenFont <- "Cambria"; dpi<-180
 col.v <- c("a_Basic"=brewer.pal(9, "Blues")[4], "b_Intermediate"=brewer.pal(9, "Blues")[7], "c_Advanced"=brewer.pal(9, "Blues")[9])
@@ -129,20 +134,22 @@ rm(col.v, col.v2, col.v3, linetype.v, label.v, datPlot_diag, g_model_diag_compar
 
 # --- Plotting the ROC curves
 # - Creating the plotting dataset
-datPlot_ROC <- rbind(data.table(TPR=roc_obj_basic$sensitivities,
-                                FPR=1-roc_obj_basic$specificities,
+datPlot_ROC <- rbind(data.table(TPR=roc_obj_basic$sensitivities/100,
+                                FPR=1-roc_obj_basic$specificities/100,
                                 Model="a_Basic"),
-                     data.table(TPR=roc_obj_int$sensitivities,
-                                FPR=1-roc_obj_int$specificities,
+                     data.table(TPR=roc_obj_int$sensitivities/100,
+                                FPR=1-roc_obj_int$specificities/100,
                                 Model="b_Intermediate"),
-                     data.table(TPR=roc_obj_adv$sensitivities,
-                                FPR=1-roc_obj_adv$specificities,
+                     data.table(TPR=roc_obj_adv$sensitivities/100,
+                                FPR=1-roc_obj_adv$specificities/100,
                                 Model="c_Advanced"))
 # - Getting the AUCs of each model (so that the values can be used as labels)
 dat_anno <- data.table(Model=c("a_Basic", "b_Intermediate","c_Advanced"),
                        AUC=c(roc_obj_basic$auc, roc_obj_int$auc, roc_obj_adv$auc),
                        x=c(0.5,0.5,0.5), y=c(0.68,0.80, 0.95))
-dat_anno[,Label:=paste0("AUC=",sprintf("%.2f",AUC*100),"%")]
+dat_anno[Model=="a_Basic",Label:=paste0("AUC=",sprintf("%.2f",AUC),"% ± ", sprintf("%.2f", (roc_obj_basic$ci[3]-roc_obj_basic$ci[1])/2), "%")]
+dat_anno[Model=="b_Intermediate",Label:=paste0("AUC=",sprintf("%.2f",AUC),"% ± ", sprintf("%.2f", (roc_obj_int$ci[3]-roc_obj_int$ci[1])/2), "%")]
+dat_anno[Model=="c_Advanced",Label:=paste0("AUC=",sprintf("%.2f",AUC),"% ± ", sprintf("%.2f", (roc_obj_adv$ci[3]-roc_obj_adv$ci[1])/2), "%")]
 # - Plotting parameters
 chosenFont <- "Cambria"; dpi<-180
 col.v <- brewer.pal(10, "Paired")[c(8,6,4)]

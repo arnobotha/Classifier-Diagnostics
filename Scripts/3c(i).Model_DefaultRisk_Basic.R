@@ -4,7 +4,7 @@
 # and forward looking information is not considers among these "basic" variables.
 # ---------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer, Marcel Muller
+# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller
 
 # DESCRIPTION:
 # This script uses the previously prepared credit dataset to create multiple "basic" 
@@ -84,7 +84,7 @@ logitMod_ali_exp1_2 <- glm(DefaultStatus1_lead_12_max ~ AgeToTerm
                            , data=datCredit_train, family="binomial")
 # Deviance and AIC
 summary(logitMod_ali_exp1_1)
-### RESULTS: Null deviance = 275184  ; Residual deviance = 274579  ; AIC = 274583 
+### RESULTS: Null deviance = 275184  ; Residual deviance = 274579  ; AIC = 274583
 summary(logitMod_ali_exp1_2)
 ### RESULTS: Null deviance = 275184  ; Residual deviance = 274940  ; AIC = 274944
 # ROC analysis
@@ -134,17 +134,17 @@ logitMod_ali_exp_3_2 <- glm(DefaultStatus1_lead_12_max ~ InterestRate_Margin_imp
                             , data=datCredit_train, family="binomial")
 # Deviance and AIC
 summary(logitMod_ali_exp_3_1)
-### RESULTS: Null deviance = 275184; Residual deviance = 273409; AIC = 273413
+### RESULTS: Null deviance = 275184; Residual deviance = 273429; AIC = 273433
 summary(logitMod_ali_exp_3_2)
-### RESULTS: Null deviance = 275184; Residual deviance = 273156; AIC = 273162
+### RESULTS: Null deviance = 275184; Residual deviance = 273163; AIC = 273169
 # ROC analysis
 datCredit_valid[, prob_ali_exp3_1 := predict(logitMod_ali_exp_3_1, newdata = datCredit_valid, type="response")]
 datCredit_valid[, prob_ali_exp3_2 := predict(logitMod_ali_exp_3_2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali_exp3_1)
-## RESULTS; 56.72%
+## RESULTS; 56.71%
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali_exp3_2)
-### RESULTS:    56.13%
-### COMPARISON: Model with binned variable has lower AIC (273162 vs 273413) and lower AUC than the model with the raw (imputed) variable (56.13% vs 56.72%).
+### RESULTS:    56.14%
+### COMPARISON: Model with binned variable has lower AIC (273169 vs 273433) and lower AUC than the model with the raw (imputed) variable (56.14% vs 56.71%).
 ### CONCLUSION: Use [InterestRate_Margin_imputed_mean].
 
 # - Clean up
@@ -161,10 +161,10 @@ logitMod_ali1 <- glm(DefaultStatus1_lead_12_max ~ Age_Adj + Term + Balance +
 ### INVESTIGATION :   Model fit seems fine, predictions investigated below (those made on the validation set) and none are exactly 0 or 1.
 # - Deviance and AIC
 summary(logitMod_ali1)
-### RESULTS: Null deviance = 275184; Residual deviance = 269438; AIC = 269450
+### RESULTS: Null deviance = 275184; Residual deviance = 268931; AIC = 268943
 # - Evaluate fit using generic R^2 based on deviance vs null deviance
 coefDeter_glm(logitMod_ali1)
-### RESULTS: 2.23%
+### RESULTS: 2.27%
 # - Odds Ratio analysis
 round(exp(cbind(OR = coef(logitMod_ali1), confint.default(logitMod_ali1))), 3)
 ### RESULTS: odds ratios of [Term], [Balance], and [Principal] are all practically 1, which limits their usefulness (however, the range of these variables may be influencing this result; a standardised odds ratio may be more insightful)
@@ -177,7 +177,7 @@ varImport <- varImport_logit(logitMod_ali1, method="stdCoef_ZScores", impPlot=T)
 # - ROC analysis
 datCredit_valid[, prob_ali1 := predict(logitMod_ali1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali1)# datCredit_valid[prob_ali1==0,.N]; datCredit_valid[prob_ali1==1,.N] # There are no probabilities that are exactly equal to 0 or 1
-### RESULTS: 63.11%
+### RESULTS: 63.12%
 
 
 # --- 2.3b Best subset selection | Full analysis
@@ -185,8 +185,8 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali1)# datC
 # - Best subset selection
 logitMod_ali_best <- MASS::stepAIC(logitMod_ali1, direction="both")
 ### WARNING:   glm.fit: fitted probabilities numerically 0 or 1
-# Start AIC = 68930.8
-# End AIC = 269449.9
+# Start AIC = 268942.9
+# End AIC = 268942.9
 summary(logitMod_ali_best)
 ### RESULTS:    Entire input space returned after have been run through the best subset selection
 ### CONCLUSION: Use analysis of full model in 2.3a as this will be identical to this model.
@@ -205,28 +205,17 @@ pack.ffdf(paste0(genObjPath, "ALI_Formula"), inputs_ali_fin); gc()
 
 # --- 2.6 Clean up
 rm(cor_ali_spear, ind_row_spear, ind_col_spear, cor_ali_spear2,
-   logitMod_ali_best)
-
-
-# --- 2.7 Saving selected inputs
-# - Save variables
-inputs_fin_bas <- inputs_ali_fin
-inputs_beh_fin <-  DefaultStatus1_lead_12_max ~ slc_acct_pre_lim_perc_imputed_med + slc_pmnt_method
-pack.ffdf(paste0(genObjPath, "Beh_Formula"), inputs_beh_fin); gc()
-
-# --- 3.5 Clean up
-rm(cor_beh_spear, ind_row_spear, ind_col_spear, cor_beh_spear2, inputs_beh_fin, logitMod_beh1); gc()
-datCredit_valid[,`:=`(prob_beh1=NULL)]
+   logitMod_ali_best); gc()
 
 
 
 
-# ------ 4. Modelling & Feature Selection by combining all previous themes
+# ------ 3. Modelling & Feature Selection by combining all previous themes
 # --- Create full model formula
 # - Load in all thematic variables
-unpack.ffdf(paste0(genObjPath, "ALI_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Beh_Formula"), tempPath)
+unpack.ffdf(paste0(genObjPath, "ALI_Formula"), tempPath)
 # - Create formula
-inputs_full <- c(labels(terms(inputs_ali_fin)), labels(terms(inputs_beh_fin)))
+inputs_full <- labels(terms(inputs_ali_fin))
 form_com_full <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_full, collapse="+")))
 
 # --- Full model
@@ -234,10 +223,10 @@ form_com_full <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_fu
 logitMod_full1 <- glm(form_com_full, data=datCredit_train, family="binomial")
 # Deviance and AIC
 summary(logitMod_full1)
-### RESULTS: Null deviance = 275184; Residual deviance = 250081; AIC = 250107
+### RESULTS: Null deviance = 275184; Residual deviance = 269450; AIC = 269462
 # Evaluate fit using generic R^2 based on deviance vs null deviance
 coefDeter_glm(logitMod_full1)
-### RESULTS: 9.12%
+### RESULTS: 2.08%
 # Odds Ratio analysis
 round(exp(cbind(OR = coef(logitMod_full1), confint.default(logitMod_full1))), 3)
 # Residual deviance analysis
@@ -245,23 +234,23 @@ resid_deviance_glm(logitMod_full1)
 ### RESULTS: Model fit is somewhat strained (3 diagnostics gave warnings)
 # Variable importance
 varImport_logit(logitMod_full1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)
-### RESULTS: Top three variables: [slc_acct_pre_lim_perc_imputed_med], [Balance], and [Principal]
+### RESULTS: Top three variables: [Principal], [Balance], and [InterestRate_Margin]
 # ROC analysis
 datCredit_train[, prob_full1 := predict(logitMod_full1, newdata = datCredit_train, type="response")]
 datCredit_valid[, prob_full1 := predict(logitMod_full1, newdata = datCredit_valid, type="response")]
 auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_full1)
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full1)
-### RESULTS: Training dataset = 74.6%
-###          Validation dataset = 74.39%
+### RESULTS: Training dataset = 63.24%
+###          Validation dataset = 63.24%
 # VIF analysis
 car::vif(logitMod_full1)
 ### RESULTS:  Both [Principal] and [Balance] have VIFs that are larger than 10, but this is expected since they are both highly correlated
 
 ### RESULTS:  All variables are significant and have reasonable standard errors.
-###           The coefficient of determination is relatively low at 9.12%.
+###           The coefficient of determination is relatively low at 2.08%.
 ###           The residual deviance analysis indicates that the model fit is strenuous.
 ###           Some VIFs are over 10, but majority are not; thus no cause for concern.
-###           Model is not overfitted as evidenced by the small change in AUC when a ROC analysis is conducted on the training- and validaiton datasets (74.6% vs 74.39%)
+###           Model is not overfitted as evidenced by identical AUCs when a ROC analysis is conducted on the training- and validaiton datasets (63.24% vs 63.24%)
 
 ### CONCLUSION: Use all the variables from the resulting account-level information and behavioral variables themes.
 ###             These models on their own are not strong predictors and it is recommended that they are at least used with the intermediate variables.
@@ -274,14 +263,14 @@ inputs_fin_bas <- formula(logitMod_full1)
 pack.ffdf(paste0(genObjPath, "Basic_Com_Formula"), inputs_fin_bas); gc()
 
 
-# --- 2.8 Clean up
-rm(inputs_fin_bas, inputs_ali_fin)
+# --- Clean up
+rm(inputs_fin_bas, inputs_ali_fin); gc()
 
 
 
 
-# ------ 5. Subsampling and refitting the final model(s)
-# --- 5.1 Preliminaries
+# ------ 4. Subsampling and refitting the final model(s)
+# --- 4.1 Preliminaries
 # - Field names
 stratifiers <- c("DefaultStatus1_lead_12_max", "Date") # Must at least include target variable used in graphing event rate
 targetVar <- "DefaultStatus1_lead_12_max"
@@ -290,96 +279,25 @@ targetVar <- "DefaultStatus1_lead_12_max"
 smp_size <- 250000 # fixed size of downsampled set
 smp_perc <- smp_size / ( datCredit_train[complete.cases(mget(stratifiers)), mget(stratifiers)][,.N] ) # Implied sampling fraction for downsampling step
 
-# --- 5.2 Downsample data into a set with a fixed size (using stratified sampling) before implementing resampling scheme
+# --- 4.2 Downsample data into a set with a fixed size (using stratified sampling) before implementing resampling scheme
 set.seed(1)
 datCredit_smp <- datCredit_train %>%group_by(across(all_of(stratifiers))) %>% slice_sample(prop=smp_perc) %>% as.data.table()
 cat( (datCredit_smp[is.na(get(targetVar)), .N] == 0) %?% 'SAFE: No missingness in target variable.\n' %:% 
        'WARNING: Missingness detected in target variable.\n')
 ### RESULTS: Subasmpling is successful.
 
-# --- 5.3 Refitting final model
+# --- 4.3 Refitting final model
 # - Load in model input space
 unpack.ffdf(paste0(genObjPath, "Basic_Com_Formula"), tempPath)
-
 # - Refit model to subsampled dataset
 logitMod_full1_smp <- glm(inputs_fin_bas, data=datCredit_smp, family="binomial")
-
 # - Deviance and AIC
 summary(logitMod_full1_smp)
 ### RESULTS:    Insignificant variables are: None
-
 ### CONCLUSION: Save to assume that these variables are indeed significant in predicting default (at least within this input space)
 
-# --- 5.4 Clean up
+# --- 4.4 Clean up
 rm(stratifiers, targetVar, smp_size, smp_perc, datCredit_smp, logitMod_full1_smp); gc()
 
 
-
-### EO: Other variations of the account-level variables can now be grouped into sub-themes, e.g., log-transform variables, using the ratio-like variables rather than the "raw" variables, e.g., Balance vs BalanceToPrincipal or AgeToTerm vs Age and Term
-### EO: Do not use the receipt variable (too many issues now)
-
-# - Remove the insignificant variables from the applicable theme and analyse again
-# "Raw" variables
-# inputs_acc2 <- DefaultStatus1_lead_12_max ~ Age_Adj + Term + Receipt_Inf + Balance + InterestRate_Margin + BalanceToPrincipal
-# logitMod_acc2 <- glm(inputs_acc2, data=datCredit_train, family="binomial")
-# summary(logitMod_acc2)
-### RESULTS: All variables are significant
-### EO: If one or more of the models were insignificant, follow the same process and define inputs_acc3 and logitMod_acc3 etc. until all variables in the subtheme model are significant
-### EO: You will end up with a range of models, all with significant variables, and now need to decide which one performs the best - use AUC as a proxy
-
-# - Calculate the AUC to identify the most predictive set of variables in a model subtheme
-# datCredit_train[, prob_acc2 := predict(logitMod_acc2, newdata = datCredit_train, type="response")]
-# datCredit_valid[, prob_acc2 := predict(logitMod_acc2, newdata = datCredit_valid, type="response")]
-
-# auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_acc2) # 60.60%
-# auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_acc2) # 60.53%
-### EO: You will then use the variables from the model that reports the highest AUC as the chosen variables from the theme
-### EO: Diagnostics (in-sample): Think about using AIC, deviance-residuals (will help to infer the same thing), statistical significance (p-values with threshold of 5%, standard errors)
-### EO: Out-of-sample: AUC
-### EO: Final analysis of the final candidate model: AUC on train and test, as well as multicollinearity, and variable importance (Odds-ratio and Shapley-values)
-
-
-# --- 4.2 Delinquency/performance-data
-# Analyse the significance of the variables related to the delinquency/performance of the account
-### EO: Think about including arrears (choose g0_delinq and arrears - possible sub-theme), time since last movement in delinquency-level
-# inputs_del1 <- DefaultStatus1_lead_12_max ~ TimeInPerfSpell + g0_Delinq + PrevDefaults + slc_acct_arr_dir_3 + slc_acct_roll_ever_24
-# logitMod_del1 <- glm(inputs_del1, data=datCredit_train, family="binomial")
-# summary(logitMod_del1)
-### RESULTS: Only one level of slc_acct_arr_dir_3 is insignificant (the missing group), but the rest of the groups are significant
-
-### EO: Now similarly, you can analyse different subthemes if you'd like and compare them to create a "base" set of variables from this theme
-
-# --- 4.3 Behavioral variables
-# Analyse the significance of the variables related to the behavior of the account
-# inputs_behav1 <- DefaultStatus1_lead_12_max ~ slc_pmnt_method + slc_acct_pre_lim_perc + slc_acct_prepaid_perc_dir_12
-
-# --- 4.3 Portfolio variables
-
-# --- 4.4 Macroeconomic information
-# Analyse the significance per variable
-# - Repo rate
-### EO: Here, you can define all of the transformations/raw MVs per variable to identify the most significant ones
-### EO: This step is the most time consuming, since you would probably have to remove a couple of variables at a time and re-run to identify whether the remaining ones are still significant
-### EO: Once you have your set of base variables per MV theme/type of variable, you can combine all of the remaining significant variables and then follow the same elimination process
-
-
-
-# - Effect size analysis | Maybe do this only for final model
-# mean odds of event (unconditioned on any input): 0.038 | prob = odds / ( 1+ odds)
-# odds of event given unit increase in InterestRate_Margin, exp(2.26322360946448 x 1) = 9.614 | Biggest effect size
-
-
-### AB: Build graphing function (I'll help with this later, have an interesting idea to illustrate effect sizes of all inputs on
-# a single graph, similar to Shapley-values' graph)
-# https://stats.oarc.ucla.edu/other/mult-pkg/faq/general/faq-how-do-i-interpret-odds-ratios-in-logistic-regression/
-# https://www.geeksforgeeks.org/how-to-plot-odds-ratio-of-prediction-of-logistic-model-in-r/
-# https://argoshare.is.ed.ac.uk/healthyr_book/odds-ratio-plot-1.html
-# https://stackoverflow.com/questions/47085514/simple-way-to-visualise-odds-ratios-in-r
-# probs <- seq(0,1,by=0.01)
-# odds <- probs / (1-probs)
-# plot(x=probs, y=odds, type="b")
-# Put odds ratios as annotations on above graph (ggplot2-variant of course)
-
-# See this link for plotting odds ratios on a log scale (which should always be done when comparing odds ratios in a graph):
-# https://andrewpwheeler.com/2013/10/26/odds-ratios-need-to-be-graphed-on-log-scales/
 

@@ -17,12 +17,14 @@
 # -- Script dependencies:
 #   - 0.Setup.R
 #   - 0a.CustomFunctions.R
+#   - 3c(v).Model_DefaultRisk_Exp2
 #
 # -- Inputs:
 #   - datCredit_real | Prepared credit data from script 2f
 #
 # -- Outputs:
-#   - 
+#   - A graph showcasing the "individual" importance of each selected portfolio-level variable
+#   - A formula for the final advanced model
 # =======================================================================================
 
 
@@ -333,7 +335,7 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_beh1)
 ### RESTULS:    73.06%
 ### CONCLUSION: Do not run a best subset selection as there are only two variables in the model that are both significant
 
-# --- 11.4 Final account-level information variables
+# --- 3.4 Final account-level information variables
 # - Final variables
 ### CONCLUSION: Use [slc_acct_pre_lim_perc_imputed_med] and [slc_pmnt_method] as the account-level information variables.
 # - Save variables
@@ -624,6 +626,8 @@ logitMod_smp <- glm(inputs_adv, data=datCredit_smp, family="binomial")
 # - Deviance and AIC
 summary(logitMod_smp)
 ### RESULTS:    Insignificant variables are: [Balance], [Principal], [M_Emp_Growth_1], [NewLoans_Aggr_Prop_1], and [NewLoans_Aggr_Prop_4]
+### MM:         Investigat variable importance of these variables.
+###             Sign of [g0_Delinq_Num] is still negative, further investigation may be warranted.
 
 ### CONCLUSION: There are a few insignificant variables compared when refitting the model on the subsampled (training) dataset.
 ###             It might be worth removing these variables.

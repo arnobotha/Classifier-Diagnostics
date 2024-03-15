@@ -2,7 +2,7 @@
 # Develop several logit models using delinquency- and forward looking information.
 # ----------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer, Marcel Muller
+# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller
 
 # DESCRIPTION:
 # This script uses the previously prepared credit dataset fused with macroeconomic
@@ -25,7 +25,9 @@
 #   - datCredit_valid | Prepared credit data from script 3b
 #
 # -- Outputs:
-#   - Sets of delinquency- and macroeconomic variables.
+#   - A graph showcasing the predictive performance of each "macroeconomic theme".
+#   - A graph showcasing the variable importance ranking of two macroeconomic variables.
+#   - A formula for the final intermediate model.
 # =======================================================================================
 
 
@@ -62,14 +64,14 @@ logitMod_mac_base1 <- glm(form_mac_base
                           , data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_mac_base1)
-### Results: Null deviance = 274496; Residual deviance = 271532; AIC = 271548
+### Results: Null deviance = 275184; Residual deviance = 271796; AIC = 271810
 # - Variable importance
 varImport_logit(logitMod_mac_base1, method="stdCoef_Goodman", impPlot=T, sig_level = 0.10)
 ### RESULTS: Top variables: [M_DTI_Growth], [M_Repo_Rate], and [M_RealIncome_Growth]
 # - ROC analysis
 datCredit_valid[, prob_mac_base1 := predict(logitMod_mac_base1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_base1)
-### RESULTS:    57.9%
+### RESULTS:    58%
 ### CONCLUSION: Estimated coefficients and the associated standard errors seem reasonable
 ###             All macroeconomic variables are significant, i.e.: [M_Repo_Rate], [M_Inflation_Growth], [M_DTI_Growth], [M_RealGDP_Growth], [M_RealIncome_Growth], [M_Emp_Growth]
 ###             Proceed to testing each variable, and its associated lags and standard deviations, separately with in its own theme.
@@ -92,14 +94,14 @@ logitMod_mac_repo1 <- glm(inputs_mac_repo1 <- form_mac_repo1
                           , data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_mac_repo1)
-### Results: Null deviance = 274496; Residual deviance = 271532; AIC = 271548
+### Results: Null deviance = 275184; Residual deviance = 272203; AIC = 272219
 # - Variable importance
 varImport_logit(logitMod_mac_repo1, method="stdCoef_Goodman", impPlot=T, sig_level = 0.10)
 ### RESULTS: Top variables: [M_Repo_Rate], [M_Repo_Rate_12] | All other variables are insignificant according to an alpha threshold of 0.1
 # - ROC analysis
 datCredit_valid[, prob_mac_repo1 := predict(logitMod_mac_repo1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_repo1)
-### RESULTS:    57.21%
+### RESULTS:    57.22%
 ### CONCLUSION: Estimated coefficients and the associated standard errors seem reasonable
 ###             Significant variables are [M_Repo_Rate] and [M_Repo_Rate_12]
 ###             Proceed to using best subset selection on the input space.
@@ -107,21 +109,21 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_repo1)
 # --- 3.1.2 Best subset selection
 # - Conducting the best subset procedure
 logitMod_mac_repo_best1 <- MASS::stepAIC(logitMod_mac_repo1, direction="both")
-# Start AIC = 271547.7
-# End AIC = 271541.7
+# Start AIC = 272218.7
+# End AIC = 272212.1
 # - Deviance and AIC
 summary(logitMod_mac_repo_best1)
-### RESULTS: Null deviance = 274496; Residual deviance = 271534; AIC = 271542
+### RESULTS: Null deviance = 275184; Residual deviance = 272204; AIC = 272212
 # - Variable importance
 varImport_logit(logitMod_mac_repo_best1, method="stdCoef_Goodman", impPlot=T, sig_level = 0.1)
-### RESULTS: Top 3 variables: [M_Repo_Rate], [M_Repo_Rate_9], and [M_Repo_Rate_12]
+### RESULTS: Top 3 variables: [M_Repo_Rate], [M_Repo_Rate_12], and [M_Repo_Rate_9]
 # - ROC analysis
 datCredit_valid[, prob_mac_repo_best := predict(logitMod_mac_repo_best1, newdata = datCredit_valid, type="response")]
 (AUC_logitMod_mac_repo_best1 <- auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_repo_best))
-### RESULTS:    57.23%
+### RESULTS:    57.22%
 ### CONCLUSION:  All estimated coefficients and their associated standard errors seem reasonable 
-###              Final selection is [M_Repo_Rate], [M_Repo_Rate_6], [M_Repo_Rate_9], and [M_Repo_Rate_12]
-###              Proceed to investigating the SD variable for [M_Repo_Rate]
+###              Final selection is [M_Repo_Rate], [M_Repo_Rate_9], and [M_Repo_Rate_12]
+###              Proceed to investigating the SD variables for [M_Repo_Rate]
 
 # --- 3.1.3 Clean up
 # - Saving the relevant model information
@@ -144,14 +146,14 @@ logitMod_mac_repo2 <- glm(inputs_mac_repo2 <- form_mac_repo2
                           , data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_mac_repo2)
-### RESULTS: Null deviance = 274496; Residual deviance = 273813; AIC = 273825
+### RESULTS: Null deviance = 275184; Residual deviance = 274540; AIC = 274552
 # - Variable importance 
 varImport_logit(logitMod_mac_repo2, method="stdCoef_Goodman", impPlot=T, sig_level = 0.1)
-### RESULTS: Top 3 variables: [M_Repo_Rate_SD_12], [M_Repo_Rate_SD_4], and [M_Repo_Rate_SD_9]
+### RESULTS: Top 3 variables: [M_Repo_Rate_SD_12], [M_Repo_Rate_SD_9], and [M_Repo_Rate_SD_4]
 # - ROC analysis
 datCredit_valid[, prob_mac_repo2 := predict(logitMod_mac_repo2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_repo2)
-### RESULTS:    54.7%
+### RESULTS:    54.55%
 ### CONCLUSION: Estimated coefficients and the associated standard errors seem reasonable
 ###             Significant variables are [M_Repo_Rate_SD_4], [M_Repo_Rate_SD_9], and [M_Repo_Rate_SD_12]
 ###             Proceed to using best subset selection on the input space.
@@ -159,18 +161,18 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_repo2)
 # --- 3.2.2 Best subset selection
 # - Conducting the best subset procedure
 logitMod_mac_repo_best2 <- MASS::stepAIC(logitMod_mac_repo2, direction="both")
-# Start AIC = AIC=273825.5
-# End AIC = 273822
+# Start AIC = AIC=274552.3
+# End AIC = 274548.4
 # - Deviance and AIC
 summary(logitMod_mac_repo_best2)
-### RESULTS: Null deviance = 274496; Residual deviance = 273814; AIC = 273822
+### RESULTS: Null deviance = 275184; Residual deviance = 274540; AIC = 274548
 # - Variable importance
 varImport_logit(logitMod_mac_repo_best2, method="stdCoef_Goodman", impPlot=T, sig_level = 0.1)
 ### RESULTS: Top 3 variables: [M_Repo_Rate_SD_12], [M_Repo_Rate_SD_4], and [M_Repo_Rate_SD_9]
 # - ROC analysis
 datCredit_valid[, prob_mac_repo_best := predict(logitMod_mac_repo_best2, newdata = datCredit_valid, type="response")]
 (AUC_logitMod_mac_repo_best2 <- auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_repo_best))
-### RESULTS:    54.7%
+### RESULTS:    54.54%
 ### CONCLUSION: All estimated coefficients and their associated standard errors seem reasonable 
 ###             Final selection is [M_Repo_Rate_SD_4], [M_Repo_Rate_SD_9], and [M_Repo_Rate_SD_12]
 ###             Proceed to investigating the combined input space (for the lagged- and SD variables) as select in the previous subsections
@@ -196,37 +198,37 @@ logitMod_mac_repo3 <- glm(form_mac_repo_com
                           , data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_mac_repo3)
-### RESULTS: Null deviance = 274496; Residual deviance = 271486; AIC = 271500
+### RESULTS: Null deviance = 275184; Residual deviance = 272173; AIC = 272187
 # - Variable importance
 varImport_logit(logitMod_mac_repo3, method="stdCoef_Goodman", impPlot=T, sig_level = 0.1)
 ### RESULTS: Top 3 variables: [M_Repo_Rate], [M_Repo_Rate_SD_12], and [M_Repo_Rate_SD_9]
 # - ROC analysis
 datCredit_valid[, prob_mac_repo3 := predict(logitMod_mac_repo3, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_repo3)
-### RESULTS:    57.03%
+### RESULTS:    57.05%
 ### CONCLUSION: Estimated coefficients and the associated standard errors seem reasonable
-###             Significant variables are [M_Repo_Rate], [M_Repo_Rate_9], [M_Repo_Rate_12], [M_Repo_Rate_SD_4], [M_Repo_Rate_SD_9], and [M_Repo_Rate_SD_12]
+###             Significant variables are [M_Repo_Rate], [M_Repo_Rate_9], [M_Repo_Rate_SD_4], [M_Repo_Rate_SD_9], and [M_Repo_Rate_SD_12]
 ###             Proceed to best subset selection for the input space.
 
 # --- 3.3.2 Best subset selection
 # - Conducting the best subset procedure
 logitMod_mac_repo_best3 <- MASS::stepAIC(logitMod_mac_repo3, direction="both")
-# Start AIC = AIC=271500.3
-# End AIC = 271499.7
+# Start AIC = AIC=272187.5
+# End AIC = 272186.3
 # - Deviance and AIC
 summary(logitMod_mac_repo_best3)
-### RESULTS: Null deviance = 274496; Residual deviance = 271488; AIC = 271500
+### RESULTS: Null deviance = 275184; Residual deviance = 272174; AIC = 272186
 # - Variable importance
 varImport_logit(logitMod_mac_repo_best3, method="stdCoef_Goodman", impPlot=T, sig_level=0.1)
-### RESULTS: Top 3 variables: [M_Repo_Rate_], [M_Repo_Rate_SD_12], and [M_Repo_Rate_SD_9]
+### RESULTS: Top 3 variables: [M_Repo_Rate], [M_Repo_Rate_9], and [M_Repo_Rate_SD_12]
 # - ROC analysis
 datCredit_valid[, prob_mac_repo_best := predict(logitMod_mac_repo_best3, newdata = datCredit_valid, type="response")]
 (AUC_logitMod_mac_repo_best3<-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_repo_best))
-### RESULTS:    57.04%
+### RESULTS:    57.05%
 ### CONCLUSION: All estimated coefficients and their associated standard errors seem reasonable 
 ###             Final selection is [M_Repo_Rate_SD_4], [M_Repo_Rate_SD_9], and [M_Repo_Rate_SD_12]
 
-### COMPARISON: The model with the combined variables performs as marginally worse than the model with the lags and better than the model with the standard deviations (57.04% for the full model vs 57.23% and 54.7%)
+### COMPARISON: The model with the combined variables performs as marginally worse than the model with the lags and better than the model with the standard deviations (57.05% for the full model vs 57.22% and 54.54%)
 
 ### CONCLUSION: The added complexity of the SD variables does not warrant the gain in the AUC (which actually deteriorates).
 ###             Only use the lagged variables.
@@ -263,14 +265,14 @@ logitMod_mac_infl1 <- glm(inputs_mac_infl1 <- form_mac_infl1
                           , data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_mac_infl1)
-### RESULTS: Null deviance = 274496; Residual deviance = 272242; AIC = 272258
+### RESULTS: Null deviance = 275184; Residual deviance = 272948; AIC = 272964
 # - Variable importance
 varImport_logit(logitMod_mac_infl1, method="stdCoef_Goodman", impPlot=T, sig_level=0.1)
-### RESULTS: Top 3 variables: [M_Inflation_Growth], [M_Inflation_Growth_1], and [M_Inflation_Growth_12]
+### RESULTS: Top 3 variables: [M_Inflation_Growth], [M_Inflation_Growth_12], and [M_Inflation_Growth_1]
 # - ROC analysis
 datCredit_valid[, prob_mac_infl1 := predict(logitMod_mac_infl1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_infl1)
-### RESULTS:    56.36%
+### RESULTS:    56.27%
 ### CONCLUSION: Estimated coefficients and the associated standard errors seem reasonable
 ###             Significant variables are [M_Inflation_Growth] , [M_Inflation_Growth_1], and [M_Inflation_Growth_12]
 ###             Proceed to using best subset selection on the input space.
@@ -278,20 +280,20 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_infl1)
 # --- 4.1.2 Best subset selection
 # - Conducting the best subset procedure
 logitMod_mac_infl_best1 <- MASS::stepAIC(logitMod_mac_infl1, direction="both")
-# Start AIC = 272258.1
-# End AIC = 272253
+# Start AIC = 272963.9
+# End AIC = 272959.7
 # - Deviance and AIC
 summary(logitMod_mac_infl_best1)
-### RESULTS: Null deviance = 274496; Residual deviance = 272243; AIC = 272253
+### RESULTS: Null deviance = 275184; Residual deviance = 272950; AIC = 272960
 # - Variable importance
 varImport_logit(logitMod_mac_infl_best1, method="stdCoef_Goodman", impPlot=T, sig_level=0.1)
-### RESULTS: Top 3 variables: [M_Inflation_Growth], [M_Inflation_Growth_1], and [M_Inflation_Growth_12]
+### RESULTS: Top 3 variables: [M_Inflation_Growth], [M_Inflation_Growth_12], and [M_Inflation_Growth_1]
 # - ROC analysis
 datCredit_valid[, prob_mac_infl_best := predict(logitMod_mac_infl_best1, newdata = datCredit_valid, type="response")]
 (AUC_logitMod_mac_infl_best1<-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_infl_best))
-### RESULTS: 56.38%
+### RESULTS: 56.27%
 ### CONCLUSION: All estimated coefficients and their associated standard errors seem reasonable 
-###             Final selection is [M_Inflation_Growth], [M_Inflation_Growth_1], [M_Inflation_Growth_12], and [M_Inflation_Growth_2]
+###             Final selection is [M_Inflation_Growth], [M_Inflation_Growth_1], and [M_Inflation_Growth_12]
 ###             Proceed to to investigating the SD variables for [M_Inflation_Growth]
 
 # --- 4.1.3 Clean up
@@ -315,14 +317,14 @@ logitMod_mac_infl2 <- glm(inputs_mac_infl2 <- form_mac_infl2
                           , data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_mac_infl2)
-### RESULTS: Null deviance = 274496; Residual deviance = 272871; AIC = 272883
+### RESULTS: Null deviance = 275184; Residual deviance = 273549; AIC = 273561
 # - Variable importance
 varImport_logit(logitMod_mac_infl2, method="stdCoef_Goodman", impPlot=T, sig_level=0.1)
-### TRESULTS: op variables: [M_Inflation_Growth_SD_12], [M_Inflation_Growth_SD_4]
+### RESULTS: Top variables: [M_Inflation_Growth_SD_12], [M_Inflation_Growth_SD_4]
 # - ROC analysis
 datCredit_valid[, prob_mac_infl2 := predict(logitMod_mac_infl2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_infl2)
-### RESTULS:    55.32%
+### RESTULS:    55.3%
 ### CONCLUSION: Estimated coefficients and the associated standard errors seem reasonable
 ###             Significant variables are [M_Inflation_Growth_SD_4] and [M_Inflation_Growth_SD_12]
 ###             Proceed 
@@ -330,15 +332,18 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_infl2)
 # --- 4.2.2 Best subset selection
 # - Conducting the best subset procedure
 logitMod_mac_infl_best2 <- MASS::stepAIC(logitMod_mac_infl2, direction="both")
-# Start AIC = AIC=272882.8
-# End AIC = AIC=272878.6
+# Start AIC = AIC=273561.3
+# End AIC = AIC=273557.1
 # - Deviance and AIC
-summary(logitMod_mac_infl_best2) # Null deviance = 274496; Residual deviance = 272873; AIC = 272879
+summary(logitMod_mac_infl_best2)
+### RESULTS: Null deviance = 275184; Residual deviance = 273551; AIC = 273557
 # - Variable importance
-varImport_logit(logitMod_mac_infl_best2, method="stdCoef_Goodman", impPlot=T, sig_level=0.1) # Top variables: [M_Inflation_Growth_SD_12] and [M_Inflation_Growth_SD_4]
+varImport_logit(logitMod_mac_infl_best2, method="stdCoef_Goodman", impPlot=T, sig_level=0.1)
+### RESULTS: Top variables: [M_Inflation_Growth_SD_12] and [M_Inflation_Growth_SD_4]
 # - ROC analysis
 datCredit_valid[, prob_mac_infl_best := predict(logitMod_mac_infl_best2, newdata = datCredit_valid, type="response")]
-(AUC_logitMod_mac_infl_best2<-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_infl_best)) # 55.29%
+(AUC_logitMod_mac_infl_best2<-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_infl_best))
+### RESULTS:  55.28%
 ### Results:  All estimated coefficients and their associated standard errors seem reasonable 
 ###           Final selection is [M_Inflation_Growth_SD_12] and [M_Inflation_Growth_SD_4]
 ###           Proceed to investigating the combined input space (for the lagged- and SD variables) as select in the previous subsections
@@ -364,14 +369,14 @@ logitMod_mac_infl3 <- glm(form_mac_infl_com
                           , data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_mac_infl3)
-### RESULTS: Null deviance = 274496; Residual deviance = 272132; AIC = 272146
+### RESULTS: Null deviance = 275184; Residual deviance = 272825; AIC = 272839
 # - Variable importance
 varImport_logit(logitMod_mac_infl3, method="stdCoef_Goodman", impPlot=T, sig_level=0.1)
-### RESULTS: Top 3 variables: [M_Inflation_Growth], [M_Inflation_Growth_1], and [M_Inflation_Growth_SD_4]
+### RESULTS: Top 3 variables: [M_Inflation_Growth], [M_Inflation_Growth_SD_4], and [M_Inflation_Growth_SD_12]
 # - ROC analysis
 datCredit_valid[, prob_mac_infl3 := predict(logitMod_mac_infl3, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_infl3)
-### RESTULS:    56.27%
+### RESTULS:    56.21%
 ### CONCLUSION: Estimated coefficients and the associated standard errors seem reasonable
 ###             Significant variables are [M_Inflation_Growth], [M_Inflation_Growth_1], [M_Inflation_Growth_12], [M_Inflation_Growth_SD_4], and [M_Inflation_Growth_SD_12]
 ###             Proceed to using best subset selection on the input space.
@@ -379,22 +384,22 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_infl3)
 # --- 4.3.2 Best subset selection
 # - Conducting the best subset procedure
 logitMod_mac_infl_best3 <- MASS::stepAIC(logitMod_mac_infl3, direction="both")
-# Start AIC = AIC=272146.3
-# End AIC = 272144.3
+# Start AIC = AIC=272838.7
+# End AIC = 272837.9
 # - Deviance and AIC
 summary(logitMod_mac_infl_best3)
-### RESULTS: Null deviance = 274496; Residual deviance = 272132; AIC = 272144
+### RESULTS: Null deviance = 275184; Residual deviance = 272826; AIC = 272838
 # - Variable importance
 varImport_logit(logitMod_mac_infl_best3, method="stdCoef_Goodman", impPlot=T, sig_level=0.1)
-### RESULTS: Top 3 variables: [M_Inflation_Growth], [M_Inflation_Growth_1], and [M_Inflation_Growth_SD_4]
+### RESULTS: Top 3 variables: [M_Inflation_Growth], [M_Inflation_Growth_SD_4], and [M_Inflation_Growth_SD_12]
 # - ROC analysis
 datCredit_valid[, prob_mac_infl_best := predict(logitMod_mac_infl_best3, newdata = datCredit_valid, type="response")]
 (AUC_logitMod_mac_infl_best3<-auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_infl_best))
-### RESULTS:    56.27%
+### RESULTS:    56.19%
 ### CONCLUSION: All estimated coefficients and their associated standard errors seem reasonable 
 ###             Final selection is [M_Inflation_Growth], [M_Inflation_Growth_1], [M_Inflation_Growth_12], [M_Inflation_Growth_SD_4], and [M_Inflation_Growth_SD_12]
 
-### COMPARISON: The model with the combined variables performs worse than the model with the lags, but better than the model with the standard deviations (56.27% for the full model vs 56.38% and 55.29%)
+### COMPARISON: The model with the combined variables performs worse than the model with the lags, but better than the model with the standard deviations (56.27% for the full model vs 56.27% and 55.28%)
 
 ### CONCLUSION: Use the lags only for this macroeconomic variable since it produces the highest AUC whilst having less variables than the other models.
 
@@ -430,7 +435,7 @@ logitMod_mac_RinG1 <- glm(inputs_mac_RinG1 <- form_mac_RinG1
                           , data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_mac_RinG1)
-### RESULTS: Null deviance = 274496; Residual deviance = 272283; AIC = 272299
+### RESULTS: Null deviance = 275184; Residual deviance = 272999; AIC = 273015
 # - Variable importance
 varImport_logit(logitMod_mac_RinG1, method="stdCoef_Goodman", impPlot=T, sig_level=0.1)
 ### RESULTS: Top 3 variables: [M_RealIncome_Growth_12], [M_RealIncome_Growth_1], and [M_RealIncome_Growth_9]
@@ -1106,9 +1111,41 @@ rm(logitMod_mac_RGDP_best1, logitMod_mac_RGDP_best2, logitMod_mac_RGDP_best3)
 
 
 
-# ------ 9. All macroeconomic variables as selected 
-# ---- 9.1 Logit model with all variables, as selected from each thematically, combined
-# --- 9.1.1 Full model
+# ------ 9. Thematic variable selection analysis
+# --- Loading in the plotting data
+if (!exists('datPlot')) unpack.ffdf(paste0(genObjPath,"Mac_Models_Summary"), tempPath)
+
+# --- Adjusting the dataset to enable easy annotations/labels
+datPlot[, Label:=paste0(sprintf("%.1f",AUC*100),"%")]
+
+# --- Plotting parameters
+col.v <- brewer.pal(9, "Blues")[c(4,7,9)]
+col.v2 <- rep(c(col.v[2], col.v[3], col.v[1]),6)
+col.v3 <- rep("white", 18)
+label.v <- c("Combined", '"Best" lag orders', '"Best" window lengths in aggregation (SD)')
+
+# --- Plot
+(g_mac_theme_sum <- ggplot(datPlot, aes(x=Base_Variable, y=AUC, group=Model)) +
+    theme_minimal() + theme(legend.position = "bottom") + labs(x="Base Variable", y="AUC(%)") +
+    geom_col(aes(colour=Model, fill=Model), position="dodge") +
+    geom_label(aes(label=Label), fill = col.v2, colour = col.v3, position=position_dodge(0.9)) +
+    scale_colour_manual(name="Model:", values=col.v, labels=label.v) +
+    scale_fill_manual(name="Model:", values=col.v, labels=label.v) +
+    scale_y_continuous(breaks=pretty_breaks(), label=percent))
+
+# --- Save plot
+dpi<-240
+ggsave(g_mac_theme_sum, file=paste0(genFigPath, "MacroVars_Select_Combined_Themes_Summary.png"), width=3000/dpi, height=1000/dpi, dpi=dpi, bg="white")
+
+# --- Clean up
+rm(dpi, col.v, vol.v2, col.v3, label.v, datPlot, g_mac_theme_sum); gc()
+
+
+
+
+# ------ 10. All macroeconomic variables as selected thematically and from the full macroeconomic input space
+# ---- 10.1 Logit model with all variables, as selected from each thematically, combined
+# --- 10.1.1 Full model
 # - Loading in the selected variables from each macroeconomic variable (if not in memory)
 if (!exists('inputs_mac_repo')) unpack.ffdf(paste0(genObjPath,"Mac_Repo_Formula"), tempPath)
 if (!exists('inputs_mac_infl')) unpack.ffdf(paste0(genObjPath,"Mac_Infl_Formula"), tempPath)
@@ -1141,7 +1178,7 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_final1)
 ### CONLCUSION: Run a best subset selection to find the "optimal" set of macroeconomic variables from this combined input space.
 ###             Save formula for the combined variable selection script.
 
-# ---- 9.1.2 Best subset selection
+# ---- 10.1.2 Best subset selection
 # - Conducting the best subset procedure
 logitMod_mac_final_best1 <- MASS::stepAIC(logitMod_mac_final1, direction="both")
 # Start AIC = 270940.3
@@ -1180,7 +1217,7 @@ length(labels(terms(logitMod_mac_final1))); length(labels(terms(logitMod_mac_fin
 ### CONCLUSION: Use the selected variables from the best subset selection model within the combined variable selection.
 ###             Save formula for the combined variable selection script.
 
-# --- 9.1.3 Clean up
+# --- 10.1.3 Clean up
 # - Saving the selected variables to the disk
 inputs_mac_com_fin_theme <- names(model.frame(logitMod_mac_final_best1))[-1]
 pack.ffdf(paste0(genObjPath, "Mac_Com_Theme_Formula"), inputs_mac_com_fin_theme); gc()
@@ -1190,7 +1227,7 @@ rm(logitMod_mac_final1, logitMod_mac_final_best1, inputs_mac_com_fin_theme, vif_
 
 
 
-# ---- 9.2 Logit model with the full macroeconomic input space (non-thematic variable selection)
+# ---- 10.2 Logit model with the full macroeconomic input space (non-thematic variable selection)
 ### NOTE: This input space excludes the volatilities as to align with the results from the thematic variable selection (which subsequently also excludes the volatilities)
 # --- 9.2.1 Full model
 # - Constructing a formula containing all variables
@@ -1217,7 +1254,7 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_mac_final2)
 ### CONLCUSION: Run a best subset selection to find the "optimal" set of macroeconomic variables.
 ###             Save formula for the combined variable selection script.
 
-# ---- 9.2.2 Best subset selection
+# ---- 10.2.2 Best subset selection
 # - Conducting the best subset procedure
 logitMod_mac_final_best2 <- MASS::stepAIC(logitMod_mac_final2, direction="both")
 # Start AIC = 270931.8
@@ -1256,7 +1293,7 @@ length(labels(terms(logitMod_mac_final2))); length(labels(terms(logitMod_mac_fin
 ### CONCLUSION: Compare the input space of the "thematic-" and "full" models.
 
 
-# --- 9.2.3 Clean up
+# --- 10.2.3 Clean up
 # - Saving the selected variables to the disk
 inputs_mac_com_fin_all <- names(model.frame(logitMod_mac_final_best2))[-1]
 pack.ffdf(paste0(genObjPath, "Mac_Com_All_Formula"), inputs_mac_com_fin_all); gc()
@@ -1264,20 +1301,27 @@ pack.ffdf(paste0(genObjPath, "Mac_Com_All_Formula"), inputs_mac_com_fin_all); gc
 datCredit_valid[, prob_mac_final_best1:=NULL]; datCredit_train[, prob_mac_final_best1:=NULL]
 rm(logitMod_mac_final1, logitMod_mac_final_best1, inputs_mac_com_fin_theme, vif_mac_final1, vif_mac_final_best1)
 
-# --- 9.3 Clean up
+
+# --- 10.3 Clean up
 datCredit_valid[, `:=` (prob_mac_final1=NULL, prob_mac_final2=NULL, prob_mac_final_best1=NULL, prob_mac_final_best2=NULL)]
 rm(ColNames7, ColNames8, form_mac_final1, form_mac_final2, logitMod_mac_final1, logitMod_mac_final2, inputs_mac_com_fin_theme, inputs_mac_com_fin_all,
    vif_mac_final1, vif_mac_final2, vif_mac_final_best1, vif_mac_final_best2)
 
 
-# --- 9.4 Final comparison and conclusion on thematic variable selection
-# Number of varaibles of the "thematic-" and "full" model
+# --- 10.4 Final comparison and conclusion on thematic variable selection
+# Number of variables of the "thematic-" and "full" model
 length(labels(terms(logitMod_mac_final_best1))); length(labels(terms(logitMod_mac_final_best2)))
 # Input space of the "thematic-" and "full" model
 (logitMod_mac_final_best1_inputs <- labels(terms(logitMod_mac_final_best1))); (logitMod_mac_final_best2_inputs <-  labels(terms(logitMod_mac_final_best2)))
-# The number of shared variables
+# The shared variables
 (shared_var <- logitMod_mac_final_best2_inputs %in% logitMod_mac_final_best1_inputs)
 sum(shared_var); logitMod_mac_final_best2_inputs[shared_var]
+# The differing variables in the "thematic" model
+(differ_var_theme <- !(logitMod_mac_final_best1_inputs %in% logitMod_mac_final_best2_inputs))
+sum(differ_var_theme); logitMod_mac_final_best1_inputs[differ_var_theme]
+# The differing variables in the "full" model
+(differ_var_full <- !(logitMod_mac_final_best2_inputs %in% logitMod_mac_final_best1_inputs))
+sum(differ_var_full); logitMod_mac_final_best2_inputs[differ_var_full]
 
 ### COMPARISON: The "thematic" model has a higher AIC than the "full" model (270934 vs 270900).
 ###             The "thematic" model has a slightly lower AUC than the "full" model (58.33% vs 58.45%) on the validation set.
@@ -1287,45 +1331,96 @@ sum(shared_var); logitMod_mac_final_best2_inputs[shared_var]
 ###             The number of shared variables is 13, more specifically the shared variables are:
 ###                 [M_RealIncome_Growth], [M_Emp_Growth_1], [M_RealGDP_Growth_1], [M_DTI_Growth_3], [M_DTI_Growth_6], [M_DTI_Growth_9], [M_Emp_Growth_9],
 ###                 [M_RealGDP_Growth_9], [M_RealIncome_Growth_9], [M_Repo_Rate_12], [M_Inflation_Growth_12], [M_RealGDP_Growth_12], [M_RealIncome_Growth_12]
+###             The number of differing variables in the "thematic" model is 6, more specifically the differing variables in the "thematic" model are:
+###                 [M_Repo_Rate], [M_Inflation_Growth_2], [M_RealIncome_Growth_1], [M_DTI_Growth], [M_DTI_Growth_1], [M_RealGDP_Growth]
+###             The number of differing variables in the "full" model is 7, more specifically the differing variables in the "full" model are:
+###                 [M_Emp_Growth], [M_Repo_Rate_1], [M_Emp_Growth_2], [M_RealGDP_Growth_2], [M_RealGDP_Growth_2], [M_RealIncome_Growth_2], [M_Repo_Rate_6], [M_Inflation_Growth_6]
 ###             The most "important" variables of the "thematic" model include: [M_RealIncome_Growth_12], [M_RealGDP_Growth_12], and [M_Repo_Rate]
 ###             The most "important" variables of the "full" model include:     [M_RealIncome_Growth_12], [M_Inflation_Growth_6], and [M_RealGDP_Growth_12]
 
-### CONCLUSION: Either input space can be used as both result in similar models.
+### CONCLUSION: The "thematic" model has more recent macroeconomic variables compared to the "full"model. Intuitively, we expect that the most recent inflation growth rate would affect the probability of default
+###             the most. The "full" model captures this through a 6-month lagged variable, whilst the "thematic" model captures this through a 2-month lagged variable.
+###             The "thematic" model therefore has more a more intuitive input space and is suggested for use in further modelling.
+
+
+# --- 10.5 Variable importance comparison
+# - Refitting the models if they are not in memory
+if (!exists("logitMod_mac_final_best1")) {
+  unpack.ffdf(paste0(genObjPath, "Mac_Com_Theme_Formula"), tempPath)
+  logitMod_mac_final_best1 <- glm(as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_mac_com_fin_theme, collapse = "+"))), data=datCredit_train, family="binomial")
+}
+if (!exists("logitMod_mac_final_best2")) {
+  unpack.ffdf(paste0(genObjPath, "Mac_Com_All_Formula"), tempPath)
+  logitMod_mac_final_best2 <- glm(as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_mac_com_fin_all, collapse = "+"))), data=datCredit_train, family="binomial")
+}
+
+# - Getting the variable rankings
+varImport_logit_Mod_mac_final_best1 <- varImport_logit(logitMod_mac_final_best1, method="stdCoef_Goodman", impPlot=T, sig_level=1)
+varImport_logit_Mod_mac_final_best2 <- varImport_logit(logitMod_mac_final_best2, method="stdCoef_Goodman", impPlot=T, sig_level=1)
+# - Getting the shared variables
+shared_var2 <- inputs_mac_com_fin_all %in% inputs_mac_com_fin_theme
+# - Create the plotting dataset
+datPlot_varImport <- rbind(data.table(varImport_logit_Mod_mac_final_best1$data, Model="Thematic"),
+                           data.table(varImport_logit_Mod_mac_final_best2$data, Model="Full"))
+# - Creating a variable used for colour aesthetics in the graph
+datPlot_varImport[Model=="Thematic" & Variable %in% inputs_mac_com_fin_all[shared_var2], Model:="Thematic - Shared"]
+datPlot_varImport[Model=="Thematic", Model:="Thematic - Unique"]
+datPlot_varImport[Model=="Full" & Variable %in% inputs_mac_com_fin_all[shared_var2], Model:="Full - Shared"]
+datPlot_varImport[Model=="Full", Model:="Full - Unique"]
+datPlot_varImport[, Model := factor(Model, levels=c("Thematic - Shared", "Full - Shared", "Thematic - Unique", "Full - Unique"))]
+datPlot_varImport <- datPlot_varImport %>% arrange(Model)
+# - Plotting parameters
+col.v <- brewer.pal(11, "Spectral")[c(1,9,2,8)]
+label.v <- c("Thematic - Shared"="Thematic - Shared", "Full - Shared"="Full - Shared", "Thematic - Unique"="Thematic - Unique", "Full - Unique"="Full - Unique")
+# - Plot of shared variables | Absolute rank
+(g_mac_theme_full_shared_comp <- ggplot(datPlot_varImport[Model %in% c("Thematic - Shared", "Full - Shared")], aes(x=Variable, y=Rank, group=Model)) +
+    theme_minimal() + theme(legend.position = "bottom") + labs(x="Variable", y="Rank") +
+    geom_col(aes(colour=Model, fill=Model), position="dodge") + coord_flip() +
+    scale_colour_manual(name="Model:", values=col.v, labels=label.v) +
+    scale_fill_manual(name="Model:", values=col.v, labels=label.v) +
+    scale_y_continuous(breaks=pretty_breaks()))
+# Save plot
+dpi<-240
+ggsave(g_mac_theme_full_shared_comp, file=paste0(genFigPath, "MacroVars_Theme_Full_VarImport_Shared_Compare.png"), width=3000/dpi, height=1000/dpi, dpi=dpi, bg="white")
+# - Plot of shared variables | Difference in rank
+# Adjusting the plotting dataset to get the difference in ranks of the shared variables
+datPlot_varImport2 <- datPlot_varImport[Model %in% c("Thematic - Shared", "Full - Shared"),list(Variable, Rank, Model)] %>%
+  pivot_wider(names_from=Model, values_from = Rank) %>% as.data.table()
+colnames(datPlot_varImport2) <- c("Variable", "Rank_Thematic", "Rank_Full")
+datPlot_varImport2[, Rank_Diff:=Rank_Thematic-Rank_Full]
+# Plotting parameters
+colPalette="BrBG"; colPaletteDir=1
+# Plot
+(g_mac_theme_full_shared_comp2 <- ggplot(datPlot_varImport2, aes(x=Variable, y=Rank_Diff)) +
+    theme_minimal() + theme(legend.position = "bottom") + labs(x="Variable", y="Rank Difference") +
+    geom_col(position="dodge", aes(col=Rank_Diff, fill=Rank_Diff)) + coord_flip() +
+    scale_y_continuous(breaks=pretty_breaks()) +
+    scale_fill_distiller(palette=colPalette, name="Rank Difference of Thematic Model Relative to Full Model", direction=colPaletteDir) +
+    scale_colour_distiller(palette=colPalette, name="Rank Difference of Thematic Model Relative to Full Model", direction=colPaletteDir))
+# Save plot
+ggsave(g_mac_theme_full_shared_comp2, file=paste0(genFigPath, "MacroVars_Theme_Full_VarImport_Shared_Compare2.png"), width=3000/dpi, height=1000/dpi, dpi=dpi, bg="white")
+# - Plot of unique variables' importance
+# Plotting parameters
+col.v <- brewer.pal(11, "Spectral")[c(1,9,2,8)]
+label.v <- c("Thematic - Shared"="Thematic - Shared", "Full - Shared"="Full - Shared", "Thematic - Unique"="Thematic - Unique", "Full - Unique"="Full - Unique")
+# Plot
+(g_mac_theme_full_shared_comp3 <- ggplot(datPlot_varImport[Model %in% c("Thematic - Unique", "Full - Unique")], aes(x=Variable, y=Rank, group=Model)) +
+    theme_minimal() + theme(legend.position = "bottom") + labs(x="Variable", y="Rank") +
+    geom_col(aes(colour=Model, fill=Model), position="dodge") + coord_flip() +
+    scale_colour_manual(name="Model:", values=col.v, labels=label.v) +
+    scale_fill_manual(name="Model:", values=col.v, labels=label.v) +
+    scale_y_continuous(breaks=pretty_breaks()))
+# Save plot
+ggsave(g_mac_theme_full_shared_comp3, file=paste0(genFigPath, "MacroVars_Theme_Full_VarImport_Shared_Compare3.png"), width=3000/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
 # - Clean up
-rm(logitMod_mac_final1_inputs, logitMod_mac_final2_inputs, shared_var, logitMod_mac_final_best1, logitMod_mac_final_best2); gc()
+rm(dpi, col.v, label.v, datPlot_varImport, datPlot_varImport2,
+   g_mac_theme_full_comp, g_mac_theme_full_comp2, g_mac_theme_full_shared_comp3); gc()
 
 
-
-
-# ------ 10. Thematic variable selection analysis
-# --- Loading in the plotting data
-if (!exists('datPlot')) unpack.ffdf(paste0(genObjPath,"Mac_Models_Summary"), tempPath)
-
-# --- Adjusting the dataset to enable easy annotations/labels
-datPlot[, Label:=paste0(sprintf("%.1f",AUC*100),"%")]
-
-# --- Plotting parameters
-col.v <- brewer.pal(9, "Blues")[c(4,7,9)]
-col.v2 <- rep(c(col.v[2], col.v[3], col.v[1]),6)
-col.v3 <- rep("white", 18)
-label.v <- c("Combined", '"Best" lag orders', '"Best" window lengths in aggregation (SD)')
-
-# --- Plot
-(g_mac_theme_sum <- ggplot(datPlot, aes(x=Base_Variable, y=AUC, group=Model)) +
-   theme_minimal() + theme(legend.position = "bottom") + labs(x="Base Variable", y="AUC(%)") +
-   geom_col(aes(colour=Model, fill=Model), position="dodge") +
-   geom_label(aes(label=Label), fill = col.v2, colour = col.v3, position=position_dodge(0.9)) +
-   scale_colour_manual(name="Model:", values=col.v, labels=label.v) +
-   scale_fill_manual(name="Model:", values=col.v, labels=label.v) +
-   scale_y_continuous(breaks=pretty_breaks(), label=percent))
-
-# --- Save plot
-dpi<-240
-ggsave(g_mac_theme_sum, file=paste0(genFigPath, "MacroVars_Select_Combined_Themes_Summary.png"), width=3000/dpi, height=1000/dpi, dpi=dpi, bg="white")
-
-# --- Clean up
-rm(dpi, col.v, vol.v2, col.v3, label.v, datPlot, g_mac_theme_sum); gc()
+# --- 10.6 Clean up
+rm(logitMod_mac_final_best1, logitMod_mac_final_best2, shared_var, shared_var2, differ_var_theme, differ_var_full,
+   varImport_logit_Mod_mac_final_best1, varImport_logit_Mod_mac_final_best2); gc()
 
 
 
@@ -1489,6 +1584,7 @@ logitMod_smp <- glm(inputs_int, data=datCredit_smp, family="binomial")
 # - Deviance and AIC
 summary(logitMod_smp)
 ### RESULTS:    Insignificant variables are: [M_DTI_Growth_9] and [M_Emp_Growth_1]
+### MM:         Investigate the importance of these variables.
 ### CONCLUSION: It might be worth while to exclude these variables.
 
 # --- 13.4 Clean up

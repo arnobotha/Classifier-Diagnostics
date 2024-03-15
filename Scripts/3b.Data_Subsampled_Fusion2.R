@@ -597,6 +597,9 @@ rm(datMV); gc()
 pack.ffdf(paste0(genObjPath, "var_Info_Cat"), var_Info_Cat)
 pack.ffdf(paste0(genObjPath, "var_Info_Num"), var_Info_Num)
 
+# --- Save fused- and enriched subsampled dataset for quick disk-based retrieval later
+pack.ffdf(paste0(genPath, "creditdata_smp"), datCredit_smp); gc()
+
 
 
 

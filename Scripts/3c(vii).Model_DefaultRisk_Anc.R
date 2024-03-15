@@ -1,0 +1,339 @@
+# =================================== MODEL SEGMENTATION COMPARISON ==========================================
+# Exploring the use of segmentation schemes in predicting the occurrence of default.
+# ------------------------------------------------------------------------------------------------------------
+# PROJECT TITLE: Classifier Diagnostics
+# SCRIPT AUTHOR(S): Marcel Muller
+
+# DESCRIPTION:
+# This script explores segmentation schemes in predicting the occurrence of default. Segmentation is done
+# using the performing leves of [g0_Delinq], i.e., 0-, 1-, and 2-months in arrears.
+# ------------------------------------------------------------------------------------------------------------
+# -- Script dependencies:
+#   - 0.Setup.R
+#   - 0a.CustomFunctions.R
+#   - 3b.Data_Subsample_Fusion2
+#
+# -- Inputs:
+#   - datCredit_smp | Prepared credit data from script 3b
+#   - datCredit_train | Prepared credit data from script 3b
+#   - datCredit_valid | Prepared credit data from script 3b
+#
+# -- Outputs:
+#   - Some graphs illustrating the differences in embedding delinquency endogenously vs exogenously
+# ============================================================================================================
+
+
+
+
+# ------ 1. Preliminaries
+ptm <- proc.time() # for runtime calculations (ignore)
+
+# - Confirm prepared datasets are loaded into memory
+if (!exists('datCredit_smp')) unpack.ffdf(paste0(genPath,"creditdata_smp"), tempPath)
+if (!exists('datCredit_train')) unpack.ffdf(paste0(genPath,"creditdata_train"), tempPath)
+if (!exists('datCredit_valid')) unpack.ffdf(paste0(genPath,"creditdata_valid"), tempPath)
+
+# - Subset to exclude default spells
+datCredit_smp <- datCredit_smp %>% subset(DefaultStatus1==0)
+datCredit_train <- datCredit_train %>% subset(DefaultStatus1==0)
+datCredit_valid <- datCredit_valid %>% subset(DefaultStatus1==0)
+
+# - Load in basic model formula
+unpack.ffdf(paste0(genObjPath, "Basic_Com_Formula"), tempPath)
+
+# - Confidence interval parameter
+confLevel <- 0.95
+
+
+
+
+# ------ 2. 12-Month default rate comparisons per segment
+# ---- 2.1 12-Month Conditional Default Rate per Segment
+# --- Quick analysis of the proportions of the segments
+(g0_Delinq_Prop <- datCredit_smp[,g0_Delinq] %>% table() %>% prop.table())
+
+# --- Aggregating the data over the entire sampling window
+# - Aggregating over delinquency segment
+port.aggr_def_full <- datCredit_smp[DefaultStatus1==0, list(EventRate = sum(DefaultStatus1_lead_12_max==1)/.N), by=list(Date)]
+port.aggr_def_full[,g0_Delinq:="Overall"]
+# - Aggregating per delinquency segment
+port.aggr_def_del <- datCredit_smp[DefaultStatus1==0, list(EventRate = sum(DefaultStatus1_lead_12_max==1)/.N), by=list(Date, g0_Delinq)]
+
+# --- Combining the two aggregation datasets
+# - Combining the datasets
+port.aggr_def <- rbind(port.aggr_def_full, port.aggr_def_del)
+# - Subsetting to exclude the large 12 months since aggregation is not meaningful for this period
+port.aggr_def <- subset(port.aggr_def, Date <= max(port.aggr_def$Date)-months(12))
+# - Facotrising [g0_Delinq] to facilitate graphing
+port.aggr_def_del[, g0_Delinq:=factor(g0_Delinq)]
+
+# --- Clean up
+rm(port.aggr_def_full, port.aggr_def_del); gc()
+
+# --- Create annotations for annotation dataset
+# - [g0_Delinq] = Full (full dataset)
+mean_EventRate_Full <- mean(port.aggr_def[g0_Delinq=="Overall", EventRate], na.rm=T)
+stdError_EventRate_Full <- port.aggr_def[g0_Delinq=="Overall", sd(EventRate, na.rm=T)] / sqrt(port.aggr_def[g0_Delinq=="Overall", .N])
+# - [g0_Delinq] = 0
+mean_EventRate_0 <- mean(port.aggr_def[g0_Delinq==0, EventRate], na.rm=T)
+stdError_EventRate_0 <- port.aggr_def[g0_Delinq == 0, sd(EventRate, na.rm=T)] / sqrt(port.aggr_def[g0_Delinq == 0, .N])
+# - [g0_Delinq] = 1
+mean_EventRate_1 <- mean(port.aggr_def[g0_Delinq==1, EventRate], na.rm=T)
+stdError_EventRate_1 <- port.aggr_def[g0_Delinq == 1, sd(EventRate, na.rm=T)] / sqrt(port.aggr_def[g0_Delinq == 1, .N])
+# - [g0_Delinq] = 2
+mean_EventRate_2 <- mean(port.aggr_def[g0_Delinq==2, EventRate], na.rm=T)
+stdError_EventRate_2 <- port.aggr_def[g0_Delinq == 2, sd(EventRate, na.rm=T)] / sqrt(port.aggr_def[g0_Delinq == 2, .N])
+
+# --- Annotation dataset
+datAnno <- data.table(g0_Delinq=c("Overall","0","1","2"),
+                      g0_Delinq_prop=c(100,sprintf("%1.2f",g0_Delinq_Prop*100)),
+                      Mean=c(mean_EventRate_Full, mean_EventRate_0, mean_EventRate_1, mean_EventRate_2),
+                      stdError=c(stdError_EventRate_Full, stdError_EventRate_0, stdError_EventRate_1, stdError_EventRate_2))
+datAnno[, Mean:=sprintf("%1.2f",Mean*100)]
+datAnno[, Margin:=sprintf("%1.3f", qnorm(1-(1-confLevel)/2) * stdError)]
+datAnno[g0_Delinq=="Overall", Label:=paste0("'Overall: TTC-mean = ", Mean, "% ± ",Margin,"%'")]
+datAnno[g0_Delinq=="0", Label:=paste0("italic(g[0])* '= 0 (", g0_Delinq_prop , "%): TTC-mean = ", Mean, "% ± ",Margin,"%'")]
+datAnno[g0_Delinq=="1", Label:=paste0("italic(g[0])* '= 1 (", g0_Delinq_prop , "%): TTC-mean = ", Mean, "% ± ",Margin,"%'")]
+datAnno[g0_Delinq=="2", Label:=paste0("italic(g[0])* '= 2 (", g0_Delinq_prop , "%): TTC-mean = ", Mean, "% ± ",Margin,"%'")]
+datAnno[,`:=`(x=rep(as.Date("2015-02-28"),4), y=as.numeric(Mean)/100)]; datAnno[,y:=datAnno$y+c(0.03,-0.05,0.12,0.2)]
+# dat_anno[1:3, Label := paste0(Label = "'MAE between '*italic(A[t])*' and '*italic(B[t])*'", " = ", sprintf("%.4f",MAE*100), "%'")]
+
+# --- Creating the event rate plot
+# - Graphing parameters
+chosenFont <- "Cambria"; dpi <- 360
+col.v <- brewer.pal(9, "Set1")[c(7,5,2,1)]
+# - Create graph
+(g_EventRate_g0_Delinq <- ggplot(port.aggr_def, aes(x=Date, y=EventRate, group=g0_Delinq)) + theme_minimal() + 
+    labs(x="Reporting date (months)", y=bquote("Conditional 12-month default rate (%)")) + 
+    theme(text=element_text(family=chosenFont),legend.position = "bottom",
+          axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
+          strip.background=element_rect(fill="snow2", colour="snow2"),
+          strip.text=element_text(size=8, colour="gray50"), strip.text.y.right=element_text(angle=90)) + 
+    # main line graph with overlaid points
+    geom_line(aes(colour=g0_Delinq, linetype=g0_Delinq)) + 
+    geom_point(aes(colour=g0_Delinq, shape=g0_Delinq), size=0.3) + 
+    #annotations
+    geom_text(data=datAnno, aes(x=x, y=y, label = Label), family=chosenFont, size=3, parse=T) + 
+    # geom_text(data=dat_anno, aes(x=x, y=y, hjust=hjust, vjust=vjust, label = Label), family=chosenFont, size=3, parse=T) + 
+    # facets & scale options
+    scale_colour_manual(name=bquote(italic(g[0])*":"), values=col.v) + 
+    scale_shape_discrete(name=bquote(italic(g[0])*":")) +
+    scale_linetype_discrete(name=bquote(italic(g[0])*":")) + 
+    scale_y_continuous(breaks=pretty_breaks(), label=percent) + 
+    scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y"))
+# - Save graph
+ggsave(g_EventRate_g0_Delinq, file=paste0(genFigPath, "DefaultRates_g0_Delinq_Compare.png"), width=2400/dpi, height=2000/dpi, dpi=dpi, bg="white")
+
+# --- Clean up
+rm(port.aggr_def, mean_EventRate_1, mean_EventRate_1, mean_EventRate_2, mean_EventRate_Full,
+   stdError_EventRate_0, stdError_EventRate_1, stdError_EventRate_2, stdError_EventRate_Full,
+   margin_EventRate_0, margin_EventRate_1, margin_EventRate_2, margin_EventRate_Full, col.v,
+   datAnno, g_EventRate_g0_Delinq); gc()
+
+
+# ---- 2.2 Distributional Analysis of [g0_Delinq] over the sampling window
+# --- Aggregating the data to the delinquency level over the sampling window
+# - Aggregating by delinquency level over the sampling window
+port.aggr_def_del_time <- datCredit_train[DefaultStatus1==0,.N,by=list(g0_Delinq,Date)]
+# - Adding a column for the sum of total observations in each date
+port.aggr_def_del_time[,Total_N:=sum(N),by=Date]
+# - Getting the proportion of observations in each delinquency level at each date
+port.aggr_def_del_time[,Prop:=N/Total_N]
+# - Factorising [g0_Delinq] to facilitate graphing
+port.aggr_def_del_time[,g0_Delinq:=factor(g0_Delinq)]
+                                 
+# --- Plot
+# - Create summaries for annotations within graph
+
+# - Facet labels
+g0_Delinq_fact <- data.table(variable=c(0,1,2),
+                             value=c('bquote(itlaic(g[0])*~"=0"',
+                                     'bquote(itlaic(g[0])*~"=1"',
+                                     'bquote(itlaic(g[0])*~"=2"'))
+# - Annotations for facets
+# Aggregation of the strata in each segment of [g0_Delinq]
+datStrata_aggr <- port.aggr_def_del_time[,list(Count_Strata=.N, Mean_Strata=mean(N,na.rm=T), SD_Strata=sd(N,na.rm=T), Min_Strata=min(N,na.rm=T)), by=list(g0_Delinq)]
+datStrata_aggr[, Margin_Strata := qnorm(1-(1-confLevel)/2) * SD_Strata / sqrt(Count_Strata)]
+# Annotation dataset
+datAnno <- data.table(g0_Delinq=factor(c(0,1,2)),
+                      Label=c(paste0("'", datStrata_aggr$Count_Strata, " total strata with a mean cell size of ",
+                                     comma(datStrata_aggr$Mean_Strata, accuracy=0.1),
+                                     " ± ", sprintf("%.1f", datStrata_aggr$Margin_Strata), " and a minimum size of ",
+                                     sprintf("%.0f", datStrata_aggr$Min_Strata),"'")),
+                      x=rep(date("2015-02-28"),3),
+                      y=c(datStrata_aggr$Mean_Strata[1]*1.2, datStrata_aggr$Mean_Strata[2]*2.6, datStrata_aggr$Mean_Strata[3]*2.6))
+# - Graphing parameters
+chosenFont <- "Cambria"; dpi <- 240
+col.v <- rep(brewer.pal(8, "Dark2")[c(1)],3)
+fill.v <- rep(brewer.pal(8, "Set2")[c(1)],3)
+
+# - Create graph to evidence minimum strata sizes
+(g_distribution_g0 <- ggplot(port.aggr_def_del_time, aes(x=Date, y=N)) + theme_minimal() + 
+    labs(x=bquote("Reporting date (months) "*italic(t)), y=bquote("Volume of "*italic(g[0]))) + 
+    theme(text=element_text(family=chosenFont),legend.position = "bottom",
+          axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
+          strip.background=element_rect(fill="snow2", colour="snow2"),
+          strip.text=element_text(size=8, colour="gray50"), strip.text.y.right=element_text(angle=90)) + 
+    # main area graph
+    geom_col(aes(col=g0_Delinq, fill=g0_Delinq)) +
+    # facet
+    facet_wrap(.~g0_Delinq, scales = "free_y", nrow=3, ncol=1, strip.position = "right", labeller=label_bquote(italic(g[0])*~"="~.(g0_Delinq))) +
+    # annotations
+    geom_text(data=datAnno, aes(x=x, y=y, label = Label), family=chosenFont, size=3, parse=T) + 
+    # scale options
+    scale_colour_manual(name=bquote(italic(g[0])~":"), values=col.v, guide="none") + 
+    scale_fill_manual(name=bquote(italic(g[0])~":"), values=fill.v, guide="none") + 
+    scale_y_continuous(breaks=pretty_breaks(), label=comma) + 
+    scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y"))
+# - Save graph
+ggsave(g_distribution_g0, file=paste0(genFigPath, "g0_Delinq_Distribution.png"), width=2400/dpi, height=1000/dpi, dpi=dpi, bg="white")
+
+
+# ------ 3. Modelling per [g0_Delinq] segment: Null models
+# --- Model for delinquency segment 0
+# - Fitting the model for delinquency segment 0
+logitMod_g0_Delinq_0_Null <- glm(DefaultStatus1_lead_12_max ~ 1, data=datCredit_train[g0_Delinq==0,], family="binomial")
+# - Model analysis
+# Deviance and AIC
+summary(logitMod_g0_Delinq_0_Null)
+### RESULTS: Insignificant variables: None
+# ROC analysis
+datCredit_valid[g0_Delinq==0, prob_g0_seg_Null := predict(logitMod_g0_Delinq_0_Null, newdata = datCredit_valid[g0_Delinq==0,], type="response")]
+auc(datCredit_valid[g0_Delinq==0,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==0,prob_g0_seg_Null])
+### RESTULS: 50%
+
+# --- Model for delinquency segment 1
+# - Fitting the model for delinquency segment 1
+logitMod_g0_Delinq_1_Null <- glm(DefaultStatus1_lead_12_max ~ 1, data=datCredit_train[g0_Delinq==1,], family="binomial")
+# - Model analysis
+# Deviance and AIC
+summary(logitMod_g0_Delinq_1_Null)
+### RESULTS: Insignificant variables: None
+# ROC analysis
+datCredit_valid[g0_Delinq==1, prob_g0_seg_Null := predict(logitMod_g0_Delinq_1_Null, newdata = datCredit_valid[g0_Delinq==1,], type="response")]
+auc(datCredit_valid[g0_Delinq==1,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==1,prob_g0_seg_Null])
+### RESTULS: 50%
+
+# --- Model for delinquency segment 2
+# - Fitting the model for delinquency segment 2
+logitMod_g0_Delinq_2_Null <- glm(DefaultStatus1_lead_12_max ~ 1, data=datCredit_train[g0_Delinq==2,], family="binomial")
+# - Model analysis
+# Deviance and AIC
+summary(logitMod_g0_Delinq_2_Null)
+### RESULTS: Insignificant variables: None
+# ROC analysis
+datCredit_valid[g0_Delinq==2, prob_g0_seg_Null := predict(logitMod_g0_Delinq_2_Null, newdata = datCredit_valid[g0_Delinq==2,], type="response")]
+auc(datCredit_valid[g0_Delinq==2,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==2,prob_g0_seg_Null])
+### RESTULS: 50%
+
+# --- Model for overall delinquency
+# - Fitting the model for delinquency segment 2
+logitMod_g0_Delinq_Full_Null <- glm(DefaultStatus1_lead_12_max ~ 1, data=datCredit_train, family="binomial")
+# - Model analysis
+# Deviance and AIC
+summary(logitMod_g0_Delinq_Full_Null)
+### RESULTS: Insignificant variables: None
+# ROC analysis
+datCredit_valid[, prob_g0_Full_Null := predict(logitMod_g0_Delinq_Full_Null, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid[,DefaultStatus1_lead_12_max], datCredit_valid[,prob_g0_Full_Null])
+### RESTULS: 50%
+
+# --- Comparison
+### The segmented- and full/overall models have no predictive power as they result in AUCs of 50%
+
+
+
+
+# ------ 4. Modelling per [g0_Delinq] segment: Fixed/constant input space
+# --- Model for delinquency segment 0
+# - Fitting the model for delinquency segment 0
+logitMod_g0_Delinq_0 <- glm(inputs_fin_bas, data=datCredit_train[g0_Delinq==0,], family="binomial")
+# - Model analysis
+# Deviance and AIC
+summary(logitMod_g0_Delinq_0)
+### RESULTS: Insignificant variables: None
+# ROC analysis
+datCredit_valid[g0_Delinq==0, prob_g0_seg := predict(logitMod_g0_Delinq_0, newdata = datCredit_valid[g0_Delinq==0,], type="response")]
+auc(datCredit_valid[g0_Delinq==0,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==0,prob_g0_seg])
+### RESTULS: 62.05%
+
+# --- Model for delinquency segment 1
+# - Fitting the model for delinquency segment 1
+logitMod_g0_Delinq_1 <- glm(inputs_fin_bas, data=datCredit_train[g0_Delinq==1,], family="binomial")
+# - Model analysis
+# Deviance and AIC
+summary(logitMod_g0_Delinq_1)
+### RESULTS: Insignificant variables: [AgeToTerm], [Balance]
+# ROC analysis
+datCredit_valid[g0_Delinq==1, prob_g0_seg := predict(logitMod_g0_Delinq_1, newdata = datCredit_valid[g0_Delinq==1,], type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_seg)
+### RESTULS: 76.44%
+
+# --- Model for delinquency segment 2
+# - Fitting the model for delinquency segment 2
+logitMod_g0_Delinq_2 <- glm(inputs_fin_bas, data=datCredit_train[g0_Delinq==2,], family="binomial")
+# - Model analysis
+summary(logitMod_g0_Delinq_2)
+### RESULTS: Insignificant variables: [AgeToTerm], [Term], [Balance], [Principal], [InterestRate_Margin_imputed_mean]
+# ROC analysis
+datCredit_valid[g0_Delinq==2, prob_g0_seg := predict(logitMod_g0_Delinq_2, newdata = datCredit_valid[g0_Delinq==2,], type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_seg)
+### RESTULS: 79.64%
+
+# --- Combined predictions assessment (ensemble approach)
+### Combine the predictions of the segments together and then assess the
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_seg)
+### RESULTS: 79.64%
+
+# --- Model over all segments (model by input)
+# - Amending the basic model formula to include deliqnuecny levels
+inputs_fin_bas_del <- as.formula(paste0("DefaultStatus1_lead_12_max ~", paste0(c(labels(terms(inputs_fin_bas)), "g0_Delinq"), collapse = "+")))
+# - Fitting the model for delinquency segment 0
+logitMod_g0_Delinq_Full <- glm(inputs_fin_bas_del, data=datCredit_train, family="binomial")
+# - Model analysis
+summary(logitMod_g0_Delinq_Full)
+### RESULTS: Insignificant variables: [Term]
+# Overall ROC analysis
+datCredit_valid[, prob_full := predict(logitMod_g0_Delinq_Full, newdata = datCredit_valid, type="response")]
+auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full)
+# ROC analysis per "hypothetical" [g0_Delinq] segment
+auc(datCredit_valid[g0_Delinq==0,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==0,prob_full])
+auc(datCredit_valid[g0_Delinq==1,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==1,prob_full])
+auc(datCredit_valid[g0_Delinq==2,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==2,prob_full])
+### RESULTS: [g0_Delinq]=0: 62.01%
+###          [g0_Delinq]=1: 50.61%
+###          [g0_Delinq]=2: 52.3%
+### NOTE: Are these results valid? We already have [g0_Delinq] included in the input space and we not constrain the predictions...?
+
+
+### AB: Can use the residual analysis function here
+###     Use the coefficient of determination
+
+
+
+
+# ------ 5. Modelling per [g0_Delinq] segment: Bespoke input space per segment
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -403,7 +403,7 @@ transform_yj <- function(x, bound_lower=-2, bound_upper=2, lambda_inc=0.5, verbo
 #         [pd_plot]:     Should a partial dependence plot be created for each variable
 # Output: A data table containing the variable importance information
 varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.05, impPlot=F, pd_plot=F, chosenFont="Cambria", 
-                            colPalette="BrBG", colPaletteDir=1, plotName=paste0(genFigPath, "VariableImportance_", method,".png"), limitVars=10){
+                            colPalette="BrBG", colPaletteDir=1, plotName=paste0(genFigPath, "VariableImportance_", method,".png"), limitVars=10, dpi=360){
   
   # - Unit testing conditions:
   # logit_model <- glm(default ~ student + balance + income, data=datTrain1, family="binomial")
@@ -687,3 +687,26 @@ resid_deviance_glm <- function(model, err_Median = 0.025, err_quantiles = 0.05) 
 ### RESULTS: candidate's max residual > 3, which indicates some strain.
 # distributional shape somewhat skew since abs(1st) != abs(3rd) quantiles
 
+
+
+
+
+
+# ----------------------------------- Inflation factors -------------------------------------
+# Generating an inflation factor for a given series of yearly inflation growth rates
+# Input:  [datMacro]: The dataset containing the yearly inflation growth rate
+#         [time]: Name of the time/date variable in [datMacro]
+#         [g_start]:  The starting date for the series of inflation growth rates
+#         [g_stop]:   The ending date for the series of inflation growth rates
+# Output: A factor indicating the cumulative inflation over the period starting at [g_start] and ending [g_stop]
+# --- Define custom function for computing inflation/deflation factors
+adjInflation <- function(datMacro, time, Inflation_Growth, g_start, g_stop) {
+  # datMacro=datMV; time="Date"; g_start<-date("2015-02-28"); g_stop<-date("2022-12-31"); Inflation_Growth<-"M_Inflation_Growth"
+  compFact <- as.numeric(datMacro[get(time) >= g_start & get(time) <= g_stop, list(Factor = prod(1 + (get(Inflation_Growth))/12))])
+  return(compFact)
+  # rm(datMacro, time, g_start, g_stop, Inflation_Growth); gc()
+}
+# - Unit test
+# if (!exists('datMV')) unpack.ffdf(paste0(genPath,"datMV"), tempPath)
+# (test <- adjInflation(datMacro=datMV, time="Date", g_start=date("2015-02-28"), g_stop=date("2022-12-31"), Inflation_Growth="M_Inflation_Growth"))
+# rm(datMV, test); gc()
