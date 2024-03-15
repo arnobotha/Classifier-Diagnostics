@@ -52,6 +52,7 @@ unpack.ffdf(paste0(genObjPath, "Int_Formula"), tempPath)
 
 
 # ------ 2. Modelling & Feature Selection by theme "Delinquency information" - This excludes the basic variable [g0_Delinq]
+
 # --- 2.1 Correlation analysis using spearman correlation
 # - Correlation threshold
 cor_thresh <- 0.6
@@ -167,6 +168,7 @@ rm(logitMod_del_exp1_1, logitMod_del_exp1_2, logitMod_del_exp2_1, logitMod_del_e
 datCredit_valid[, `:=` (prob_del_exp1_1=NULL, prob_del_exp1_2=NULL, prob_del_exp2_1=NULL, prob_del_exp2_2=NULL, prob_del_exp3_1=NULL, prob_del_exp3_2=NULL)]
 
 
+
 # --- 2.3 Best subset selection
 # - Full logit model with all account-level information - Exclude variables using insights from correlation analysis:  [PerfSpell_Num]
 logitMod_del1 <- glm(inputs_del1 <- DefaultStatus1_lead_12_max ~ PrevDefaults + TimeInPerfSpell + g0_Delinq_Num + g0_Delinq_SD_4 + g0_Delinq_SD_6 + 
@@ -191,7 +193,7 @@ varImport_logit(logitMod_del1, method="stdCoef_Goodman", sig_level=0.1, impPlot=
 # ROC analysis
 datCredit_valid[, prob_del1 := predict(logitMod_del1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del1)
-### RESULTS:    83.32%
+### RESULTS:    87.73%
 ### CONCLUSION: Proceed to using best subset selection on the input space.
 
 # - Best subset selection

@@ -410,6 +410,9 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   # method <- "stdCoef_ZScores"; sig_level<-0.05; impPlot<-T; pd_plot<-T; chosenFont="Cambria"; colPalette="BrBG"; colPaletteDir=1
   # plotName=paste0(genFigPath, "VariableImportance_", method,".png"); limitVars=10
   
+  # - Safety check
+  if (!any(class(model) == "glm")) stop("Specified model object is not of class 'glm' or 'lm'. Exiting .. ")
+  
   # --- 0. Setup
   # - Get the data the model was trained on
   datTrain1 <- subset(logit_model$data, select = names(logit_model$data)[names(logit_model$data) %in% names(model.frame(logit_model))])
@@ -447,11 +450,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   coefficients_sig_data <- coefficients_sig_data[coefficients_sig_data_index==1] # The chaining ensures that only the columns pertaining to the significant variables are chosen
   
   # - Stopping the function if there are no significant variables
-  if (is.null(coefficients_data)){
-    stop("ERROR: Variable importance not conducted since there are no significant variables.")
-  }
-  # - Clean up
-  
+  if (is.null(coefficients_data)) stop("ERROR: Variable importance not conducted since there are no significant variables.") 
   
   # - Initiating the dataset to be returned (results dataset)
   results <- list(data = data.table(Variable = coefficients_sig_model,Value = 0,Rank = 0))
@@ -460,10 +459,8 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   
   if (method=='stdCoef_ZScores'){
     # -- Standardizing the input space using Z-scores, followed by refitting the logit model
+    # B = \beta - mean(X) / sd(x)
     # NOTE: The resulting coefficients are therefore "standardized", as per Menard2011 (http://www.jstor.org/stable/41290135)
-    
-    # Assigning the method to the results
-    results$Method <- "Standardised coefficients using Z-scores"
     
     # Scaling the variables
     datTrain2 <- copy(datTrain1)
@@ -476,27 +473,30 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     # Re-training the model on the scaled data
     suppressWarnings( logit_model <- glm(logit_model$formula, data=datTrain2, family="binomial") )
     
-    # Populating the results dataset
-    results$data[,Std_Coefficient := data.table(names=names(logit_model$coefficients[which(names(logit_model$coefficients) %in% coefficients_sig_model)]),
+    # Calculating importance measure and preparing result set
+    results$data[,Value := data.table(names=names(logit_model$coefficients[which(names(logit_model$coefficients) %in% coefficients_sig_model)]),
                                                 Std_Coefficient=logit_model$coefficients[which(names(logit_model$coefficients) %in% coefficients_sig_model)]) %>% arrange(names) %>% subset(select="Std_Coefficient")]
-    results$data[,Value:=Std_Coefficient]; results$data[,Std_Coefficient:=NULL]
+    results$Method <- "Standardised coefficients using Z-scores"
     
   } else if (method=="stdCoef_Goodman") { 
-    # -- Variable importance based on standardised coefficients from Goodman
-    # B = \beta - mean(X) / sd(x)# for each one-standard deviation increase in X, the outcome variable changes by B standard deviations (see Menard2011; https://www.jstor.org/stable/41290135)
+    # -- Variable importance based on Goodman's standardised coefficients
+    # See Menard2011; https://www.jstor.org/stable/41290135)
+    # B = \beta / sd(\beta)
 
-    # Assigning the method to the results
-    results$Method <- "Standardised coefficients: Goodman"
-    # Computing the importance measure and populating the results dataset
+    # Calculating importance measure and preparing result set
     results$data <- copy(coefficients_summary)[names %in% coefficients_sig_model]
     results$data[,Value:=coefficient/se] # Compute the importance measure
     results$data[,`:=`(coefficient=NULL,se=NULL, sig=NULL)]; colnames(results$data) <- c("Variable", "Value")
+    results$Method <- "Standardised coefficients: Goodman"
 
-  } else if (method=="stdCoef_Menard"){ # - Standardising the coefficient estimates using the unstandardised coefficients (see Menard2004: https://www.jstor.org/stable/27643560)
-    # -- Standardising the coefficient estimates using the unstandardised coefficients (see Menard2004: https://www.jstor.org/stable/27643560)
-    # Assigning the method to the results
+  } else if (method=="stdCoef_Menard"){ 
+    # -- Variable importance based on Menard's standardised coefficients from Menard2011; https://www.jstor.org/stable/41290135)
+    # B = \beta . s_x . R / s_{logit( \hat{Y} )}, where s_x is the standard deviation of X, R is the Pearson correlation between observed values Y and 
+    # predicted class probabilities \hat{Y}, and s_\hat{Y} is the standard deviation of logit(\hat{Y})
     
-    # Computing the standard deviations for each x (this requires a loop to ensure that categorical vairables are correctly accounted for)
+    # Computing the standard deviations for each x (this requires a loop to ensure that categorical variables are correctly accounted for)
+    ### AB: how to compute exactly for categorical? Google suggests standard error of bin proportion, Harrell suggests using "binconf" function from Hmisc-package to calculate Wilson's confidence interval
+    # see (https://stats.stackexchange.com/questions/51248/how-can-i-find-the-standard-deviation-in-categorical-distribution#:~:text=There%20is%20no%20standard%20deviation,a%20binomial%20or%20multinomial%20proportion.)
     sd_x <- rep(0, length(coefficients_sig_model))
     for (i in 1:length(coefficients_sig_model)){
       x <- datTrain1[,get(coefficients_sig_data[i])]
@@ -512,6 +512,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
         sd_x[i] <- sd(x, na.rm=T)
       } # else
     } # for
+    
     # Computing the standard deviation for each y
     y_prob <- na.omit(predict(logit_model, newdata = datTrain1, type="response")); y_logit <- log(y_prob/(1-y_prob)) # Standard deviation of predictions
     sd_y <- sd(y_logit) 
@@ -520,18 +521,18 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     # Computing the variable importance
     results$data$Value <- coefficients_summary$coefficient[coefficients_sig_data_index==1] * r2 * (sd_x/sd_y)
     
-    # Populating result set
-    results$Method <- "Standardised Coefficients: Menard"
+    # Calculating importance measure and preparing result set
     results$data <- copy(coefficients_summary)[names %in% coefficients_sig_model]
     results$data[,Value:=abs(coefficient/se)] # Compute the importance measure
     results$data[,`:=`(coefficient=NULL,se=NULL, sig=NULL)]; colnames(results$data) <- c("Variable", "Value")
+    results$Method <- "Standardised Coefficients: Menard"
   
   } else if (method=="partDep") { # - Variable importance as determined by feature importance rank measure (FIRM) (explainable AI technique)
-    # Assigning the method to the results
-    results$Method <- "Partial Dependence (FIRM)"
-    # Create the results table
+    
+    # Calculating importance measure and preparing result set
     results$data <- vip::vi_firm(logit_model, feature_names=coefficients_sig_data, method="firm", train=datTrain1)
-    # Plotting the partial dependence
+    
+    # Calculating (and) the partial dependence
     if (pd_plot==T){
       for (i in seq_along(coefficients_sig_model)){
         datPlot_pd <- data.table(attr(results$data, which = "effects")[[i]])
@@ -540,8 +541,10 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
             labs(x=coefficients_sig_data[i],y="yhat") + theme(plot.title = element_text(hjust=0.5)))
       } # for
     } # if
+    
     # Adding a column to indicate the rank order of the variables' importance and getting the data in the desired format
     results$data <- data.table(results$data) %>% rename(Value = Importance)
+    results$Method <- "Partial Dependence (FIRM)"
 
   } else {stop(paste0('"', method,'" is not supported. Please use either "stcCoef_ZScores", "stdCoef_Goodman", "stdCoef_Menard", or "pd" as method.'))}# if else (method)
   
@@ -556,7 +559,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   results$data[, Contribution := Value_Abs / sumVarImport]
   
   # - Post results to console
-  print(results$data)
+  #print(results$data)
   
   # --- 3. Creating a general plot of the variable importance (if desired)
   if (impPlot==T){
@@ -594,11 +597,11 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
 }
 # - Unit test
 # install.packages("ISLR"); require(ISLR)
-# datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
-# logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
-# a<-varImport_logit(logit_model = logit_model, method="stdCoef_ZScores", sig_level = 0.05, impPlot=T)
-# b<-varImport_logit(logit_model = logit_model, method="stdCoef_Goodman", sig_level = 0.05, impPlot=T)
-# c<-varImport_logit(logit_model = logit_model, method="stdCoef_Menard", sig_level = 0.05, impPlot=T)
+# datTrain_simp <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
+# logit_model <- glm(default ~ student + balance + income, data=datTrain_simp, family="binomial")
+# a<-varImport_logit(logit_model = logit_model, method="stdCoef_ZScores", impPlot=T)
+# b<-varImport_logit(logit_model = logit_model, method="stdCoef_Goodman", impPlot=T)
+# c<-varImport_logit(logit_model = logit_model, method="stdCoef_Menard", impPlot=T)
 
 
 
@@ -606,26 +609,81 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
 
 # ------------------------- DIAGNOSTIC FUNCTIONS FOR LOGIT MODELS ---------------------------
 
-# Calculate a generic coefficient of determination (R^2) \in [0,1] based on the "null deviance" in likelihoods
+# Calculate a pseudo coefficient of determination (R^2) \in [0,1] for glm assuming binary
+# logistic regression as default, based on the "null deviance" in likelihoods
 # between the candidate model and the intercept-only (or "empty/worst/null") model.
-# R^2 = 1 - D/D_0 where D is the deviance of the candidate model (or -2loglik(\beta) ) and D_0
-# is the deviance of the null-model.
 # NOTE: This generic R^2 is NOT equal to the typical R^2 used in linear regression, i.e., it does
 # NOT explain the % of variance explained by the model; but rather it denotes the %-valued degree
-# to which the candidate's fit is to perfection.
-# NOTE 2: This generic R^2 is valid for any generalised linear model, and its intuition can even apply to models outside of GLMs
-# given likelihoods can be obtained (i.e., wherever the underlying MLE-process is used)
-# NOTE 3: Smaller deviance statistic = better fit
-# see https://bookdown.org/egarpor/SSS2-UC3M/logreg-deviance.html
+# to which the candidate's fit can be deemed as "perfect".
+# Implements McFadden's pseudo R^2, Cox-Snell generalised R^2, Nagelkerke's improvement upon Cox-Snell's R^2
+# see https://bookdown.org/egarpor/SSS2-UC3M/logreg-deviance.html ; https://web.pdx.edu/~newsomj/cdaclass/ho_logistic.pdf; 
+# https://statisticalhorizons.com/r2logistic/
+# https://stats.stackexchange.com/questions/8511/how-to-calculate-pseudo-r2-from-rs-logistic-regression
 coefDeter_glm <- function(model) {
-  1 - model$deviance / model$null.deviance
+  
+  # - Safety check
+  if (!any(class(model) == "glm")) stop("Specified model object is not of class 'glm' or 'lm'. Exiting .. ")
+  
+  
+  # -- Preliminaries
+  require(scales) # for formatting of results
+  L_full <- logLik(model) # log-likelihood of fitted model, ln(L_M)
+  nobs <- attr(L_full, "nobs") # sample size, same as NROW(model$model)
+  orig_formula <- deparse(unlist(list(model$formula, formula(model), model$call$formula))[[1]]) # model formula
+  orig_call <- model$call; calltype.char <- as.character(orig_call[1]) # original model fitting call specification, used merely for "plumbing"
+  data <- model$model # data matrix used in fitting the model
+  # get weight matrix corresponding to each observation, if applicable/specified, otherwise, this defaults to just the 0/1-valued observations (Y)
+  if (!is.null(model$prior.weights) & length(model$prior.weights) > 0) {
+    weights <- model$prior.weights
+  } else if (!is.null(data$`(weights)`) & length(data$`(weights)` > 0)) {
+    weights <- data$`(weights)`
+  } else weights <- NULL
+ data <- data[, 1, drop=F]; names(data) <- "y"
+ nullCall <- call(calltype.char, formula = as.formula("y ~ 1"), data = data, weights = weights, family = model$family, 
+                     method = model$method, control = model$control, offset = model$offset)
+ L_base <- logLik(eval(nullCall)) # log-likelihood of the null model, ln(L_0)
+  
+  # -- Implement the McFadden pseudo R^2 measure from McFadden1974, R^2 = 1 - log(L_M)/log(L_0)
+  # NOTE: null deviance L_0 plays an analogous role to the residual sum of squares in linear regression, therefore
+  # McFadden's R^2 corresponds to a proportional reduction in "error variance", according to Allison2013 (https://statisticalhorizons.com/r2logistic/)
+  # NOTE2: deviance (L_M) and null deviance (L_0) within a GLM-object is already the log-likelihood since deviance = -2*ln(L_M) by definition
+  # https://stats.stackexchange.com/questions/8511/how-to-calculate-pseudo-r2-from-rs-logistic-regression
+  coef_McFadden <- 1 - model$deviance / model$null.deviance
+  if ( !all.equal(coef_McFadden, as.numeric(1 - (-2*L_full)/(-2*L_base) ) ) ) stop("ERROR: Internal function error in calculating & verifying McFadden's pseudo R^2-measure")
+
+  
+  # -- Implement Cox-Snell R^2 measure from Cox1983, which according to Allison2013 is more a "generalized" R^2 measure than pseudo,
+  # given that its definition is an "identity" in normal-theory linear regression. Can therefore be used to other regression settings using MLE,
+  # E.g., negative binomial regression for count data or Weibull regression for survival data
+  # Definition: R^2 = 1 - (L_0/L_F)^(2/nobs), but equivalent to below given that L_base = ln(L0) and L_full = ln(L_full)
+  # Why? Since (L_0/L_F)^(2/nobs) can be rewritten as exp[ ln( (L_0/L_F)^(2/nobs) )] which simplifies to exp[ (2/nobs) . ln( L_0/L_F )] given property ln(a^b) = b.ln(a),
+  # finally becoming exp[ (2/nobs) . ( ln( L_0 ) - ln( L_F)) ]  given property ln(a/b) = ln(a) - ln(b).
+  # The below is numerically expedient in avoiding "underflow" memory issues when dealing with large negative log-likelihood values that should rather not be exponentiated.
+  # Source: DescTools::PseudoR2 function in DescTools package
+  coef_CoxSnell <- as.numeric( 1 - exp(2/nobs * (L_base - L_full)) )
+  
+  
+  # -- Implement Nagelkerke R^2 from Nagelkerke1991, which according to Allison2013 improves upon Cox-Snell R^2 by ensuring an upper bound of 1
+  # NOTE: Cox-Snell R^2 has an upper bound of 1 - (L_0)^(2/n), which can be considerably less than 1.
+  # This comes at the cost of reducing the attractive theoretical properties of the Cox-Snell R^2 
+  coef_Nagelkerke <- (1 - exp((model$deviance - model$null.deviance)/nobs))/(1 - exp(-model$null.deviance/nobs))
+  
+  
+  # -- Report results
+  return( data.frame(McFadden=percent(coef_McFadden, accuracy=0.01), CoxSnell=percent(coef_CoxSnell, accuracy=0.01), Nagelkerke=percent(coef_Nagelkerke, accuracy=0.01)) )
+  
+  ### NOTE: All of the above were tested and confirmed to equal the results produced below:
+  # DescTools::PseudoR2(model, c("McFadden", "CoxSnell", "Nagelkerke"))
+  
+  # - cleanup (only relevant whilst debugging this function)
+  rm(model, L_full, L_base, nobs, data, nullCall, orig_formula, orig_call, weights, coef_McFadden, coef_CoxSnell, coef_Nagelkerke)
 }
 # - Unit test
 # install.packages("ISLR"); require(ISLR)
-# datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
-# logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
+# datTrain_simp <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
+# logit_model <- glm(default ~ student + balance + income, data=datTrain_simp, family="binomial")
 # coefDeter_glm(logit_model)
-### RESULTS: candidate is 46% better than null-model in terms of its deviance
+### RESULTS: candidate is 46% (McFadden) better than null-model in terms of its deviance
 
 
 # - Perform residual analysis for a glm-model using deviances (difference between predicted probabilities and observed proportions of success)
@@ -633,8 +691,16 @@ coefDeter_glm <- function(model) {
 # Accordingly, min/max residuals should lie within [-3,3], median should be close to 0, and 1st/3rd quantiles 
 # should be similarly in their absolute value.
 # Deviations from these principles indicate strain in the underlying fit of the model
-# see https://library.virginia.edu/data/articles/understanding-deviance-residuals
-resid_deviance_glm <- function(model, err_Median = 0.025, err_quantiles = 0.05) {
+# see https://library.virginia.edu/data/articles/understanding-deviance-residuals ; https://web.pdx.edu/~newsomj/cdaclass/ho_diagnostics.pdf
+resid_deviance_glm <- function(model, err_Median = 0.025, err_quantiles = 0.05, plotResid=T, inf_degree_significance=0.01) {
+  
+  # - Preliminaries
+  require(scales) # formatting numbers
+  require(dplyr)
+  
+  # - Safety check
+  if (!any(class(model) == "glm")) stop("Specified model object is not of class 'glm' or 'lm'. Exiting .. ")
+  
   # - testing conditions
   # model <- logit_model
   
@@ -643,40 +709,68 @@ resid_deviance_glm <- function(model, err_Median = 0.025, err_quantiles = 0.05) 
   
   # -- 1b. Manual calculation of the above (for verification purposes)
   # NOTE: this process uses several types of residuals, which we'll illustrate here assuming logistic regression
+  
   # 0) get predictions and observations (y)
   p_hat <- predict(model, type = "response"); y <- model$y
+  
   # 1) raw residuals: the difference between observed values {0,1} and predicted probabilities of belonging to a binary-valued class
-  e <- residuals(model, type = "response") # or simply e = y - p_hat where y is the observed binary-valued outcome \in {0,1}
+  e <- residuals(model, type = "response") # or simply e = y - p_hat where y is the observed binary-valued outcome \in {0,1} and e \in [-1,1]
+  
   # 2) Pearson residuals: rescaled version of raw residuals by dividing it with the standard deviation of a binomial distribution (if using logistic regression)
   r <- e / sqrt(p_hat * (1 - p_hat)) # or simply r <- residuals(model, type = "pearson")
-  # 3) standardised Pearson residuals: adjusting the Pearson residual for leverage (or "hat values"), which is the distance between observations and the mean.
+  
+  # 3) Calculate "hatvalues", which is the "degree to which observation y_i influences fitted/predicted/class-probability \hat{y}_i
+  # NOTE: hatvalue h \in [0,1] is the leverage score for ith observation (related to Mahalanobis distance),defined as
+  # h = x_i^T . (X^T . X)^{-1} . x_i  , where x_i is the ith observation and X is the n x p design matrix whose rows correspond to observations (input space) and columns are variables
+  # see https://en.wikipedia.org/wiki/Leverage_(statistics)#Definition_and_interpretations ; https://stats.stackexchange.com/questions/551302/developing-leverage-statistics-manually-in-r
+  # see https://pj.freefaculty.org/guides/stat/Regression/RegressionDiagnostics/OlsHatMatrix.pdf
   # High hat-values indicate greater leverage/influence of the associated observation relative to the mean
+  # NOTE: Calculating hatvalues is conceptually easy, e.g., X <- model.matrix(model); h <- diag(X %*% solve(t(X) %*% X) %*% t(X))
+  # However, singular matrices (non-invertible, i.e., where det(cov(X)) == 0) can hinder its calculation in practice, particulalry when trying to invert "t(X) %*% X" using "solve()"
+  # This can be mitigated by applying a small adjustment within the "solve()"-part using ridge regression, or by the LASSO;
+  # However, this is exhaustive and we rather rely on R's built-in functionality that already caters exhaustively for these issues.
+  h <- hatvalues(model)
+  # Influential observations can be highlighted for those cases 
+  # see https://stackoverflow.com/questions/9476475/how-to-produce-leverage-stats
+  inf_degree <- NROW(h[h> (3 * mean(h))]) / NROW(h)
+  inf_degree_max <- max(h) / mean(h)
+
+  # 4) standardised/studentized Pearson residuals: adjusting the Pearson residual for leverage (or "hat values")
   # NOTE: These residuals are usually standard normally distributed, which can be a useful diagnostic in and of itself; see Agresti2002
-  rs <- r / sqrt(1 - hatvalues(model)) # or simply rs <- rstandard(m, type = "pearson") 
-  # 4) deviance residuals (finally): derived from the likelihood ratio test when comparing a candidate to a saturated/full/perfect model (such that p coefficients = n observations)
-  d <- sign(e)*sqrt(-2*(y*log(p_hat) + (1 - y)*log(1 - p_hat))) # or simply as residuals(model)
+  rs <- r / sqrt(1 - h) # or simply rs <- rstandard(m, type = "pearson") 
+  
+  # 5) deviance residuals (finally): derived from the likelihood ratio test when comparing a candidate to a saturated/full/perfect model (such that p coefficients = n observations)
+  d <- sign(e)*sqrt(-2*(y*log(p_hat) + (1 - y)*log(1 - p_hat)) ) # or simply as residuals(model)
   d_aggr <- quantile(d)
   # [SANITY CHECK] Distribution summary of residual deviances should agree with each other, respective to both methods by which they are calculated.
   cat( all.equal(d_aggr1, d_aggr) %?% 'SAFE: Both methods by which residual deviances are calculated agree with each other in result.\n' %:% 
          'WARNING: The methods by which residual deviances are calculated yield different results.\n')
   
   # -- 2. Reporting results
-  d_aggr
-  cat("Residual deviance (difference between observed and predicted; smaller = better):", sum(d^2), '\n---------\n')
+  cat( (inf_degree <= inf_degree_significance) %?% 
+         paste0('SAFE: The degree of influential cases is low at ', percent(inf_degree, accuracy=0.1), ' where hatvalues h > (3*mean(h)) is true.\n---------\n') %:%
+         paste0('WARNING: High degree of influential cases at ', percent(inf_degree, accuracy=0.1), ' where hatvalues h > (3*mean(h)) is true. \n\tAlso, max(hatvalue) / mean(hatvalue) = ', 
+                comma(inf_degree_max), '; whereas rule-of-thumb is 3.\n---------\n') )
+  cat("Residual deviance (difference between observed and predicted; smaller = better):", comma(sum(d^2)), '\n---------\n')
   # [DIAGNOSTIC] Absolute values of min and max percentiles <= 3 ?
   cat( (abs(d_aggr[1]) <= 3 & abs(d_aggr[5]) <= 3) %?% 'SAFE: Min/max residual deviances are within expected bounds (<=3 in absolute value); model fit is adequate.\n' %:%
     'WARNING: Min/max residual deviances are outside expected bounds (<=3 in absolute value); model fit is somewhat strained.\n')
   # [DIAGNOSTIC] median residual deviance close to 0 ?
-  cat( (abs(d_aggr[3]) <= err_Median) %?% 'SAFE: Median residual deviance is sufficiently close to zero; model fit is adequate.\n' %:%
-    'WARNING: Median residual deviance is not zero; model fit is somewhat strained.\n')
+  cat( (abs(d_aggr[3]) <= err_Median) %?% 
+         paste0('SAFE: Median residual deviance (', comma(abs(d_aggr[3]), accuracy=0.01), ') is sufficiently close to zero; model fit is adequate.\n') %:%
+    paste0('WARNING: Median residual deviance (', comma(abs(d_aggr[3]), accuracy=0.01), ') is not zero; model fit is somewhat strained.\n') )
   # [DIAGNOSTIC] 1st and 3rd percentile is relatively close to one another, indicating a symmetric distribution ?
-  cat( (abs(d_aggr[2]) - abs(d_aggr[4]) <= err_quantiles) %?% 'SAFE: 1st/3rd quantiles of residual deviances are sufficiently close to each in absolute value; model fit is adequate.\n' %:%
-    'WARNING: 1st/3rd quantiles of residual deviances differ substantially from each other in absolute value; model fit is somewhat strained.\n' )
+  cat( (abs(d_aggr[2]) - abs(d_aggr[4]) <= err_quantiles) %?% 'SAFE: 1st/3rd quantiles of residual deviances are sufficiently close to each in absolute value; model fit is adequate.\n---------\n' %:%
+    'WARNING: 1st/3rd quantiles of residual deviances differ substantially from each other in absolute value; model fit is somewhat strained.\n---------\n' )
+  # [DIAGNOSTIC] Degree to which hat values (leverage scores) exceed a common rule of thumb (> 3 x mean(h))
+  
+  # -- 3. Graph distritubion of residuals
+  if (plotResid) { hist(d, breaks="FD") }
   
   return(d_aggr)
   
   # -- cleanup (only relevant whilst debugging this function)
-  rm(e,d,p_hat,y,r,rs,err_Median,err_quantiles)
+  rm(e,d,p_hat,y,r,rs,err_Median,err_quantiles,model,X,h,inf_degree_significance)
 }
 # - Unit test
 # install.packages("ISLR"); require(ISLR)
