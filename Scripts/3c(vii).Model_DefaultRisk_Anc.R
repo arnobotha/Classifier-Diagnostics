@@ -141,27 +141,25 @@ port.aggr_def_del_time[,Total_N:=sum(N),by=Date]
 port.aggr_def_del_time[,Prop:=N/Total_N]
 # - Factorising [g0_Delinq] to facilitate graphing
 port.aggr_def_del_time[,g0_Delinq:=factor(g0_Delinq)]
-                                 
-# --- Plot
 # - Create summaries for annotations within graph
+port.aggr_def_del_time[,Facet:=factor(g0_Delinq, labels=c("italic(g[0])*'=0'", "italic(g[0])*'=1'", "italic(g[0])*'=2'"))]
 
-# - Facet labels
-g0_Delinq_fact <- data.table(variable=c(0,1,2),
-                             value=c('bquote(itlaic(g[0])*~"=0"',
-                                     'bquote(itlaic(g[0])*~"=1"',
-                                     'bquote(itlaic(g[0])*~"=2"'))
+# --- Plot
 # - Annotations for facets
-# Aggregation of the strata in each segment of [g0_Delinq]
-datStrata_aggr <- port.aggr_def_del_time[,list(Count_Strata=.N, Mean_Strata=mean(N,na.rm=T), SD_Strata=sd(N,na.rm=T), Min_Strata=min(N,na.rm=T)), by=list(g0_Delinq)]
+# Statistics of the aggregated datset
+datStrata_aggr <- port.aggr_def_del_time[,list(Count_Strata=.N, Mean_Strata=mean(N,na.rm=T), SD_Strata=sd(N,na.rm=T), Min_Strata=min(N,na.rm=T))]
 datStrata_aggr[, Margin_Strata := qnorm(1-(1-confLevel)/2) * SD_Strata / sqrt(Count_Strata)]
+
 # Annotation dataset
 datAnno <- data.table(g0_Delinq=factor(c(0,1,2)),
+                      Facet=factor(c("italic(g[0])*'=0'", "italic(g[0])*'=1'", "italic(g[0])*'=2'")),
                       Label=c(paste0("'", datStrata_aggr$Count_Strata, " total strata with a mean cell size of ",
                                      comma(datStrata_aggr$Mean_Strata, accuracy=0.1),
-                                     " ± ", sprintf("%.1f", datStrata_aggr$Margin_Strata), " and a minimum size of ",
-                                     sprintf("%.0f", datStrata_aggr$Min_Strata),"'")),
+                                     " ± ", sprintf("%.1f", datStrata_aggr2$Margin_Strata), " and a minimum size of ",
+                                     sprintf("%.0f", datStrata_aggr2$Min_Strata),"'")),
                       x=rep(date("2015-02-28"),3),
-                      y=c(datStrata_aggr$Mean_Strata[1]*1.2, datStrata_aggr$Mean_Strata[2]*2.6, datStrata_aggr$Mean_Strata[3]*2.6))
+                      y=c(0, datStrata_aggr$Mean_Strata*0.35, 0))
+datAnno[1,Label:=NA]; datAnno[3,Label:=NA]
 # - Graphing parameters
 chosenFont <- "Cambria"; dpi <- 240
 col.v <- rep(brewer.pal(8, "Dark2")[c(1)],3)
@@ -177,7 +175,7 @@ fill.v <- rep(brewer.pal(8, "Set2")[c(1)],3)
     # main area graph
     geom_col(aes(col=g0_Delinq, fill=g0_Delinq)) +
     # facet
-    facet_wrap(.~g0_Delinq, scales = "free_y", nrow=3, ncol=1, strip.position = "right", labeller=label_bquote(italic(g[0])*~"="~.(g0_Delinq))) +
+    facet_wrap(.~Facet, scales = "free_y", strip.position = "right", ncol=1, nrow=3, labeller=label_parsed) +  # label_bquote(italic(g[0])*~"="~.(g0_Delinq))) + # labeller
     # annotations
     geom_text(data=datAnno, aes(x=x, y=y, label = Label), family=chosenFont, size=3, parse=T) + 
     # scale options
@@ -187,6 +185,8 @@ fill.v <- rep(brewer.pal(8, "Set2")[c(1)],3)
     scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y"))
 # - Save graph
 ggsave(g_distribution_g0, file=paste0(genFigPath, "g0_Delinq_Distribution.png"), width=2400/dpi, height=1000/dpi, dpi=dpi, bg="white")
+
+
 
 
 # ------ 3. Modelling per [g0_Delinq] segment: Null models
@@ -285,8 +285,12 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_seg)
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_seg)
 ### RESULTS: 79.64%
 
+
+
+
+# ------ 5. Modelling overall [g0_Delinq] segments: Fixed/constant input space
 # --- Model over all segments (model by input)
-# - Amending the basic model formula to include deliqnuecny levels
+# - Amending the basic model formula to include delinquency levels
 inputs_fin_bas_del <- as.formula(paste0("DefaultStatus1_lead_12_max ~", paste0(c(labels(terms(inputs_fin_bas)), "g0_Delinq"), collapse = "+")))
 # - Fitting the model for delinquency segment 0
 logitMod_g0_Delinq_Full <- glm(inputs_fin_bas_del, data=datCredit_train, family="binomial")
@@ -300,7 +304,8 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full)
 auc(datCredit_valid[g0_Delinq==0,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==0,prob_full])
 auc(datCredit_valid[g0_Delinq==1,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==1,prob_full])
 auc(datCredit_valid[g0_Delinq==2,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==2,prob_full])
-### RESULTS: [g0_Delinq]=0: 62.01%
+### RESULTS: Overall: 79.55%
+###          [g0_Delinq]=0: 62.01%
 ###          [g0_Delinq]=1: 50.61%
 ###          [g0_Delinq]=2: 52.3%
 ### NOTE: Are these results valid? We already have [g0_Delinq] included in the input space and we not constrain the predictions...?

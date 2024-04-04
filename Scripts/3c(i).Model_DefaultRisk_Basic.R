@@ -257,7 +257,7 @@ car::vif(logitMod_full1)
 
 # --- Save model formula to disk
 # - Final variables
-### CONCLUSION: Use [AgeToTerm], [Term], [Balance],, [Principal], [InterestRate_Margin_imputed_mean], [slc_acct_pre_lim_perc_imputed_med], [slc_pmnt_method]
+### CONCLUSION: Use [AgeToTerm], [Term], [Balance],, [Principal], [InterestRate_Margin_imputed_mean]
 # - Save variables
 inputs_fin_bas <- formula(logitMod_full1)
 pack.ffdf(paste0(genObjPath, "Basic_Com_Formula"), inputs_fin_bas); gc()

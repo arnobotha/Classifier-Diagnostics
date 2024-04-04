@@ -71,7 +71,7 @@ ind_col_spear <- ind_row_spear %% ncol(cor_del_spear) + ncol(cor_del_spear)*(ind
 cor_del_spear2 <- data.table(x=rownames(cor_del_spear)[floor((ind_row_spear-1)/ncol(cor_del_spear)) + 1],
                              y=colnames(cor_del_spear)[ind_col_spear])
 for(i in 1:(nrow(cor_del_spear2))) {cat("Absolute correlation above ", cor_thresh, " found for ", cor_del_spear2[i,1][[1]], " and ", cor_del_spear2[i,2][[1]], "\n")}
-### RESULTS: High-correlation detected within [PerfSpell_Num], [Prev_Defaults], [g0_Delinq], [g0_Delinq_SD_4], [g0_Delinq_SD_6], [PerfSpell_g0_Delinq_Num], [g0_Delinq_Num], and [slc_past_due_amt_imputed]
+### RESULTS: High-correlation detected within [PerfSpell_Num], [Prev_Defaults], [g0_Delinq], [g0_Delinq_SD_4], [g0_Delinq_SD_6], [PerfSpell_g0_Delinq_Num], [g0_Delinq_Num], and [slc_acct_roll_ever_24_imputed_mean]
 
 ### Conclusion:
 ###   Remove either [PrevDefaults] or [PerfSpell_Num]
@@ -191,13 +191,13 @@ varImport_logit(logitMod_del1, method="stdCoef_Goodman", sig_level=0.1, impPlot=
 # ROC analysis
 datCredit_valid[, prob_del1 := predict(logitMod_del1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_del1)
-### RESULTS:    83.32%
+### RESULTS:    87.73%
 ### CONCLUSION: Proceed to using best subset selection on the input space.
 
 # - Best subset selection
 logitMod_del_best <- MASS::stepAIC(logitMod_del1, direction="both")
 # Start AIC = 174968.9
-# End AIC = 171501.4
+# End AIC = 174968.9
 ### RESULTS:    Model inputed is returned as final model
 ### CONCLUSION: Use analysis of full model above.
 
@@ -342,7 +342,7 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_beh1)
 inputs_beh_fin <-  DefaultStatus1_lead_12_max ~ slc_acct_pre_lim_perc_imputed_med + slc_pmnt_method
 pack.ffdf(paste0(genObjPath, "Beh_Formula"), inputs_beh_fin); gc()
 
-# --- 11.5 Clean up
+# --- 3.5 Clean up
 rm(cor_beh_spear, ind_row_spear, ind_col_spear, cor_beh_spear2, inputs_beh_fin, logitMod_beh1); gc()
 datCredit_valid[,`:=`(prob_beh1=NULL)]
 
@@ -424,12 +424,12 @@ summary(logitMod_por1)
 round(exp(cbind(OR = coef(logitMod_por1), confint.default(logitMod_por1))), 3)
 ### RESULTS: There is no variable with an odds ratio close to one, this is an indicatiion that the variables are significant in predicting default.
 # Variable importance
-varImport_logit(logitMod_del1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)
-### RESULTS: Top three variables: [PrevDefaultsTRUE], [slc_past_due_amt_imputed_med], and [g0_Delinq_SD_6]
+varImport_logit(logitMod_por1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)
+### RESULTS: Top three variables: [g0_Delinq_Any_Aggr_Prop], [AgeToTerm_Aggr_Mean], and [NewLoans_Aggr_Prop_1]
 # ROC analysis
 datCredit_valid[, prob_por1 := predict(logitMod_por1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_por1)
-### RESULTS:    58.15%
+### RESULTS:    58.31%
 ###             The estimated coefficients and standard errors of all variables related to [InterestRate_Margin_imputed_Aggr] and [CuringEvents_Aggr_Prop] are very large.
 ###             Some variables are insignificant: [InstalmentToBalance_Aggr_Prop], [CuringEvents_Aggr_Prop], [NewLoans_Aggr_Prop], [NewLoans_Aggr_Prop_4], and [InterestRate_Margin_Aggr_Med_1]
 ### CONCLUSION: Proceed to using best subset selection on the input space.
@@ -440,7 +440,7 @@ logitMod_por_best <- MASS::stepAIC(logitMod_por1, direction="both")
 # Start AIC = 262879.3
 # End AIC = 262873.9
 summary(logitMod_por_best)
-### RESULTS: [NewLoans_Aggr_Prop_4] has a p-value of 0.13 - this is dubious, but we'll keep it in the model for now (it might be significant when combining with the broader input spcae)
+### RESULTS: [NewLoans_Aggr_Prop_5] has a p-value of 0.13 - this is dubious, but we'll keep it in the model for now (it might be significant when combining with the broader input spcae)
 ###          Null deviance = 266435; Residual deviance = 262854; AIC = 262874
 # Evaluate fit using generic R^2 based on deviance vs null deviance
 coefDeter_glm(logitMod_por_best)
@@ -454,10 +454,10 @@ varImport_logit(logitMod_por_best, method="stdCoef_Goodman", sig_level=0.1, impP
 # ROC Analysis
 datCredit_valid[, prob_por_best := predict(logitMod_por_best, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_por_best)
-### RESULTS: 58.15%
+### RESULTS: 58.3%
 length(all.vars(getCall(logitMod_por1)$formula)); length(all.vars(getCall(logitMod_por_best)$formula))
 ### RESULTS:      The AIC of the model from the best subset selection is lower than the full model (262874 vs 262879).
-###               The AUC of the model from the best subset selection is identical than the full model (58.15% vs 58.15%).
+###               The AUC of the model from the best subset selection is almost identical than the full model (58.3% vs 58.31%).
 ###               The number of variables in the model from the best subset selection has been reduced to 10 from the full model which has 15 variables.
 
 ### CONCLUSION:   Use the specified variables of the best subset selection in the dynamic variable selection process.
@@ -528,30 +528,33 @@ unpack.ffdf(paste0(genObjPath, "Int_Formula"), tempPath)
 unpack.ffdf(paste0(genObjPath, "Del_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Beh_Formula"), tempPath); unpack.ffdf(paste0(genObjPath, "Por_Formula"), tempPath)
 
 # --- Formula compilation
-inputs_adv1 <- as.formula(paste0("DefaultStatus1_lead_12_max~", paste(labels(terms(inputs_fin_bas)), collapse="+"), "+", paste(labels(terms(inputs_int)), collapse="+"), "+", paste(labels(terms(inputs_del_fin)), collapse="+"), "+", paste(labels(terms(inputs_beh_fin)), collapse="+"), "+", paste(labels(terms(inputs_por_fin)), collapse="+")))
+inputs_adv1 <- as.formula(paste0("DefaultStatus1_lead_12_max~", paste(labels(terms(inputs_fin_bas)), collapse="+"), "+", paste(labels(terms(inputs_int)), collapse="+"), "+",
+                                 paste(labels(terms(inputs_del_fin)), collapse="+"), "+", paste(labels(terms(inputs_beh_fin)), collapse="+"), "+", paste(labels(terms(inputs_por_fin)), collapse="+")))
 # --- Fitting the full model
 logitMod_adv1 <- glm(inputs_adv1, data=datCredit_train, family="binomial")
 # --- Assess full model
 summary(logitMod_adv1)
-### RESULTS:    Insignificant variables: [AgeToTerm], [M_Repo_Rate], [M_Inflation_Growth_2], [slc_pmnt_method], [g0_Delinq_Any_Aggr_Prop], [g0_Delinq_Any_Aggr_Prop_Lag_5], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop_5], and [InterestRate_Margin_Aggr_Med_2]
+### RESULTS:    Insignificant variables: [AgeToTerm], [M_Repo_Rate_9], [M_Inflation_Growth_9], [M_RealIncome_Growth_12], [M_DTI_Growth_12], [slc_pmnt_method], [g0_Delinq_Any_Aggr_Prop], [g0_Delinq_Any_Aggr_Prop_Lag_5] [NewLoans_Aggr_Prop_4], and [InterestRate_Margin_Aggr_Med_2]
 ### CONCLUSION: Remove insignificant variables and refit model
 
 # --- Formula compilation
-inputs_adv2 <- as.formula(paste0("DefaultStatus1_lead_12_max~", paste(labels(terms(inputs_adv1))[-unlist(lapply(c("AgeToTerm", "M_Repo_Rate", "M_Inflation_Growth_2", "slc_pmnt_method", "g0_Delinq_Any_Aggr_Prop", "g0_Delinq_Any_Aggr_Prop_Lag_5", "NewLoans_Aggr_Prop_3", "NewLoans_Aggr_Prop_5", "InterestRate_Margin_Aggr_Med_2"), function(X) which(X==labels(terms(inputs_adv1)))))], collapse="+")))
+inputs_adv2 <- as.formula(paste0("DefaultStatus1_lead_12_max~", paste(labels(terms(inputs_adv1))[-unlist(lapply(c("AgeToTerm", "M_Repo_Rate_9", "M_Inflation_Growth_9",
+                                                                                                                  "M_RealIncome_Growth_12", "M_DTI_Growth_12", "slc_pmnt_method", 
+                                                                                                                  "g0_Delinq_Any_Aggr_Prop", "g0_Delinq_Any_Aggr_Prop_Lag_5", "NewLoans_Aggr_Prop_4", "InterestRate_Margin_Aggr_Med_2"), function(X) which(X==labels(terms(inputs_adv1)))))], collapse="+")))
 # --- Fitting the full model
 logitMod_adv2 <- glm(inputs_adv2, data=datCredit_train, family="binomial")
 # --- Assess full model
 summary(logitMod_adv2)
-### RESULTS:    None
+### RESULTS:    Insignificant variables: [NewLoans_Aggr_Prop_3] has a p-value of 0.11, keep in model for now
 ### CONCLUSION: Continue with assessment
 
 # --- Evaluating the full model
 # - Deviance and AIC
 summary(logitMod_adv2)
-### RESULTS: Null deviance = 254945; Residual deviance = 167851; AIC = 167911
+### RESULTS: Null deviance = 255631; Residual deviance = 168280; AIC = 168332
 # - Evaluate fit using generic R^2 based on deviance vs null deviance
 coefDeter_glm(logitMod_adv2)
-### RESULTS: 34.16%
+### RESULTS: 34.17%
 # - Odds Ratio analysis 
 round(exp(cbind(OR = coef(logitMod_adv2), confint.default(logitMod_adv2))), 3)
 ### [Balance], [Principal], and [slc_past_due_amt_imputed_med] have ratios close to 1, but this might not give an accurate indication because of the range of these variables
@@ -566,8 +569,8 @@ datCredit_train[, prob_adv2 := predict(logitMod_adv2, newdata = datCredit_train,
 datCredit_valid[, prob_adv2 := predict(logitMod_adv2, newdata = datCredit_valid, type="response")]
 auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_adv2)
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_adv2)
-### RESULTS: Training = 90.49%
-###          Validation = 90.04%
+### RESULTS: Training = 90.53%
+###          Validation = 90.44%
 # VIF analysis
 car::vif(logitMod_adv2)
 ### RESULTS:  Most variables have low VIF values (<10), however most macroeconomic variables have large VIF values (>10)
@@ -625,12 +628,16 @@ logitMod_smp <- glm(inputs_adv, data=datCredit_smp, family="binomial")
 
 # - Deviance and AIC
 summary(logitMod_smp)
-### RESULTS:    Insignificant variables are: [Balance], [Principal], [M_Emp_Growth_1], [NewLoans_Aggr_Prop_1], and [NewLoans_Aggr_Prop_4]
-### MM:         Investigat variable importance of these variables.
-###             Sign of [g0_Delinq_Num] is still negative, further investigation may be warranted.
+### RESULTS: Insignificant variables are: [Balance], [Principal], [M_DTI_Growth_6], [NewLoans_Aggr_Prop_3], and [NewLoans_Aggr_Prop_5]
+###          Sign of [g0_Delinq_Num] is still negative, but this might be due to the unique composition of the input space.
+# - Variable importance
+varImport_logit(logitMod_smp, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)
+### RESULTS: Subsampled: Top three variables: [PrevDefaultsTRUE], [g0_Delinq], and [g0_Delinq_SD_6] ([TimeInPerfSpell] is the 4th "most important" variable)
+###          Full:       Top three variables: [PrevDefaultsTRUE], [g0_Delinq], and [TimeInPerfSpell]
+###          None of the insignificant variables of the model trained on the subsampled data are among the "most important" variables of the model trained on the full data.
 
 ### CONCLUSION: There are a few insignificant variables compared when refitting the model on the subsampled (training) dataset.
-###             It might be worth removing these variables.
+###             It might be worth removing these variables, especially since they aren't rank as being "important" in the model trained on the full data.
 
 # --- 7.4 Clean up
 rm(stratifiers, targetVar, smp_size, smp_perc, datCredit_smp, logitMod_smp); gc()

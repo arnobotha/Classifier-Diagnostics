@@ -2,7 +2,7 @@
 # Setting up R environment, parameters, and function definitions
 # ---------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Roelinde Bester
+# SCRIPT AUTHOR(S): Dr Arno Botha, Roelinde Bester, Marcel Muller
 
 # DESCRIPTION: 
 # This script installs and loads various libraries and packages, compiles all
@@ -87,9 +87,8 @@ if (Sys.getenv("USERNAME") == "WRQ") {
   # - Common path for saving important analytics (e.g., sampling)
   genFigPath <- "C:/Users/WRQ/OneDrive - FRG/Analytix/Research/Classifier-Diagnostics/Figures/"
   
+  # --- Custom path where R-scripts are saved
 } else if (Sys.getenv("USERNAME") == "Arno Botha") {
-  # - Custom path where R-scripts are saved
-  
   path_cust <- "E:/WorkLife/Analytix/Research/Classifier-Diagnostics/Scripts/"
   
   # - Common path for storing important R-objects as back-up
@@ -104,7 +103,7 @@ if (Sys.getenv("USERNAME") == "WRQ") {
   # - Common path for importing raw data
   genRawPath <- "E:/DataDump/FNB SLC/"
   
-} else if (Sys.getenv("USERNAME") == "R5532132") {
+} else if (Sys.getenv("USERNAME") == "R5532132") { # Marcel
   # - Custom path where R-scripts are saved
   path_cust <- "C:/Users/R5532132/OneDrive - FRG/GCRM/Classifier-Diagnostics/Scripts/"
   
@@ -113,8 +112,19 @@ if (Sys.getenv("USERNAME") == "WRQ") {
   
   # - Common path for saving important analytics (e.g., sampling)
   genFigPath <- "C:/Users/R5532132/OneDrive - FRG/GCRM/Classifier-Diagnostics/Figures/"
+  
+}  else if (Sys.getenv("USERNAME") == "R5668395") { # Roland
+  # - Custom path where R-scripts are saved
+  path_cust <- "C:/Users/R5668395/OneDrive - FRG/Classifier-Diagnostics/Scripts/"
+  
+  # - Common path for storing important R-objects as back-up
+  genObjPath <- "C:/Users/R5668395/OneDrive - FRG/Classifier-Diagnostics/Objects/"
+  
+  # - Common path for saving important analytics (e.g., sampling)
+  genFigPath <- "C:/Users/R5668395/OneDrive - FRG/Classifier-Diagnostics/Figures/"
+  
 }  else {
-  stop("User-specific paths not set for current user: ", Sys.getenv("USERNAME"), ". Please fix in Setup script (0.Setup.R) before continuing")
+    stop("User-specific paths not set for current user: ", Sys.getenv("USERNAME"), ". Please fix in Setup script (0.Setup.R) before continuing")
 }
 
 
