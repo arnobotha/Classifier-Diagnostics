@@ -34,6 +34,10 @@
 
 # ------ 1. Preliminaries
 
+# - General
+cpu.threads <- 6
+confLevel <- 0.95
+
 # - Confirm prepared datasets are loaded into memory
 if (!exists('datCredit_real')) unpack.ffdf(paste0(genPath,"creditdata_final4a"), tempPath)
 
@@ -63,9 +67,6 @@ eventRate_pop <- datCredit[, list(Target=get(targetVar),
                     by=list(Time)][Time >= def_StartDte & Time <= maxDate, ][order(Time), EventRate]
 plot(eventRate_pop, type="b")
 
-# - General
-cpu.threads <- 6
-confLevel <- 0.95
 
 # - Iteration parameters
 smp_size_v <- c(100000,150000,200000,250000,375000,500000,625000,750000,875000,1000000,1250000,1500000,1750000,2000000,
@@ -255,10 +256,10 @@ datGraph[, EventRate_MAE_TrainValid_Mean_upper := EventRate_TrainValid_MAE_Mean 
 # - Create summary table for annotations within graph
 datAnnotate <- datGraph[SubSampleSize %in% c(100000,150000,250000,375000,500000,625000,750000,875000, 1000000,1250000,1500000,1750000,
                                              2000000,2500000,4000000,5000000,10000000), 
-                        list(`"Size "*italic(s)`=comma(SubSampleSize), 
-                             `italic(E)*"["*epsilon(italic(s))*"] for "*italic(D):italic(D[T])`=paste0(sprintf("%.3f", EventRate_PopTrain_MAE_Mean*100),"%"),
+                        list(`"Size "*italic(n[s])`=comma(SubSampleSize), 
+                             `italic(E)*"["*epsilon(italic(n[s]))*"] for "*italic(D):italic(D[T])`=paste0(sprintf("%.3f", EventRate_PopTrain_MAE_Mean*100),"%"),
                              `95% CI`=paste0("± ",sprintf("%.4f",EventRate_MAE_PopTrain_Mean_ErrMargin*100),"%"),
-                              `italic(E)*"["*epsilon(italic(s))*"] for "*italic(D[T]):italic(D[V])`=paste0(sprintf("%.3f", EventRate_TrainValid_MAE_Mean*100),"%"),
+                              `italic(E)*"["*epsilon(italic(n[s]))*"] for "*italic(D[T]):italic(D[V])`=paste0(sprintf("%.3f", EventRate_TrainValid_MAE_Mean*100),"%"),
                              `95% CI`=paste0("± ",sprintf("%.4f",EventRate_MAE_TrainValid_Mean_ErrMargin*100),"%"))]
 
 # SCRATCH
@@ -317,7 +318,7 @@ label.v2 <- list(expression(italic(D)*" vs "*italic(D[T])),
 
 # - Create main graph
 (g1 <- ggplot(datGraph3, aes(x=SubSampleSize, y=Value, group=Set)) + theme_minimal() + 
-  labs(x=bquote("Subsample size "*italic(s)*" = |"*italic(D[S])*"|"), y=bquote("Error measure value "*italic(E)*'['*epsilon(italic(s))*"] (%)")) + 
+  labs(x=bquote("Subsample size "*italic(n[s])*" = |"*italic(D[S])*"|"), y=bquote("Error measure value "*italic(E)*'['*epsilon(italic(n[s]))*"] (%)")) + 
   theme(text=element_text(family=chosenFont),legend.position = "bottom",
         axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
         strip.background=element_rect(fill="snow2", colour="snow2"),

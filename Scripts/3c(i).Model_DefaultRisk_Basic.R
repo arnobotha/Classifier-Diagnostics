@@ -165,6 +165,10 @@ summary(logitMod_ali1)
 # - Evaluate fit using generic R^2 based on deviance vs null deviance
 coefDeter_glm(logitMod_ali1)
 ### RESULTS: 2.27%
+### RESULTS: Null deviance = 275184; Residual deviance = 268919; AIC = 268931
+# - Evaluate fit using generic R^2 based on deviance vs null deviance
+coefDeter_glm(logitMod_ali1)
+### RESULTS: 2.28%
 # - Odds Ratio analysis
 round(exp(cbind(OR = coef(logitMod_ali1), confint.default(logitMod_ali1))), 3)
 ### RESULTS: odds ratios of [Term], [Balance], and [Principal] are all practically 1, which limits their usefulness (however, the range of these variables may be influencing this result; a standardised odds ratio may be more insightful)
@@ -178,6 +182,7 @@ varImport <- varImport_logit(logitMod_ali1, method="stdCoef_ZScores", impPlot=T)
 datCredit_valid[, prob_ali1 := predict(logitMod_ali1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_ali1)# datCredit_valid[prob_ali1==0,.N]; datCredit_valid[prob_ali1==1,.N] # There are no probabilities that are exactly equal to 0 or 1
 ### RESULTS: 63.12%
+
 
 
 # --- 2.3b Best subset selection | Full analysis
@@ -298,6 +303,3 @@ summary(logitMod_full1_smp)
 
 # --- 4.4 Clean up
 rm(stratifiers, targetVar, smp_size, smp_perc, datCredit_smp, logitMod_full1_smp); gc()
-
-
-

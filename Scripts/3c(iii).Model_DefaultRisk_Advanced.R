@@ -52,6 +52,7 @@ unpack.ffdf(paste0(genObjPath, "Int_Formula"), tempPath)
 
 
 # ------ 2. Modelling & Feature Selection by theme "Delinquency information" - This excludes the basic variable [g0_Delinq]
+
 # --- 2.1 Correlation analysis using spearman correlation
 # - Correlation threshold
 cor_thresh <- 0.6
@@ -165,6 +166,7 @@ summary(logitMod_del_exp4_2)
 # - Clean up
 rm(logitMod_del_exp1_1, logitMod_del_exp1_2, logitMod_del_exp2_1, logitMod_del_exp2_2, logitMod_del_exp3_1, logitMod_del_exp3_2, logitMod_del_exp4_1, logitMod_del_exp4_2); gc()
 datCredit_valid[, `:=` (prob_del_exp1_1=NULL, prob_del_exp1_2=NULL, prob_del_exp2_1=NULL, prob_del_exp2_2=NULL, prob_del_exp3_1=NULL, prob_del_exp3_2=NULL)]
+
 
 
 # --- 2.3 Best subset selection
