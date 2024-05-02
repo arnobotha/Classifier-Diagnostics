@@ -2,7 +2,7 @@
 # Subsampling and resampling data prior to fusing the input space towards PD-modelling
 # ------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer, Marcel Muller
+# SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer, Marcel Muller, Roland Breedt
 
 # DESCRIPTION:
 # This script performs the following high-level tasks:
@@ -110,7 +110,7 @@ cat( (datCredit_smp[is.na(get(targetVar)), .N] == 0) %?% 'SAFE: No missingness i
 rm(datCredit_real); gc()
 
 # - Save to disk (zip) for quick disk-based retrieval later
-pack.ffdf(paste0(genPath, "creditdata_final4b"), datCredit_smp); gc()
+pack.ffdf(paste0(genPath, "creditdata_final4b"), datCredit_smp)
 
 
 
@@ -368,19 +368,21 @@ cat( ( datCredit_smp[is.na(pmnt_method_grp), .N] == 0) %?%
 
 # - Factorised [g0_Delinq] variable
 datCredit_smp[,g0_Delinq_fac := as.factor(g0_Delinq)]
+### RB: Improve by adding sanity check and results
 
 # - Bin [InterestRate_Margin_imputed] | Binning the variable into three equally sized bins
 datCredit_smp[, InterestRate_Margin_imputed_bin := factor(ntile(InterestRate_Margin_imputed_mean, n=3))]
 (var_Info_Num$InterestRate_Margin_Imputed_Bin <- describe(datCredit_smp$InterestRate_Margin_imputed_bin))
-
+### RB: Improve by adding sanity check and results
 
 
 # --- 7. Featuring Engineering: Portfolio-level information
 
-# - Creating an aggregated dataset with which to fuse to the full dataset
+# - Pre default delinquency rate
+#Note: Creating an aggregated dataset with which to fuse to the full dataset
 dat_g0_Delinq_Aggr <- data.table(datCredit_smp[DefaultStatus1==0, list(sum(g0_Delinq>0, na.rm=T)/.N), by=list(Date)])
 colnames(dat_g0_Delinq_Aggr) <- c("Date", "g0_Delinq_Any_Aggr_Prop")
-
+### RB: Improve by adding sanity check and results
 
 # - Aggregated delinquency proportions (any delinquency)
 # Fusing the aggregated variable to the full dataset
@@ -390,7 +392,7 @@ cat( ( sum(datCredit_smp[DefaultStatus1==0, sum(g0_Delinq_Any_Aggr_Prop + sum(g0
        'SAFE: New feature [g0_Delinq_Any_Aggr_Prop] has logical values.\n' %:% 
        'WARNING: New feature [g0_Delinq_Any_Aggr_Prop] has illogical values \n' )
 (var_Info_Num$g0_Delinq_Any_Aggr_Prop <- describe(datCredit_smp$g0_Delinq_Any_Aggr_Prop)); plot(unique(datCredit_smp$g0_Delinq_Any_Aggr_Prop), type="b")
-
+### RB: Improve by adding results
 
 # - 5 month lagged delinquency proportion (as found to be significant within experimental script 3c(v))
 # Lagging the delinquency proportions by 12-months
@@ -402,6 +404,7 @@ cat( ( (datCredit_smp[is.na(g0_Delinq_Any_Aggr_Prop_Lag_5), .N] == datCredit_smp
        'SAFE: New feature [g0_Delinq_Any_Aggr_Prop_Lag_5] has logical values.\n' %:% 
        'WARNING: New feature [g0_Delinq_Any_Aggr_Prop_Lag_5] has illogical values \n' )
 (var_Info_Cat$g0_Delinq_Any_Aggr_Prop_Lag_5 <- describe(datCredit_smp$g0_Delinq_Any_Aggr_Prop_Lag_5)); plot(unique(datCredit_smp$g0_Delinq_Any_Aggr_Prop_Lag_5), type="b")
+### RB: Improve by adding sanity check and results
 
 # - Average pre-default delinquency level
 datCredit_smp[,g0_Delinq_Ave:=mean(ifelse(DefaultStatus1==0,g0_Delinq,0), na.rm=T), by=Date]
@@ -410,7 +413,9 @@ cat( (sum(datCredit_smp[, sum(is.na(g0_Delinq_Ave)), by=Date][,2])==0) %?%
        'SAFE: New feature [g0_Delinq_Ave] has logical values.\n' %:% 
        'WARNING: New feature [g0_Delinq_Ave] has illogical values \n' )
 (var_Info_Cat$g0_Delinq_Ave <- describe(datCredit_smp$g0_Delinq_Ave)); plot(unique(datCredit_smp$g0_Delinq_Ave), type="b")
+### RB: Improve by adding sanity check and results
 
+### RB: Add in lagged versions of DefaultRate_12
 
 # - Ratio type variables (portfolio-level) during performance spells
 # (Total) Arrears to (Total) Balance; (Total) Instalments to (Total) Balance
@@ -430,6 +435,7 @@ cat( (sum(datCredit_smp[, sum(is.na(InstalmentToBalance_Aggr_Prop)), by=Date][,2
        'WARNING: New feature [InstalmentToBalance_Aggr_Prop] has illogical values \n' )
 (var_Info_Cat$InstalmentToBalance_Aggr_Prop <- describe(datCredit_smp$InstalmentToBalance_Aggr_Prop)); plot(unique(datCredit_smp$InstalmentToBalance_Aggr_Prop), type="b")
 (var_Info_Cat$ArrearsToBalance_Aggr_Prop <- describe(datCredit_smp$ArrearsToBalance_Aggr_Prop)); plot(unique(datCredit_smp$ArrearsToBalance_Aggr_Prop), type="b")
+### RB: Improve by results
 
 # - Proportion of curing loans across performing/default spell type
 datCredit_smp[, CuringEvents_Aggr_Prop := sum(PerfSpell_Counter==1 & PerfSpell_Num>=2, na.rm=T)/.N, by=list(Date)]
@@ -437,7 +443,7 @@ cat( (sum(datCredit_smp[, sum(is.na(CuringEvents_Aggr_Prop)), by=Date][,2])==0) 
        'SAFE: New feature [CuringEvents_Aggr_Prop] has logical values.\n' %:% 
        'WARNING: New feature [CuringEvents_Aggr_Prop] has illogical values \n' )
 (var_Info_Cat$CuringEvents_Aggr_Prop <- describe(datCredit_smp$CuringEvents_Aggr_Prop)); plot(unique(datCredit_smp$CuringEvents_Aggr_Prop), type="b")
-
+### RB: Improve by adding sanity check and results
 
 # - Proportion of new loans vs existing portfolio over time
 # NOTE: we therefore measure credit demand within market, underlying market conditions, and the implicit effect of bank policies)
@@ -450,15 +456,15 @@ datNewLoans_Aggr_Check1 <- data.table(Variable = NULL, # Dataset for conducting 
 ColNames <- colnames(dat_NewLoans_Aggr)[-1] # Names of the columns
 for (i in seq_along(lags)){ # Looping over the specified lags and applying each to each of the specified columns
   for (j in seq_along(ColNames)){
-    dat_NewLoans_Aggr[, (paste0(ColNames[j],"_",lags[i])) := shift(get(ColNames[j]), n=lags[i], type="lag")]
-    datNewLoans_Aggr_Check1 <- rbind(datNewLoans_Aggr_Check1,
-                                     data.table(Variable=paste0(ColNames[j],"_",lags[i]),
-                                                Check=sum(is.na(dat_NewLoans_Aggr[,get(paste0(ColNames[j],"_",lags[i]))]))==lags[i]))
+    dat_NewLoans_Aggr[, (paste0(ColNames[j],"_",lags[i])) := fcoalesce(shift(get(ColNames[j]), n=lags[i], type="lag"),get(ColNames[j]))] # Impute NA's with the non lagged value
   }
 }
 # [SANITY CHECK] Check whether the lags were created correctly
-cat( (datNewLoans_Aggr_Check1[,.N]==sum(datNewLoans_Aggr_Check1$Check)) %?% "SAFE: Lags applied successfully to the aggregated variable [NewLoans_Aggr].\n" %:%
-       "WARNING: Excessive missingness detected in the lagged aggregated variable [NewLoans_Aggr] variables.\n")
+cat((anyNA(dat_NewLoans_Aggr[,NewLoans_Aggr_Prop_1]) | anyNA(dat_NewLoans_Aggr[,NewLoans_Aggr_Prop_3]) | anyNA(dat_NewLoans_Aggr[,NewLoans_Aggr_Prop_4])
+     | anyNA(dat_NewLoans_Aggr[,NewLoans_Aggr_Prop_5])) %?% "WARNING: Missingness detected, [NewLoans_Aggr_Prop_1], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop_4], and/or [NewLoans_Aggr_Prop_5] compromised.\n" %:%
+      "SAFE: No missingness, [NewLoans_Aggr_Prop_1], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop_4], and [NewLoans_Aggr_Prop_5] created successfully.\n")
+### RB: Improve by adding sanity check and results
+
 # Merging the credit dataset with the aggregated dataset
 datCredit_smp <- merge(datCredit_smp, dat_NewLoans_Aggr, by="Date", all.x=T)
 # Validate merging success by checking for missingness (should be zero)
@@ -481,7 +487,7 @@ cat( (sum(datCredit_smp[, sum(is.na(AgeToTerm_Aggr_Mean)), by=Date][,2])==0) %?%
        'SAFE: New feature [AgeToTerm_Aggr_Mean] has logical values.\n' %:% 
        'WARNING: New feature [AgeToTerm_Aggr_Mean] has illogical values \n' )
 (var_Info_Cat$AgeToTerm_Aggr_Mean <- describe(datCredit_smp$AgeToTerm_Aggr_Mean)); plot(unique(datCredit_smp$AgeToTerm_Aggr_Mean), type="b")
-
+### RB: Improve by adding sanity check and results
 
 # - Aggregate maturity of performance spell ages over time
 datCredit_smp[, PerfSpell_Maturity_Aggr_Mean := mean(PerfSpell_Age, na.rm=T), by=Date]
@@ -489,7 +495,7 @@ cat( (sum(datCredit_smp[, sum(is.na(PerfSpell_Maturity_Aggr_Mean)), by=Date][,2]
        'SAFE: New feature [PerfSpell_Maturity_Aggr_Mean] has logical values.\n' %:% 
        'WARNING: New feature [Perf_SpellMaturity_Aggr_Mean] has illogical values \n' )
 (var_Info_Cat$PerfSpell_Maturity_Aggr_Mean <- describe(datCredit_smp$PerfSpell_Maturity_Aggr_Mean)); plot(unique(datCredit_smp$PerfSpell_Maturity_Aggr_Mean), type="b")
-
+### RB: Improve by adding sanity check and results
 
 # - Median-aggregated interest rate margin
 # NOTE: The median is preferred over the mean since it resulted in a superior model, as investigated in the experimental script 3c(v)
@@ -504,15 +510,15 @@ dat_IRM_Aggr_Check1 <- data.table(Variable = NULL, # Dataset for conducting sani
 ColNames <- colnames(dat_IRM_Aggr)[-1] # Names of the columns
 for (i in seq_along(lags)){ # Looping over the specified lags and applying each to each of the specified columns
   for (j in seq_along(ColNames)){
-    dat_IRM_Aggr[, (paste0(ColNames[j],"_",lags[i])) := shift(get(ColNames[j]), n=lags[i], type="lag")]
-    dat_IRM_Aggr_Check1 <- rbind(dat_IRM_Aggr_Check1,
-                                 data.table(Variable=paste0(ColNames[j],"_",lags[i]),
-                                            Check=sum(is.na(dat_IRM_Aggr[,get(paste0(ColNames[j],"_",lags[i]))]))==lags[i]))
+    dat_IRM_Aggr[, (paste0(ColNames[j],"_",lags[i])) := fcoalesce(shift(get(ColNames[j]), n=lags[i], type="lag"),get(ColNames[j]))] # Impute NA's with non-lagged version of variable
   }
 }
 # [SANITY CHECK] Check whether the lags were created correctly
-cat( (dat_IRM_Aggr_Check1[,.N]==sum(dat_IRM_Aggr_Check1$Check)) %?% "SAFE: Lags applied successfully to the aggregated variable [InterestRate_Margin_Aggr_Med].\n" %:%
-       "WARNING: Excessive missingness detected in the lagged aggregated variable [InterestRate_Margin_Aggr_Med] variables.\n")
+cat((anyNA(dat_IRM_Aggr[,InterestRate_Margin_Aggr_Med_1]) | anyNA(dat_IRM_Aggr[,InterestRate_Margin_Aggr_Med_2]) | anyNA(dat_IRM_Aggr[,InterestRate_Margin_Aggr_Med_3])) %?%
+      "WARNING: Missingness detected, [InterestRate_Margin_Aggr_Med_1], [InterestRate_Margin_Aggr_Med_2] and/or [InterestRate_Margin_Aggr_Med_3] compromised.\n" %:%
+      "SAFE: No missingness, [InterestRate_Margin_Aggr_Med_1], [InterestRate_Margin_Aggr_Med_2] and [InterestRate_Margin_Aggr_Med_3] created successfully.\n")
+### RB: Improve by adding sanity check and results
+
 # Merging the credit dataset with the aggregated dataset
 datCredit_smp <- merge(datCredit_smp, dat_IRM_Aggr, by="Date", all.x=T)
 # Validate merging success )by checking for missingness (should be zero)
@@ -554,6 +560,7 @@ for (i in seq_along(lags)){
 # [SANITY CHECK] Check whether the lages were created correctly
 cat( (datMV_Check1[,.N]==sum(datMV_Check1$Check)) %?% "SAFE: Lags applied successfully to the macroeconomic variables.\n" %:%
       "WARNING: Excessive missingness detected in the lagged macroeconomic variables.\n")
+### RB: Improve by adding sanity check and results
 
 # - Rolling volatility/ standard deviations
 # Specifying the rolling standard deviation windows (monthly) that should be applied
@@ -575,6 +582,8 @@ for (i in seq_along(SD_windows)){
 # [SANITY CHECK] Check whether the lags were created correctly
 cat( (datMV_Check2[,.N]==sum(datMV_Check2$Check)) %?% "SAFE: Lags applied successfully to the macroeconomic variables.\n" %:%
        "WARNING: Excessive missingness detected in the lagged macroeconomic variables.\n")
+### RB: Improve by adding sanity check and results
+### Fix missingness
 
 # - Merging the macroeconomic information to the subsampled dataset
 datCredit_smp <- merge(datCredit_smp, subset(datMV, select=colnames(datMV)[!(colnames(datMV) %in% ColNames)]), by = "Date", all.x = T)
@@ -587,6 +596,7 @@ for (i in 1:length(list_merge_variables)){
 }
 cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fusion with macroeconomic data is successful.\n" %:%
        "WARNING: Missingness in certain macroecnomic fields detected, fusion compromised.\n")
+### RB: Improve by adding sanity check and results
 
 # - Cleanup
 rm(datMV); gc()

@@ -1,14 +1,14 @@
-# =================================== MODEL SEGMENTATION COMPARISON ==========================================
+# =================================== INFLATION EFFECTS ON SENSITIVE VARIABLES ==========================================
 # Exploring the influence of inflation on variables sensitive to the time value of money, i.e., [Principal]
 # and [Balance].
-# ------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
 # SCRIPT AUTHOR(S): Marcel Muller
 
 # DESCRIPTION:
 # This script explores the influence of inflation on [Principal] and [Balance], which are both sensitive to
 # the time value of money, in terms of their statistical significance in predicting default in a logit model.
-# ------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
 #   - 0a.CustomFunctions.R
@@ -20,7 +20,7 @@
 #
 # -- Outputs:
 #   - Some graphs illustrating the differences in the raw variables vs their defalted counterparts
-# ============================================================================================================
+# =======================================================================================================================
 
 
 

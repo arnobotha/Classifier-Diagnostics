@@ -3,7 +3,7 @@
 # engineering some basic features that must precede any (non-clustered) subsampling
 # ---------------------------------------------------------------------------------------
 # PROJECT TITLE: Loss Modelling (LGD) for FNB Mortgages
-# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller
+# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller, Roland Breedt
 
 # DESCRIPTION:
 # This script performs the following high-level tasks:
@@ -196,22 +196,28 @@ datCredit_real[is.na(g0_Delinq_SD), g0_Delinq_SD := 0] # Some missing values exi
 cat( (datCredit_real[is.na(g0_Delinq_SD), .N] == 0) %?% "SAFE: No missingness, [g0_Delinq_SD] created successfully.\n" %:%
        "WARNING: Missingness detected, [g0_Delinq_SD] compromised.\n")
 describe(datCredit_real[, list(g0_Delinq_SD=mean(g0_Delinq_SD, na.rm=T)), by=list(LoanID)]$g0_Delinq_SD)
-### RESULT: mean account-level SD in delinquency states of 0.21; median: 0, but 95%-percentile of 1.2
+### RESULT: mean account-level SD in delinquency states of 0.21; median: 0, but 95%-percentile of 1.19
 # This suggests that most accounts do not vary significantly in their delinquency states over loan life, which is sensible
 
 # - 4-,5-,6-,9- and 12 month rolling state standard deviation
 # NOTE: Usefulness of each time window length will yet be determined during prototyping/modelling
-datCredit_real[, g0_Delinq_SD_12 := frollapply(g0_Delinq, n=12, FUN=sd, align="right"), by=list(LoanID)]
-datCredit_real[, g0_Delinq_SD_9 := frollapply(g0_Delinq, n=9, FUN=sd, align="right"), by=list(LoanID)]
-datCredit_real[, g0_Delinq_SD_6 := frollapply(g0_Delinq, n=6, FUN=sd, align="right"), by=list(LoanID)]
-datCredit_real[, g0_Delinq_SD_5 := frollapply(g0_Delinq, n=5, FUN=sd, align="right"), by=list(LoanID)]
-datCredit_real[, g0_Delinq_SD_4 := frollapply(g0_Delinq, n=4, FUN=sd, align="right"), by=list(LoanID)]
-cat( ((datCredit_real[is.na(g0_Delinq_SD_4), .N] == datCredit_real[Counter<4,.N]) &
-      (datCredit_real[is.na(g0_Delinq_SD_5), .N] == datCredit_real[Counter<5,.N]) &
-      (datCredit_real[is.na(g0_Delinq_SD_6), .N] == datCredit_real[Counter<6,.N]) &
-      (datCredit_real[is.na(g0_Delinq_SD_9), .N] == datCredit_real[Counter<9,.N]) &
-      (datCredit_real[is.na(g0_Delinq_SD_12), .N] == datCredit_real[Counter<12,.N])) %?% "SAFE: No excessive missingness, [g0_Delinq_SD_4], [g0_Delinq_SD_5], [g0_Delinq_SD_6], [g0_Delinq_SD_9], and [g0_Delinq_SD_12] created successfully.\n" %:%
-        "WARNING: Excessive missingness detected, [g0_Delinq_SD_4], [g0_Delinq_SD_5], [g0_Delinq_SD_6], [g0_Delinq_SD_9], and/or [g0_Delinq_SD_12] compromised.\n")
+SD_LoanLevel<-datCredit_real[,list(SD_Loans=sd(g0_Delinq,na.rm=TRUE)),by=list(LoanID)] # Create standard deviation variable for each loan account
+SD_Overall<-mean(SD_LoanLevel[,SD_Loans],na.rm=TRUE) # Obtain mean SD over loan accounts for imputation of NA's at the beginning of each loan's history
+
+# frollapply function lags the variable across some fixed window
+datCredit_real[, g0_Delinq_SD_12 := frollapply(g0_Delinq, n=12, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]
+datCredit_real[, g0_Delinq_SD_9 := frollapply(g0_Delinq, n=9, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]
+datCredit_real[, g0_Delinq_SD_6 := frollapply(g0_Delinq, n=6, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]
+datCredit_real[, g0_Delinq_SD_5 := frollapply(g0_Delinq, n=5, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]
+datCredit_real[, g0_Delinq_SD_4 := frollapply(g0_Delinq, n=4, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]
+
+# [SANITY CHECK] Check for no missingness in engineered variables
+cat((anyNA(datCredit_real[,g0_Delinq_SD_12]) | anyNA(datCredit_real[,g0_Delinq_SD_9]) | anyNA(datCredit_real[,g0_Delinq_SD_6])
+    | anyNA(datCredit_real[,g0_Delinq_SD_5]) | anyNA(datCredit_real[,g0_Delinq_SD_4])) %?% "WARNING: Excessive missingness detected, [g0_Delinq_SD_4], [g0_Delinq_SD_5], [g0_Delinq_SD_6], [g0_Delinq_SD_9], and/or [g0_Delinq_SD_12] compromised.\n" %:%
+      "SAFE: No missingness, [g0_Delinq_SD_4], [g0_Delinq_SD_5], [g0_Delinq_SD_6], [g0_Delinq_SD_9], and [g0_Delinq_SD_12] created successfully.\n")
+
+#Clean-up
+rm(SD_LoanLevel,SD_Overall)
 
 # - Time in delinquency state
 # NOTE: This variable is conceptually different to [TimeInPerfSpell].
@@ -238,7 +244,15 @@ cat( ( datCredit_real[is.na(PerfSpell_g0_Delinq_SD),.N]==datCredit_real[is.na(Pe
        'SAFE: New feature [PerfSpell_g0_Delinq_SD] has logical values.\n' %:% 
        'WARNING: New feature [PerfSpell_g0_Delinq_SD] has illogical values \n' )
 
+### RB: Create new default rate input variable
+# - Setting some aggregation parameters, purely to facilitate graphing aesthetics
+def_StartDte <- min(datCredit_real[,Date], na.rm=T)
+def_EndDte <- max(datCredit_real[,Date], na.rm=T)
+maxDate <- def_EndDte - years(1) # A post-hoc filter, used for graphing purposes, given a 12-month outcome window
 
+# - Aggregate to monthly level and observe up to given point
+port.aggr <- datCredit_real[DefaultStatus1==0, list(DefaultRate_12 = sum(DefaultStatus1_lead_12_max, na.rm=T)/.N),
+                      by=list(Date)][Date >= def_StartDte & Date <= maxDate,] %>% setkey(Date)
 
 
 # ------ 4. General cleanup & checks

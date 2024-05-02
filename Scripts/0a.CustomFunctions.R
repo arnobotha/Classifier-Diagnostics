@@ -2,7 +2,7 @@
 # Defining custom functions used across various projects
 # ------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller
+# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller, Roland Breedt
 
 # DESCRIPTION:
 # This script defines various functions that are used elsewhere in this project
@@ -411,7 +411,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   # plotName=paste0(genFigPath, "VariableImportance_", method,".png"); limitVars=10
   
   # - Safety check
-  if (!any(class(model) == "glm")) stop("Specified model object is not of class 'glm' or 'lm'. Exiting .. ")
+  if (!any(class(logit_model) %in% c("glm", "lm"))) stop("Specified model object is not of class 'glm' or 'lm'. Exiting .. ")
   
   # --- 0. Setup
   # - Get the data the model was trained on
@@ -804,3 +804,64 @@ adjInflation <- function(datMacro, time, Inflation_Growth, g_start, g_stop) {
 # if (!exists('datMV')) unpack.ffdf(paste0(genPath,"datMV"), tempPath)
 # (test <- adjInflation(datMacro=datMV, time="Date", g_start=date("2015-02-28"), g_stop=date("2022-12-31"), Inflation_Growth="M_Inflation_Growth"))
 # rm(datMV, test); gc()
+
+# ------------------------- Matthews Correlation Coefficient ---------------------------
+# This function gives the Matthews Correlation Coefficient, as calculated from the confusion matrix entries
+# Input: 1) Actual values for a classifier problem in vector form, e.g., [1,1,0,1,0,0]
+#        2) Corresponding probability scores for classier in vector form, e.g., [0.74, 0.92, 0.38, 0.53, 0.02, 0.6]
+#        3) Cutoff value used on probability scores (Optional; default is 0.5)
+# Output: Matthews Correlation Coefficient
+
+Get_MCC<-function(Actual, Predicted, Cutoff=0.5){
+
+  # - Safety Check for NA's
+  if(anyNA(c(Actual,Predicted))){
+    stop("Input fields are not allowed NA values, exiting...")
+  }
+  # - Safety Check for equal input length
+  if(length(Actual)!=length(Predicted)){
+    stop("Input fields are not of the same length, exiting...")
+  }
+  # - Safety Check for Actuals to be 0 or 1
+  if(FALSE %in% (Actual==0|Actual==1)){
+    stop("Actual should be in {0,1}, exiting...")
+  }
+  
+  # - Obtain the confusion matrix entries
+  TP<-0
+  TN<-0
+  FP<-0
+  FN<-0
+  
+  for(k in 1:length(Actual)){
+    if(Actual[k]==1){
+      if(Predicted[k]<=Cutoff) {FN<-FN+1}
+      else{TP<-TP+1}
+    }
+    else{
+      if(Predicted[k]<=Cutoff) {TN<-TN+1}
+      else{FP<-FP+1}
+    }
+  }
+  
+  # - Initialise the MCC, to store the result
+  MCC<-NA
+  
+  # - Scenario when there is only one non-zero entry in the confusion matrix
+  # - If TP = n then MCC=1, otherwise if TN=n then MCC=-1 (n is the sample size)
+  if((TN == 0 & FN == 0 & FP == 0) | (TP == 0 & FN == 0 & FP == 0) | (TN == 0 & TP == 0 & FP == 0) | (TN == 0 & TP == 0 & FN == 0)) {
+    MCC <- ifelse((TP != 0 | TN != 0), 1, -1)
+    # - Scenario when there is zero rows or columns
+  } else if ((FP+TN) == 0 | (TP+FN) == 0 |
+             (TN+FN) == 0 | (TP+FP) == 0)
+  {
+    MCC <- 0
+    # - Normal MCC Calculation
+  } else {
+    MCC <- (TP * TN - FP * FN) / (sqrt((TP + FP) * (TP + FN) * (TN + FP) * (TN + FN)))
+  }
+  # - Housekeeping
+  rm(Actual, Predicted, Cutoff,TP ,TN ,FP ,FN)
+  
+  return(MCC)
+}

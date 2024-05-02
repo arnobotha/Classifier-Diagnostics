@@ -2,7 +2,7 @@
 # Setting up R environment, parameters, and function definitions
 # ---------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Roelinde Bester, Marcel Muller
+# SCRIPT AUTHOR(S): Dr Arno Botha, Roelinde Bester, Marcel Muller, Roland Breedt
 
 # DESCRIPTION: 
 # This script installs and loads various libraries and packages, compiles all
@@ -41,6 +41,7 @@ require(zoo)
 require(Hmisc)
 require(survival) # for survival modelling
 require(pROC); require(ROCR) # both for conducting ROC-analyses
+require(ModelMetrics) # getting a confusion matrix
 
 #for plots
 require(ggplot2)
