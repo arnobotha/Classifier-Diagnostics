@@ -10,6 +10,8 @@
 # ---------------------------------------------------------------------------------------
 # -- Inputs:
 #   - DelinqM.R | Delinquency measures and related functions
+#   - TruEnd.R | TruEnd-procedure and related functions
+#   - 0a.CustomFunctions | Multi-project library of custom & curated functions
 # =======================================================================================
 
 
@@ -43,7 +45,7 @@ require(survival) # for survival modelling
 require(pROC); require(ROCR) # both for conducting ROC-analyses
 require(ModelMetrics) # getting a confusion matrix
 
-#for plots
+# for graphics
 require(ggplot2)
 require(corrplot) # For correlation plots
 require(scales)
@@ -114,7 +116,7 @@ if (Sys.getenv("USERNAME") == "WRQ") {
   # - Common path for saving important analytics (e.g., sampling)
   genFigPath <- "C:/Users/R5532132/OneDrive - FRG/GCRM/Classifier-Diagnostics/Figures/"
   
-}  else if (Sys.getenv("USERNAME") == "R5668395") { # Roland
+} else if (Sys.getenv("USERNAME") == "R5668395") { # Roland
   # - Custom path where R-scripts are saved
   path_cust <- "C:/Users/R5668395/OneDrive - FRG/Classifier-Diagnostics/Scripts/"
   
@@ -124,7 +126,7 @@ if (Sys.getenv("USERNAME") == "WRQ") {
   # - Common path for saving important analytics (e.g., sampling)
   genFigPath <- "C:/Users/R5668395/OneDrive - FRG/Classifier-Diagnostics/Figures/"
   
-}  else {
+} else {
     stop("User-specific paths not set for current user: ", Sys.getenv("USERNAME"), ". Please fix in Setup script (0.Setup.R) before continuing")
 }
 

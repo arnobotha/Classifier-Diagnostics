@@ -89,6 +89,28 @@ adjInflation <- function(g_start, g_stop) {
 }
 
 
+# - Advanced inflation factors 
+# NOTE: Marcel's version, overwriting the previous function definition for now
+# Generating an inflation factor for a given series of yearly inflation growth rates
+# Input:  [datMacro]: The dataset containing the yearly inflation growth rate
+#         [time]: Name of the time/date variable in [datMacro]
+#         [g_start]:  The starting date for the series of inflation growth rates
+#         [g_stop]:   The ending date for the series of inflation growth rates
+# Output: A factor indicating the cumulative inflation over the period starting at [g_start] and ending [g_stop]
+# --- Define custom function for computing inflation/deflation factors
+adjInflation <- function(datMacro, time, Inflation_Growth, g_start, g_stop) {
+  # datMacro=datMV; time="Date"; g_start<-date("2015-02-28"); g_stop<-date("2022-12-31"); Inflation_Growth<-"M_Inflation_Growth"
+  compFact <- as.numeric(datMacro[get(time) >= g_start & get(time) <= g_stop, list(Factor = prod(1 + (get(Inflation_Growth))/12))])
+  return(compFact)
+  # rm(datMacro, time, g_start, g_stop, Inflation_Growth); gc()
+}
+# - Unit test
+# if (!exists('datMV')) unpack.ffdf(paste0(genPath,"datMV"), tempPath)
+# (test <- adjInflation(datMacro=datMV, time="Date", g_start=date("2015-02-28"), g_stop=date("2022-12-31"), Inflation_Growth="M_Inflation_Growth"))
+# rm(datMV, test); gc()
+
+
+
 
 
 
@@ -686,6 +708,9 @@ coefDeter_glm <- function(model) {
 ### RESULTS: candidate is 46% (McFadden) better than null-model in terms of its deviance
 
 
+
+
+
 # - Perform residual analysis for a glm-model using deviances (difference between predicted probabilities and observed proportions of success)
 # A standard normal distribution approximates the residual deviance distribution for a well-fitted model (assuming logistic regression)
 # Accordingly, min/max residuals should lie within [-3,3], median should be close to 0, and 1st/3rd quantiles 
@@ -784,28 +809,7 @@ resid_deviance_glm <- function(model, err_Median = 0.025, err_quantiles = 0.05, 
 
 
 
-
-
-# ----------------------------------- Inflation factors -------------------------------------
-# Generating an inflation factor for a given series of yearly inflation growth rates
-# Input:  [datMacro]: The dataset containing the yearly inflation growth rate
-#         [time]: Name of the time/date variable in [datMacro]
-#         [g_start]:  The starting date for the series of inflation growth rates
-#         [g_stop]:   The ending date for the series of inflation growth rates
-# Output: A factor indicating the cumulative inflation over the period starting at [g_start] and ending [g_stop]
-# --- Define custom function for computing inflation/deflation factors
-adjInflation <- function(datMacro, time, Inflation_Growth, g_start, g_stop) {
-  # datMacro=datMV; time="Date"; g_start<-date("2015-02-28"); g_stop<-date("2022-12-31"); Inflation_Growth<-"M_Inflation_Growth"
-  compFact <- as.numeric(datMacro[get(time) >= g_start & get(time) <= g_stop, list(Factor = prod(1 + (get(Inflation_Growth))/12))])
-  return(compFact)
-  # rm(datMacro, time, g_start, g_stop, Inflation_Growth); gc()
-}
-# - Unit test
-# if (!exists('datMV')) unpack.ffdf(paste0(genPath,"datMV"), tempPath)
-# (test <- adjInflation(datMacro=datMV, time="Date", g_start=date("2015-02-28"), g_stop=date("2022-12-31"), Inflation_Growth="M_Inflation_Growth"))
-# rm(datMV, test); gc()
-
-# ------------------------- Matthews Correlation Coefficient ---------------------------
+# - Matthews Correlation Coefficient 
 # This function gives the Matthews Correlation Coefficient, as calculated from the confusion matrix entries
 # Input: 1) Actual values for a classifier problem in vector form, e.g., [1,1,0,1,0,0]
 #        2) Corresponding probability scores for classier in vector form, e.g., [0.74, 0.92, 0.38, 0.53, 0.02, 0.6]
