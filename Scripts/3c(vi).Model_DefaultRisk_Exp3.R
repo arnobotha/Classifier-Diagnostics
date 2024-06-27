@@ -43,22 +43,7 @@ datCredit_valid <- datCredit_valid %>% subset(DefaultStatus1==0)
 
 
 
-# ------ 2. Applying deflation factor to [Principal] and [Balance]
-# --- Getting a range of inflation factors for each date in the sampling window
-date_range <- ceiling_date(unique(datCredit_train$Date), unit="month")-days(1)
-datInflation <- data.table(Date=date_range)
-datInflation[,Inf_Factor:=adjInflation(datMacro=datMV, time="Date", Inflation_Growth="M_Inflation_Growth", g_start=Date, g_stop = date_range[length(date_range)]), by=Date]
-datCredit_train <- merge(datCredit_train, datInflation, all.x=T, by="Date")
-datCredit_valid <- merge(datCredit_valid, datInflation, all.x=T, by="Date")
-
-# --- Deflate the relevant variables
-# - [Principal]
-datCredit_train[, Principal_Real := Principal*Inf_Factor]
-datCredit_valid[, Principal_Real := Principal*Inf_Factor]
-# - [Balance]
-datCredit_train[, Balance_Real := Balance*Inf_Factor]
-datCredit_valid[, Balance_Real := Balance*Inf_Factor]
-
+# ------ 2. Explanatory analysis on variables
 # --- Distribution Comparison
 # - [Principal] vs [Principal_Real]
 # Aggregating over the sampling window
@@ -72,13 +57,13 @@ port.aggr_Principal_long[,Variable:=factor(Variable, levels=c("Principal_Real_Ag
 chosenFont<-"Cambria"
 # Plotting the distributions
 (g_Principal <- ggplot(data=port.aggr_Principal_long, aes(x=Date, y=Value, group=Variable)) +
-  geom_point(aes(colour=Variable, shape=Variable)) +
-  geom_line(aes(colour=Variable, linetype=Variable)) +
-  theme(text=element_text(family=chosenFont),legend.position = "bottom",
-        axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
-        strip.background=element_rect(fill="snow2", colour="snow2"),
-        strip.text=element_text(size=8, colour="gray50"), strip.text.y.right=element_text(angle=90)) +
-        scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y"))
+    geom_point(aes(colour=Variable, shape=Variable)) +
+    geom_line(aes(colour=Variable, linetype=Variable)) +
+    theme(text=element_text(family=chosenFont),legend.position = "bottom",
+          axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
+          strip.background=element_rect(fill="snow2", colour="snow2"),
+          strip.text=element_text(size=8, colour="gray50"), strip.text.y.right=element_text(angle=90)) +
+    scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y"))
 # Save plot
 dpi<-240
 ggsave(g_Principal, file=paste0(genFigPath, "Principal_vs_Principal_Real.png"), width=3000/dpi, height=1000/dpi, dpi=dpi, bg="white")
@@ -91,13 +76,13 @@ port.aggr_Balance_long <- pivot_longer(port.aggr_Balance, cols=c(Balance_Aggr_Me
 colnames(port.aggr_Balance_long) <- c("Date", "Variable", "Value")
 # Plotting the distributions
 (g_Balance <- ggplot(data=port.aggr_Balance_long, aes(x=Date, y=Value, group=Variable)) +
-  geom_point(aes(colour=Variable, shape=Variable)) +
-  geom_line(aes(colour=Variable, linetype=Variable)) +
-  theme(text=element_text(family=chosenFont),legend.position = "bottom",
-        axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
-        strip.background=element_rect(fill="snow2", colour="snow2"),
-        strip.text=element_text(size=8, colour="gray50"), strip.text.y.right=element_text(angle=90)) +
-  scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y"))
+    geom_point(aes(colour=Variable, shape=Variable)) +
+    geom_line(aes(colour=Variable, linetype=Variable)) +
+    theme(text=element_text(family=chosenFont),legend.position = "bottom",
+          axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
+          strip.background=element_rect(fill="snow2", colour="snow2"),
+          strip.text=element_text(size=8, colour="gray50"), strip.text.y.right=element_text(angle=90)) +
+    scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y"))
 # Save plot
 dpi<-240
 ggsave(g_Balance, file=paste0(genFigPath, "Balance_vs_Balance_Real.png"), width=3000/dpi, height=1000/dpi, dpi=dpi, bg="white")
@@ -117,34 +102,34 @@ rm(date_range, datInflation, port.aggr_Principal, port.aggr_Principal_long,
 logitMod_Principal <- glm(DefaultStatus1_lead_12_max ~ Principal, family="binomial", data=datCredit_train)
 # Deviance and AIC
 summary(logitMod_Principal)
-### RESULTS: Null deviance = 275184; Residual Deviance = 273599; AIC = 273603
+### RESULTS: Null deviance = 279124; Residual Deviance = 277690; AIC = 277694
 ###         [Principal] is significant
 # Coefficient of determination
 coefDeter_glm(logitMod_Principal)
-### RESULTS: 0.058%
+### RESULTS: 0.51% 
 # ROC Analysis
 datCredit_valid[,prob_logitMod_Principal:=predict(logitMod_Principal, newdata = datCredit_valid, type = "response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_logitMod_Principal)
-### RESULTS: 57.5%
+### RESULTS: 57.8%
 
 # - Fitting a model with [Principal_Real]
 # Model fit
 logitMod_Principal_Real <- glm(DefaultStatus1_lead_12_max ~ Principal_Real, family="binomial", data=datCredit_train)
 # Deviance and AIC
 summary(logitMod_Principal_Real)
-### RESULTS: Null deviance = 275184; Residual Deviance = 274780; AIC = 274784
+### RESULTS: Null deviance = 279124; Residual Deviance = 278738; AIC = 278742
 ###          [Principal_Real] is significant
 # Coefficient of determination
 coefDeter_glm(logitMod_Principal_Real)
-### RESULTS: 0.0015%
+### RESULTS: 0.14%
 # ROC Analysis
 datCredit_valid[,prob_logitMod_Principal_Real:=predict(logitMod_Principal_Real, newdata = datCredit_valid, type = "response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_logitMod_Principal_Real)
-### RESULTS: 55.19%
+### RESULTS: 55.75%
 
 # - COMPARISON
-### Model with [Principal] has a better fit than the model with [Principal_Real]; AIC of 273603 vs 274784 and Coefficient of Determination of 0.058% vs 0.0015%
-### Model with [Principal] results in better prediction than the model with [Principal_Real]; AUC of 57.5% vs 55.19%
+### Model with [Principal] has a better fit than the model with [Principal_Real]; AIC of 277694 vs 278742 and Coefficient of Determination of 0.51% vs 0.14%
+### Model with [Principal] results in better prediction than the model with [Principal_Real]; AUC of 57.8% vs 55.75%
 ### Both [Principal] and [Principal_Real] are significant in their respective models
 
 
@@ -154,46 +139,54 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_logitMod_Pr
 logitMod_Balance <- glm(DefaultStatus1_lead_12_max ~ Balance, family="binomial", data=datCredit_train)
 # Deviance and AIC
 summary(logitMod_Balance)
-### RESULTS: Null deviance = 275184; Residual Deviance = 275014; AIC = 275018
+### RESULTS: Null deviance = 279124; Residual Deviance = 278988; AIC = 278992
 ###          [Balance] is significant
 # Coefficient of determination
 coefDeter_glm(logitMod_Balance)
-### RESULTS: 0.06%
+### RESULTS: 0.05%
 # ROC Analysis
 datCredit_valid[,prob_logitMod_Balance:=predict(logitMod_Balance, newdata = datCredit_valid, type = "response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_logitMod_Balance)
-### RESULTS: 52.19%
+### RESULTS: 52.85%
 
 # - Fitting a model with [Balance_Real]
 # Model fit
 logitMod_Balance_Real <- glm(DefaultStatus1_lead_12_max ~ Balance_Real, family="binomial", data=datCredit_train)
 # Deviance and AIC
 summary(logitMod_Balance_Real)
-### RESULTS: Null deviance = 275184; Residual Deviance = 275158; AIC = 275162
+### RESULTS: Null deviance = 279124; Residual Deviance = 279097; AIC = 279101
 ###          [Balance_Real] is significant
 # Coefficient of determination
 coefDeter_glm(logitMod_Balance_Real)
-### RESULTS: 0.009%
+### RESULTS: 0.01%
 # ROC Analysis
 datCredit_valid[,prob_logitMod_Balance_Real:=predict(logitMod_Balance_Real, newdata = datCredit_valid, type = "response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_logitMod_Balance_Real)
-### RESULTS: 49.73%
+### RESULTS: 48.93%
 ### Look at section 2.5 to fix this
-###          Model is reverse ranking, will need to adjust [Balance_Real] and refit
+###          Model is reverse ranking, will need to adjust [Balance_Real] and refit, however, this may be corrected when the input space is increased
 
 # - COMPARISON
-### Model with [Balance] has a better fir than the model with [Balance_Real]; AIC of 275018 vs 275162 and Coefficient of Determination of 0.06% vs 0.009%
-### Model with [Balance] results in better prediction than the model with [Balance_Real]; AUC of 52.19% vs 49.73%
+### Model with [Balance] has a better fit than the model with [Balance_Real]; AIC of 278992 vs 279101 and Coefficient of Determination of 0.05% vs 0.01%
+### Model with [Balance] results in better prediction than the model with [Balance_Real]; AUC of 52.85% vs 48.92%
 ### Both [Balance] and [Balance_Real] are significant in their respective models
 
 
 
 # ---- 3.2 Full input space
 # --- 3.2.1 Loading in the full input space and adjusting it accordingly
-# - Conditionally loading in the input space
-if (!exists('inputs_adv')) unpack.ffdf(paste0(genObjPath,"Adv_Formula"), tempPath)
+# - Define an complex/advanced input space to facilitate experiments (this space is directly informed by the latest (June 2024) variable selection results)
+inputs_adv <- as.formula("DefaultStatus1_lead_12_max ~ AgeToTerm + Principal + Balance + InterestRate_Margin_imputed_mean + g0_Delinq + M_Repo_Rate_12 +
+                                                       M_Inflation_Growth_9 + M_RealIncome_Growth_2 + M_RealIncome_Growth_9 + 
+                                                       M_RealIncome_Growth_12 + M_DTI_Growth_3 + M_DTI_Growth_6 + 
+                                                       M_Emp_Growth_9 + M_Emp_Growth_12 + PrevDefaults + TimeInPerfSpell + 
+                                                       g0_Delinq_Num + g0_Delinq_SD_4 + g0_Delinq_SD_6 + slc_acct_roll_ever_24_imputed_mean + 
+                                                       slc_acct_arr_dir_3 + slc_past_due_amt_imputed_med + slc_acct_pre_lim_perc_imputed_med + 
+                                                       g0_Delinq_Any_Aggr_Prop + AgeToTerm_Aggr_Mean + NewLoans_Aggr_Prop_1 + 
+                                                       InterestRate_Margin_Aggr_Med_1 + NewLoans_Aggr_Prop + NewLoans_Aggr_Prop_4 + 
+                                                       InterestRate_Margin_Aggr_Med_3")
 # - Adjusting the input space for [Principal]
-inputs_adv_principal_real <- as.formula(paste0("DefaultStatus1_lead_12_max~", paste0(labels(terms(inputs_adv))[-which(labels(terms(inputs_adv))=="Principal")],collapse="+"),"+ Principal_Real"))
+inputs_adv_principal_real <- as.formula(paste0("DefaultStatus1_lead_12_max~", paste0(labels(terms(inputs_adv))[-which(labels(terms(inputs_adv))=="Principal")], collapse="+"), "+ Principal_Real"))
 # - Adjusting the input space for [Balance]
 inputs_adv_balance_real <-  as.formula(paste0("DefaultStatus1_lead_12_max~", paste0(labels(terms(inputs_adv))[-which(labels(terms(inputs_adv))=="Balance")], collapse="+"), "+ Balance_Real"))
 # - Adjusting the input space for both [Principal] and [Balance]
@@ -205,15 +198,15 @@ inputs_adv_real <-  as.formula(paste0("DefaultStatus1_lead_12_max~", paste0(labe
 logitMod_adv <- glm(inputs_adv, family="binomial", data=datCredit_train)
 # - Deviance and AIC
 summary(logitMod_adv)
-### RESULTS: Null deviance = 255631; Residual Deviance = 168261; AIC = 168321
+### RESULTS: Null deviance = 279124; Residual Deviance = 188109; AIC = 188175
 ###          Variables are significant
 # - Coefficient of determination
 coefDeter_glm(logitMod_adv)
-### RESULTS: 34.18%
+### RESULTS: 32.61%
 # - ROC Analysis
-datCredit_valid[,prob_logitMod_Principal_Real_Full:=predict(logitMod_Principal_Real_Full, newdata = datCredit_valid, type = "response")]
+datCredit_valid[,prob_logitMod_Principal_Real_Full:=predict(logitMod_adv, newdata = datCredit_valid, type = "response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_logitMod_Principal_Real_Full)
-### RESULTS: 90.4%
+### RESULTS: 89.87%
 
 
 # --- 3.2.3 [Principal_Real]
@@ -221,15 +214,15 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_logitMod_Pr
 logitMod_Principal_Real_Full <- glm(inputs_adv_principal_real, family="binomial", data=datCredit_train)
 # - Deviance and AIC
 summary(logitMod_Principal_Real_Full)
-### RESULTS: Null deviance = 255631; Residual Deviance = 168222; AIC = 168282
+### RESULTS: Null deviance = 279124; Residual Deviance = 188033; AIC = 188099
 ###          [Principal_Real] is significant
 # - Coefficient of determination
 coefDeter_glm(logitMod_Principal_Real_Full)
-### RESULTS: 34.19%
+### RESULTS: 32.63%
 # - ROC Analysis
 datCredit_valid[,prob_logitMod_Principal_Real_Full:=predict(logitMod_Principal_Real_Full, newdata = datCredit_valid, type = "response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_logitMod_Principal_Real_Full)
-### RESULTS: 90.4%
+### RESULTS: 89.87%
 
 
 # --- 3.2.4 [Balance_Real]
@@ -238,15 +231,15 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_logitMod_Pr
 logitMod_Balance_Real_Full <- glm(inputs_adv_balance_real, family="binomial", data=datCredit_train)
 # - Deviance and AIC
 summary(logitMod_Balance_Real_Full)
-### RESULTS: Null deviance = 255631; Residual Deviance = 167928; AIC = 167988
+### RESULTS: Null deviance = 279124; Residual Deviance = 187679; AIC = 187745
 ###          [Balance_Real] is significant
 # - Coefficient of determination
 coefDeter_glm(logitMod_Balance_Real_Full)
-### RESULTS: 34.31%
+### RESULTS: 32.76%
 # - ROC Analysis
 datCredit_valid[,prob_logitMod_Balance_Real_Full:=predict(logitMod_Balance_Real_Full, newdata = datCredit_valid, type = "response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_logitMod_Balance_Real_Full)
-### RESULTS: 90.56%
+### RESULTS: 89.99%
 
 
 # --- 3.2.5 [Principal_Real] and [Balance_Real]
@@ -255,15 +248,15 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_logitMod_Ba
 logitMod_Real_Full <- glm(inputs_adv_real, family="binomial", data=datCredit_train)
 # - Deviance and AIC
 summary(logitMod_Real_Full)
-### RESULTS: Null deviance = 255631; Residual Deviance = 168184; AIC = 168244
+### RESULTS: Null deviance = 279124; Residual Deviance = 188000; AIC = 188066
 ###          [Principal_Real] and [Balance_Real] are significant
 # - Coefficient of determination
 coefDeter_glm(logitMod_Real_Full)
-### RESULTS: 34.21%
+### RESULTS: 32.65%
 # - ROC Analysis
 datCredit_valid[,prob_logitMod_Real_Full:=predict(logitMod_Real_Full, newdata = datCredit_valid, type = "response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_logitMod_Real_Full)
-### RESULTS: 90.47%
+### RESULTS: 89.92%
 
 
 
@@ -294,7 +287,7 @@ rm(stratifiers, targetVar, smp_size, smp_perc); gc()
 logitMod_Principal_smp <- glm(DefaultStatus1_lead_12_max ~ Principal, family="binomial", data=datCredit_train_smp)
 # Deviance and AIC
 summary(logitMod_Principal_smp)
-### RESULTS: Null deviance = 68370; Residual Deviance = 67978; AIC = 67982
+### RESULTS: Null deviance = 69475; Residual Deviance = 69138; AIC = 69142
 ###          Variable is significant
 
 # - Fitting a model with [Principal_Real]
@@ -302,7 +295,7 @@ summary(logitMod_Principal_smp)
 logitMod_Principal_Real_smp <- glm(DefaultStatus1_lead_12_max ~ Principal_Real, family="binomial", data=datCredit_train_smp)
 # Deviance and AIC
 summary(logitMod_Principal_Real_smp)
-### RESULTS: Null deviance = 68370; Residual Deviance = 68325; AIC = 68329
+### RESULTS: Null deviance = 69475; Residual Deviance = 69386; AIC = 69390
 ###          [Principal_Real] is significant
 
 
@@ -316,7 +309,7 @@ summary(logitMod_Principal_Real_smp)
 logitMod_Balance_smp <- glm(DefaultStatus1_lead_12_max ~ Balance, family="binomial", data=datCredit_train_smp)
 # Deviance and AIC
 summary(logitMod_Balance_smp)
-### RESULTS: Null deviance = 68370; Residual Deviance = 42043; AIC = 42095
+### RESULTS: Null deviance = 69475; Residual Deviance = 69447; AIC = 69451
 ###          [Balance_Real] is significant
 
 # - Fitting a model with [Balance_Real]
@@ -324,7 +317,7 @@ summary(logitMod_Balance_smp)
 logitMod_Balance_Real_smp <- glm(DefaultStatus1_lead_12_max ~ Balance_Real, family="binomial", data=datCredit_train_smp)
 # Deviance and AIC
 summary(logitMod_Balance_Real_smp)
-### RESULTS: Null deviance = 68370; Residual Deviance = 42043; AIC = 42095
+### RESULTS: Null deviance = 69475; Residual Deviance = 69465; AIC = 69469
 ###          [Balance_Real] is significant
 
 # - COMPARISON
@@ -338,60 +331,60 @@ summary(logitMod_Balance_Real_smp)
 logitMod_adv_smp <- glm(inputs_adv, family="binomial", data=datCredit_train_smp)
 # - Deviance and AIC
 summary(logitMod_adv_smp)
-### RESULTS: Null deviance = 63506 ; Residual Deviance = 42109; AIC = 42161
-###          Insignificant variables: [Principal], [Balance]
+### RESULTS: Null deviance = 69475 ; Residual Deviance = 46593; AIC = 46659
+###          [Principal] and [Balance] are significant.
 # - Coefficient of determination
 coefDeter_glm(logitMod_adv_smp)
-### RESULTS: 33.69%
+### RESULTS: 32.94%
 # - ROC Analysis
 datCredit_valid_smp[,prob_logitMod_adv_smp:=predict(logitMod_adv_smp, newdata = datCredit_valid_smp, type = "response")]
 auc(datCredit_valid_smp$DefaultStatus1_lead_12_max, datCredit_valid_smp$prob_logitMod_adv_smp)
-### RESULTS: 90.54%
+### RESULTS: 89.77%
 
 # --- 4.3.2 [Principal_Real]
 # - Model fit
 logitMod_Principal_Real_smp <- glm(inputs_adv_principal_real, family="binomial", data=datCredit_train_smp)
 # Deviance and AIC
 summary(logitMod_Principal_Real_smp)
-### RESULTS: Null deviance = 63506; Residual Deviance = 42071; AIC = 42123
+### RESULTS: Null deviance = 69475; Residual Deviance = 46575; AIC = 46641
 ###          [Balance] and [Principal_Real] are significant
 # - Coefficient of determination
 coefDeter_glm(logitMod_Principal_Real_smp)
-### RESULTS: 33.75%
+### RESULTS: 32.96%
 # - ROC Analysis
 datCredit_valid_smp[,prob_logitMod_Principal_Real_smp:=predict(logitMod_Principal_Real_smp, newdata = datCredit_valid_smp, type = "response")]
 auc(datCredit_valid_smp$DefaultStatus1_lead_12_max, datCredit_valid_smp$prob_logitMod_Principal_Real_smp)
-### RESULTS: 90.53%
+### RESULTS: 89.78%
 
 # --- 4.3.2 [Balance_Real]
 # - Model fit
 logitMod_Balance_Real_smp <- glm(inputs_adv_balance_real, family="binomial", data=datCredit_train_smp)
 # - Deviance and AIC
 summary(logitMod_Balance_Real_smp)
-### RESULTS: Null deviance = 63506; Residual Deviance = 42043; AIC = 42095
+### RESULTS: Null deviance = 69475; Residual Deviance = 46504; AIC = 46570
 ###          [Principal] and [Balance_Real] are significant
 # - Coefficient of determination
 coefDeter_glm(logitMod_Balance_Real_smp)
-### RESULTS: 33.80%
+### RESULTS: 33.06%
 # - ROC Analysis
 datCredit_valid_smp[,prob_logitMod_Balance_Real_smp:=predict(logitMod_Balance_Real_smp, newdata = datCredit_valid_smp, type = "response")]
 auc(datCredit_valid_smp$DefaultStatus1_lead_12_max, datCredit_valid_smp$prob_logitMod_Balance_Real_smp)
-### RESULTS: 90.68%
+### RESULTS: 89.85%
 
 # --- 4.3.3 [Principal_Real] and [Balance_Real]
 # - Model fit
 logitMod_Real_smp <- glm(inputs_adv_real, family="binomial", data=datCredit_train_smp)
 # - Deviance and AIC
 summary(logitMod_Real_smp)
-### RESULTS: Null deviance = 63506; Residual Deviance = 42086; AIC = 42138
-###          Insignificant variables: [Principal_Real] and [Balance_Real]
+### RESULTS: Null deviance = 69475; Residual Deviance = 46567; AIC = 46633
+###          [Principal_Real] & [Balance_Real] are significant, however, [Principal_Real] is close to the cut-off of 0.05.
 # - Coefficient of determination
 coefDeter_glm(logitMod_Real_smp)
-### RESULTS: 33.73%
+### RESULTS: 32.97%
 # - ROC Analysis
 datCredit_valid_smp[,prob_logitMod_Real_smp:=predict(logitMod_Real_smp, newdata = datCredit_valid_smp, type = "response")]
 auc(datCredit_valid_smp$DefaultStatus1_lead_12_max, datCredit_valid_smp$prob_logitMod_Real_smp)
-### RESULTS: 90.57%
+### RESULTS: 89.81%
 
 
 # ---- 4.4 Conclusion
@@ -407,20 +400,13 @@ auc(datCredit_valid_smp$DefaultStatus1_lead_12_max, datCredit_valid_smp$prob_log
 ###     - [Principal] and [Principal_Real] are significant in their respective models.
 ###     - [Balance] and [Balance_Real] are significant.
 ###   Sub subsample, full input space
-###     - [Principal] and [Balance] are insignificant.
+###     - [Principal] and [Balance] are significant.
 ###     - [Principal_Real] and [Balance] are significant.
 ###     - [Principal] and [Balance_Real] are significant.
 ###     - [Principal_Real] and [Balance_Real] are significant.
 
-###   Use either [Balance] or [Principal] (or their derivatives in the final model), but not both in the final model.
-###     [Principal] is preferred. [Balance] has a component of loan age within since balances decrease over time.
-###                               [Principal] has no such component and may give a better indication of the underlying account.
-
-
-
-
-
-
-
-
-
+###   Use either [Balance] or [Principal] or [Balance_Real] or [Principal_Real]
+###   Each version of the model results in an AUC between 89%-90% (which is within the "margin of error")
+###   Each version of the model results in a pseudo R-squared of around 33% (which is within the "margin of error")
+###   The inflation-adjusted versions of [Principal] and [Balance] are the preferred choice since they are more intuitive and
+###   help to mitigate the effects of inflation on the PDs (which can itself be isolated to the inflation macroeconomic variable)

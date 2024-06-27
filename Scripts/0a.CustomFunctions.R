@@ -425,7 +425,8 @@ transform_yj <- function(x, bound_lower=-2, bound_upper=2, lambda_inc=0.5, verbo
 #         [pd_plot]:     Should a partial dependence plot be created for each variable
 # Output: A data table containing the variable importance information
 varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.05, impPlot=F, pd_plot=F, chosenFont="Cambria", 
-                            colPalette="BrBG", colPaletteDir=1, plotName=paste0(genFigPath, "VariableImportance_", method,".png"), limitVars=10, dpi=360){
+                            colPalette="BrBG", colPaletteDir=1, plotVersionName="", plotName=paste0(genFigPath, "VariableImportance_", method,"_", plotVersionName,".png"), 
+                            limitVars=10, dpi=180){
   
   # - Unit testing conditions:
   # logit_model <- glm(default ~ student + balance + income, data=datTrain1, family="binomial")

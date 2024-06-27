@@ -135,13 +135,15 @@ rm(port.aggr_def, mean_EventRate_1, mean_EventRate_1, mean_EventRate_2, mean_Eve
 # ---- 2.2 Distributional Analysis of [g0_Delinq] over the sampling window
 # --- Aggregating the data to the delinquency level over the sampling window
 # - Aggregating by delinquency level over the sampling window
-port.aggr_def_del_time <- datCredit_train[DefaultStatus1==0,.N,by=list(g0_Delinq,Date)]
+port.aggr_def_del_time <- datCredit_train[DefaultStatus1==0,.N,by=list(DefaultStatus1_lead_12_max,g0_Delinq,Date)]
 # - Adding a column for the sum of total observations in each date
 port.aggr_def_del_time[,Total_N:=sum(N),by=Date]
 # - Getting the proportion of observations in each delinquency level at each date
 port.aggr_def_del_time[,Prop:=N/Total_N]
 # - Factorising [g0_Delinq] to facilitate graphing
 port.aggr_def_del_time[,g0_Delinq:=factor(g0_Delinq)]
+# - Factorising [DefaultStatus1_lead_12_max] to facilitate graphing
+port.aggr_def_del_time[,DefaultStatus1_lead_12_max:=factor(DefaultStatus1_lead_12_max)]
 # - Create summaries for annotations within graph
 port.aggr_def_del_time[,Facet:=factor(g0_Delinq, labels=c(paste0("italic(g[0])*'=0 (",sprintf( "%1.2f",g0_Delinq_Prop[1]*100),"%)'"),
                                                           paste0("italic(g[0])*'=1 (",sprintf( "%1.2f",g0_Delinq_Prop[2]*100),"%)'"),
@@ -150,7 +152,7 @@ port.aggr_def_del_time[,Facet:=factor(g0_Delinq, labels=c(paste0("italic(g[0])*'
 # --- Plot
 # - Annotations for facets
 # Statistics of the aggregated datset
-datStrata_aggr <- port.aggr_def_del_time[,list(Count_Strata=.N, Mean_Strata=mean(N,na.rm=T), SD_Strata=sd(N,na.rm=T), Min_Strata=min(N,na.rm=T))]
+datStrata_aggr <- port.aggr_def_del_time[,list(Count_Strata=.N, Mean_Strata=mean(N,na.rm=T), SD_Strata=sd(N,na.rm=T), Min_Strata=min(N,na.rm=T)), by=list(DefaultStatus1_lead_12_max)]
 datStrata_aggr[, Margin_Strata := qnorm(1-(1-confLevel)/2) * SD_Strata / sqrt(Count_Strata)]
 
 # Annotation dataset
@@ -158,17 +160,21 @@ datAnno <- data.table(g0_Delinq=factor(c(0,1,2)),
                       Facet=factor(c(paste0("italic(g[0])*'=0 (",sprintf( "%1.2f",g0_Delinq_Prop[1]*100),"%)'"),
                                      paste0("italic(g[0])*'=1 (",sprintf( "%1.2f",g0_Delinq_Prop[2]*100),"%)'"),
                                      paste0("italic(g[0])*'=2 (",sprintf( "%1.2f",g0_Delinq_Prop[3]*100),"%)'"))),
-                      Label=c(paste0("'", datStrata_aggr$Count_Strata, " total strata with a mean cell size of ",
-                                     comma(datStrata_aggr$Mean_Strata, accuracy=0.1),
-                                     " ± ", sprintf("%.1f", datStrata_aggr$Margin_Strata), " and a minimum size of ",
-                                     sprintf("%.0f", datStrata_aggr$Min_Strata),"'")),
-                      x=rep(date("2015-02-28"),3),
-                      y=c(0, datStrata_aggr$Mean_Strata*0.35, 0))
-datAnno[1,Label:=NA]; datAnno[3,Label:=NA]
+                      Label=c(paste0("'", datStrata_aggr$Count_Strata[1], " total 12-month non-default strata with a mean cell size of ",
+                                     comma(datStrata_aggr$Mean_Strata[1], accuracy=0.1),
+                                     " ± ", sprintf("%.1f", datStrata_aggr$Margin_Strata[1]), " and a minimum size of ",
+                                     sprintf("%.0f", datStrata_aggr$Min_Strata[1]),"'"),
+                              paste0("'", datStrata_aggr$Count_Strata[2], " total 12-month default strata with a mean cell size of ",
+                                     comma(datStrata_aggr$Mean_Strata[2], accuracy=0.1),
+                                     " ± ", sprintf("%.1f", datStrata_aggr$Margin_Strata[2]), " and a minimum size of ",
+                                     sprintf("%.0f", datStrata_aggr$Min_Strata[2]),"'")),
+                      x=rep(date("2015-02-28"),6),
+                      y=c(0, datStrata_aggr$Mean_Strata[1]*0.35, 0, 0, datStrata_aggr$Mean_Strata[1]*0.3, 0))
+datAnno[c(1,3,4,6),Label:=NA]
 # - Graphing parameters
 chosenFont <- "Cambria"; dpi <- 240
-col.v <- rep(brewer.pal(8, "Dark2")[c(1)],3)
-fill.v <- rep(brewer.pal(8, "Set2")[c(1)],3)
+col.v <- rep(brewer.pal(8, "Dark2")[c(1,3)],3)
+fill.v <- rep(brewer.pal(8, "Set2")[c(1,3)],3)
 
 # - Create graph to evidence minimum strata sizes
 (g_distribution_g0 <- ggplot(port.aggr_def_del_time, aes(x=Date, y=N)) + theme_minimal() + 
@@ -178,7 +184,7 @@ fill.v <- rep(brewer.pal(8, "Set2")[c(1)],3)
           strip.background=element_rect(fill="snow2", colour="snow2"),
           strip.text=element_text(size=8, colour="gray50"), strip.text.y.right=element_text(angle=90)) + 
     # main area graph
-    geom_col(aes(col=g0_Delinq, fill=g0_Delinq)) +
+    geom_col(aes(col=DefaultStatus1_lead_12_max, fill=DefaultStatus1_lead_12_max), position="identity", alpha=c(0.5)) +
     # facet
     facet_wrap(.~Facet, scales = "free_y", strip.position = "right", ncol=1, nrow=3, labeller=label_parsed) +  # label_bquote(italic(g[0])*~"="~.(g0_Delinq))) + # labeller
     # annotations
@@ -385,8 +391,8 @@ summary(logitMod_g0_Delinq_0_b)
 # --- 7.1.2 Dynamic variable selection
 # - Adjusting the input space
 inputs_g0_Delinq_0_b2 <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_g0_Delinq_0_b))[!(labels(terms(inputs_g0_Delinq_0_b)) %in%
-                                                                                                        c("Term", "Principal", "InterestRate_Margin_imputed_mean", "M_DTI_Growth_6", "M_DTI_Growth_9", "slc_acct_roll_ever_24_imputed_mean",
-                                                                                                          "slc_acct_arr_dir_3", "slc_past_due_amt_imputed_med", "slc_acct_pre_lim_perc_imputed_med", "NewLoans_Aggr_Prop_3", "NewLoans_Aggr_Prop_5"))], collapse = "+")))
+                                                                                                                           c("Term", "Principal", "InterestRate_Margin_imputed_mean", "M_DTI_Growth_6", "M_DTI_Growth_9", "slc_acct_roll_ever_24_imputed_mean",
+                                                                                                                             "slc_acct_arr_dir_3", "slc_past_due_amt_imputed_med", "slc_acct_pre_lim_perc_imputed_med", "NewLoans_Aggr_Prop_3", "NewLoans_Aggr_Prop_5"))], collapse = "+")))
 # - Fitting the model for delinquency segment 2
 logitMod_g0_Delinq_0_b2 <- glm(inputs_g0_Delinq_0_b2, data=datCredit_train[g0_Delinq==2,], family="binomial")
 # - Model analysis
@@ -397,7 +403,7 @@ summary(logitMod_g0_Delinq_0_b2)
 # --- 7.1.3 Dynamic variable selection
 # - Adjusting the input space
 inputs_g0_Delinq_0_b3 <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_g0_Delinq_0_b2))[!(labels(terms(inputs_g0_Delinq_0_b2)) %in%
-                                                                                                                           c("M_Emp_Growth_9", "M_RealGDP_Growth_12"))], collapse = "+")))
+                                                                                                                            c("M_Emp_Growth_9", "M_RealGDP_Growth_12"))], collapse = "+")))
 # - Fitting the model for delinquency segment 2
 logitMod_g0_Delinq_0_b3 <- glm(inputs_g0_Delinq_0_b3, data=datCredit_train[g0_Delinq==2,], family="binomial")
 # - Model analysis
@@ -476,8 +482,8 @@ summary(logitMod_g0_Delinq_2_b)
 # --- 7.3.2 Dynamic variable selection
 # - Adjusting the input space
 inputs_g0_Delinq_2_b2 <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_g0_Delinq_2_b))[!(labels(terms(inputs_g0_Delinq_2_b)) %in%
-                                                                                                                 c("Term", "Principal", "InterestRate_Margin_imputed_mean", "M_DTI_Growth_6", "M_DTI_Growth_9", "slc_acct_roll_ever_24_imputed_mean", "slc_acct_arr_dir_3",
-                                                                                                                   "slc_acct_pre_lim_perc_imputed_med", "NewLoans_Aggr_Prop_3", "NewLoans_Aggr_Prop_5"))], collapse = "+")))
+                                                                                                                           c("Term", "Principal", "InterestRate_Margin_imputed_mean", "M_DTI_Growth_6", "M_DTI_Growth_9", "slc_acct_roll_ever_24_imputed_mean", "slc_acct_arr_dir_3",
+                                                                                                                             "slc_acct_pre_lim_perc_imputed_med", "NewLoans_Aggr_Prop_3", "NewLoans_Aggr_Prop_5"))], collapse = "+")))
 # - Fitting the model for delinquency segment 2
 logitMod_g0_Delinq_2_b2 <- glm(inputs_g0_Delinq_2_b2, data=datCredit_train[g0_Delinq==2,], family="binomial")
 # - Model analysis
@@ -488,7 +494,7 @@ summary(logitMod_g0_Delinq_2_b2)
 # --- 7.3.3 Dynamic variable selection
 # - Adjusting the input space
 inputs_g0_Delinq_2_b3 <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_g0_Delinq_2_b2))[!(labels(terms(inputs_g0_Delinq_2_b2)) %in%
-                                                                                                                           c("Balance", "M_Emp_Growth_9", "M_RealGDP_Growth_12"))], collapse = "+")))
+                                                                                                                            c("Balance", "M_Emp_Growth_9", "M_RealGDP_Growth_12"))], collapse = "+")))
 # - Fitting the model for delinquency segment 2
 logitMod_g0_Delinq_2_b3 <- glm(inputs_g0_Delinq_2_b3, data=datCredit_train[g0_Delinq==2,], family="binomial")
 # - Model analysis
@@ -546,20 +552,5 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_fullb)
 # ------ 9. Comparison of segmented- vs full model : Bespoke input space per segment
 ### Segmented Model: Overall      : AUC = 73.65% | Coef. of Deter. = NA
 ### Full Model:      Overall      : AUC = 90.44% | Coef. of Deter. = 34.17%
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
