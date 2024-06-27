@@ -156,10 +156,9 @@ rm(datMV); gc()
 # NOTE: This step deliberately spans both performing and default spells
 # NOTE: Need to specify a (k+1)-window for the "frollapply()" function, e.g., a 12-month outcome implies 13 elements
 # Uses the custom function "imputLastKnown" defined in script 0
-maxDate <- max(datCredit_real[,Date], na.rm=T) - years(1) # Dates larger than maxDate do not have 12-month default because of the end of the sampling window
-datCredit_real[, DefaultStatus1_lead_12_max := ifelse(Date<=maxDate,imputeLastKnown(frollapply(x=DefaultStatus1, n=13, align="left", FUN=max)),NA), by=list(LoanID)]
+datCredit_real[, DefaultStatus1_lead_12_max := imputeLastKnown(frollapply(x=DefaultStatus1, n=13, align="left", FUN=max)), by=list(LoanID)]
 datCredit_real$DefaultStatus1_lead_12_max %>% table() %>% prop.table() 
-### RESULTS: 91.84% of observations have not defaulted in the next 12 months from reporting date, whilst 8.16% of accounts have.
+### RESULTS: 91.93% of observations have not defaulted in the next 12 months from reporting date, whilst 8.07% of accounts have.
 
 # - Relocate variable next to current default status variable
 datCredit_real <- datCredit_real %>% relocate(DefaultStatus1_lead_12_max, .after=DefaultStatus1)
@@ -188,7 +187,7 @@ datCredit_real[, g0_Delinq_Num := cumsum(g0_Delinq_Shift) + 1, by=list(LoanID)] 
 cat( (datCredit_real[is.na(g0_Delinq_Num), .N] == 0) %?% "SAFE: No missingness, [g0_Delinq_Num] created successfully.\n" %:%
        "WARNING: Missingness detected, [g0_Delinq_Num] compromised.\n")
 describe(datCredit_real$g0_Delinq_Num)
-### RESULT: Mean state number of 3.28 across all rows; median: 1; max of 100. 
+### RESULT: Mean state number of 3.3 across all rows; median: 1; max of 100. 
 # This high max suggests outlier-accounts with rapid and frequent changes in g0
 
 # - Account-level standard deviation of the delinquency state
@@ -212,7 +211,7 @@ datCredit_real[, g0_Delinq_SD_6 := frollapply(g0_Delinq, n=6, FUN=sd, align="rig
 datCredit_real[, g0_Delinq_SD_5 := frollapply(g0_Delinq, n=5, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]
 datCredit_real[, g0_Delinq_SD_4 := frollapply(g0_Delinq, n=4, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]
 
-# [SANITY CHECK] Check for missingness in engineered variables
+# [SANITY CHECK] Check for no missingness in engineered variables
 cat((anyNA(datCredit_real[,g0_Delinq_SD_12]) | anyNA(datCredit_real[,g0_Delinq_SD_9]) | anyNA(datCredit_real[,g0_Delinq_SD_6])
     | anyNA(datCredit_real[,g0_Delinq_SD_5]) | anyNA(datCredit_real[,g0_Delinq_SD_4])) %?% "WARNING: Excessive missingness detected, [g0_Delinq_SD_4], [g0_Delinq_SD_5], [g0_Delinq_SD_6], [g0_Delinq_SD_9], and/or [g0_Delinq_SD_12] compromised.\n" %:%
       "SAFE: No missingness, [g0_Delinq_SD_4], [g0_Delinq_SD_5], [g0_Delinq_SD_6], [g0_Delinq_SD_9], and [g0_Delinq_SD_12] created successfully.\n")
@@ -245,54 +244,15 @@ cat( ( datCredit_real[is.na(PerfSpell_g0_Delinq_SD),.N]==datCredit_real[is.na(Pe
        'SAFE: New feature [PerfSpell_g0_Delinq_SD] has logical values.\n' %:% 
        'WARNING: New feature [PerfSpell_g0_Delinq_SD] has illogical values \n' )
 
-# --- Create a portfolio level input variable, i.e., default incidence rate
-																			 																				
+### RB: Create new default rate input variable
+# - Setting some aggregation parameters, purely to facilitate graphing aesthetics
+def_StartDte <- min(datCredit_real[,Date], na.rm=T)
+def_EndDte <- max(datCredit_real[,Date], na.rm=T)
+maxDate <- def_EndDte - years(1) # A post-hoc filter, used for graphing purposes, given a 12-month outcome window
+
 # - Aggregate to monthly level and observe up to given point
-port.aggr <- datCredit_real[, list(DefaultStatus1_Aggr_Prop = sum(DefaultStatus1, na.rm=T)/.N),
-                      by=list(Date)]
-
-# - Quick plot for visual inspection
-plot(port.aggr[,1],as.matrix(port.aggr[,2]),type="l",xlab="Date", ylab="Probability", main="Default incidence rate")
-
-# - Merge default rate to credit dataset by date
-datCredit_real <- merge(datCredit_real, port.aggr, by="Date", all.x=T)
-# [Sanity Check] Check for any missingness in the DefaultStatus1_Aggr_Prop variable
-cat(anyNA(datCredit_real[,DefaultStatus1_Aggr_Prop]) %?% "Missingness detected in the DefaultStatus1_Aggr_Prop variable. \n" %:% "No Missingness detected in the DefaultStatus1_Aggr_Prop variable. \n")
-
-# - Proportion of new loans vs existing portfolio over time
-# NOTE: we therefore measure credit demand within market, underlying market conditions, and the implicit effect of bank policies)
-# Creating an aggregated dataset
-dat_NewLoans_Aggr <- datCredit_real[, list(NewLoans_Aggr_Prop = sum(Age_Adj==1, na.rm=T)/.N), by=list(Date)]
-# Applying various lags
-lags <- c(1,3,4,5) # Lags
-ColNames <- colnames(dat_NewLoans_Aggr)[-1] # Names of the columns
-for (i in seq_along(lags)){ # Looping over the specified lags and applying each to each of the specified columns
-  for (j in seq_along(ColNames)){
-    dat_NewLoans_Aggr[, (paste0(ColNames[j],"_",lags[i])) := fcoalesce(shift(get(ColNames[j]), n=lags[i], type="lag"),get(ColNames[j]))] # Impute NA's with the non lagged value
-  }
-}
-# [SANITY CHECK] Check whether the lags were created correctly
-cat((anyNA(dat_NewLoans_Aggr[,NewLoans_Aggr_Prop_1]) | anyNA(dat_NewLoans_Aggr[,NewLoans_Aggr_Prop_3]) | anyNA(dat_NewLoans_Aggr[,NewLoans_Aggr_Prop_4])
-     | anyNA(dat_NewLoans_Aggr[,NewLoans_Aggr_Prop_5])) %?% "WARNING: Missingness detected, [NewLoans_Aggr_Prop_1], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop_4], and/or [NewLoans_Aggr_Prop_5] compromised.\n" %:%
-      "SAFE: No missingness, [NewLoans_Aggr_Prop_1], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop_4], and [NewLoans_Aggr_Prop_5] created successfully.\n")
-### RESULTS: Variables successfully created without any missingness
-
-# Merging the credit dataset with the aggregated dataset
-datCredit_real <- merge(datCredit_real, dat_NewLoans_Aggr, by="Date", all.x=T)
-# Validate merging success by checking for missingness (should be zero)
-list_merge_variables <- list(colnames(dat_NewLoans_Aggr))
-results_missingness <- list()
-for (i in 1:length(list_merge_variables)){
-  output <- sum(is.na(datCredit_real$list_merge_variables[i]))
-  results_missingness[[i]] <- output
-}
-cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fusion with aggregated data is successful.\n" %:%
-       "WARNING: Missingness in certain aggregated fields detected, fusion compromised.\n")
-describe(datCredit_real$NewLoans_Aggr_Prop); plot(unique(datCredit_real$NewLoans_Aggr_Prop), type="b")
-### RESULTS: Variable has mean of 0.008 vs median of 0.007,
-# bounded by [0.003, 0.014] for 5%-95% percentiles; no major outliers
-
-
+port.aggr <- datCredit_real[DefaultStatus1==0, list(DefaultRate_12 = sum(DefaultStatus1_lead_12_max, na.rm=T)/.N),
+                      by=list(Date)][Date >= def_StartDte & Date <= maxDate,] %>% setkey(Date)
 
 
 # ------ 4. General cleanup & checks
@@ -301,7 +261,7 @@ describe(datCredit_real$NewLoans_Aggr_Prop); plot(unique(datCredit_real$NewLoans
 datCredit_real[, g0_Delinq_Shift := NULL]
 
 # - Clean-up
-rm(list_merge_variables, results_missingness, port.aggr, dat_NewLoans_Aggr)
+rm(list_merge_variables, results_missingness)
 
 # - Save to disk (zip) for quick disk-based retrieval later
 pack.ffdf(paste0(genPath, "creditdata_final4a"), datCredit_real); gc()

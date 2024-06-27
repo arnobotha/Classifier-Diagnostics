@@ -2,7 +2,7 @@
 # Compare logit models with raw variables against their transformed counterparts.
 # -----------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Marcel Muller, Roland Breedt
+# SCRIPT AUTHOR(S): Marcel Muller
 
 # DESCRIPTION:
 # This script uses the previously prepared credit dataset to fit a few logit models
@@ -80,16 +80,16 @@ logitMod_Test_yj_Bal <- glm(inputs_Test_log_Bal <- DefaultStatus1_lead_12_max ~ 
 # --- Basic model statistics
 # - Raw variable
 summary(logitMod_Test_Bal)
-### RESULTS: Null deviance = 279124; Residual deviance = 278988; AIC = 278992
-###          Standard Error = 0.00000001237
+### RESULTS: Null deviance = 275184; Residual deviance = 275014; AIC = 275018
+###          Standard Error = 0.00000001235
 # - Log-transformed variable
 summary(logitMod_Test_log_Bal)
-### RESULTS: Null deviance = 279124; Residual deviance = 278821; AIC = 278825
-###          Standard Error = 0.001113
+### RESULTS: Null deviance = 275184; Residual deviance = 275005; AIC = 275009
+###          Standard Error = 0.001124
 # - Yeo-Johnson optimal normality transformation
 summary(logitMod_Test_yj_Bal)
-### RESULTS: Null deviance = 279124; Residual deviance = 278665; AIC = 278669
-###          Standard error = 0.00009055
+### RESULTS: Null deviance = 275184; Residual deviance = 274723; AIC = 274727
+###          Standard error = 0.00009032
 
 # --- Odds ratio analysis
 # - Raw variable
@@ -97,7 +97,7 @@ round(exp(cbind(OR = coef(logitMod_Test_Bal), confint.default(logitMod_Test_Bal)
 ### RESULTS: OR = 1; 2.5% OR = 1; 97.5% OR = 1
 # - Log-transformed variable
 round(exp(cbind(OR = coef(logitMod_Test_log_Bal), confint.default(logitMod_Test_log_Bal))), 3)
-### RESULTS: OR = 0.98; 2.5% OR = 0.978; 97.5% OR = 0.982
+### RESULTS: OR = 0.984; 2.5% OR = 0.9682; 97.5% OR = 0.987
 # - Yeo-Johnson optimal normality transformation
 round(exp(cbind(OR = coef(logitMod_Test_yj_Bal), confint.default(logitMod_Test_yj_Bal))), 3)
 ### RESULTS: OR = 0.998; 2.5% OR = 0.998; 97.5% OR = 0.998
@@ -106,15 +106,15 @@ round(exp(cbind(OR = coef(logitMod_Test_yj_Bal), confint.default(logitMod_Test_y
 # - Raw variable
 datCredit_valid[, prob_Test_Bal := predict(logitMod_Test_Bal, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_Test_Bal)
-### RESULTS:~ 52.85%
+### RESULTS:~ 52.19%
 # - Log-transformed variable
 datCredit_valid[, prob_Test_log_Bal := predict(logitMod_Test_log_Bal, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_Test_log_Bal)
-### RESULTS:~ 52.85%
+### RESULTS:~ 52.19%
 # - Yeo-Johnson optimal transformation for normality
 datCredit_valid[, prob_Test_yj_Bal := predict(logitMod_Test_yj_Bal, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_Test_yj_Bal)
-### RESULTS:~ 52.85%
+### RESULTS:~ 52.19%
 
 # --- Graph for comparison of model statistics
 # - Getting the summary statistics for each model
@@ -182,44 +182,44 @@ logitMod_Test_yj_Bal2 <- glm(inputs_Test_yj_Bal2 <- DefaultStatus1_lead_12_max ~
 # --- Basic model statistics
 # - Raw variable [Balance]
 summary(logitMod_Test_Bal2)
-### RESULTS: Null deviance = 279124; Residual deviance = 220702; AIC = 220708
-###          Standard error [Balance] = 0.00000001335; Standard error [g0_Delinq] = 0.01101438818
+### RESULTS: Null deviance = 275184; Residual deviance = 215917; AIC = 215923
+###          Standard error [Balance] = 0.00000001342; Standard error [g0_Delinq] = 0.01113485479
 # - Transformed variable [BalanceLog]
 summary(logitMod_Test_log_Bal2)
-### RESULTS: Null deviance = 279124; Residual deviance = 219507; AIC = 219513
-###          Standard error [BalanceLog] = 0.001205; Standard error [g0_Delinq] = 0.011222
+### RESULTS: Null deviance = 275184; Residual deviance = 214993; AIC = 214999
+###          Standard error [BalanceLog] = 0.001225; Standard error [g0_Delinq] = 0.011331
 # - Yeo-Johnson transformed variable [BalanceYJ]
 summary(logitMod_Test_yj_Bal2)
-### RESULTS: Null deviance = 279124; Residual deviance = 220188; AIC = 220194
-###          Standard error [BalanceLog] = 0.0001056; Standard error [g0_Delinq] = 0.0110269
+### RESULTS: Null deviance = 215431; Residual deviance = 215437; AIC = 215437
+###          Standard error [BalanceLog] = 0.0001057; Standard error [g0_Delinq] = 0.0111498
 
 # --- Odds ration analysis
 # - Raw variable [Balance]
 round(exp(cbind(OR = coef(logitMod_Test_Bal2), confint.default(logitMod_Test_Bal2))), 3)
 ### RESULTS: Balance:   OR = 1;      2.5% OR = 1;      97.5% OR = 1
-###          g0_Delinq: OR = 14.486; 2.5% OR = 14.176; 97.5% OR = 14.802
+###          g0_Delinq: OR = 15.011; 2.5% OR = 14.687; 97.5% OR = 15.342
 # - Transformed variable [BalanceLog]
 round(exp(cbind(OR = coef(logitMod_Test_log_Bal2), confint.default(logitMod_Test_log_Bal2))), 3)
-### RESULTS: Balance:   OR = 0.955;  2.5% OR = 0.953;  97.5% OR = 0.957
-###          g0_Delinq: OR = 15.202; 2.5% OR = 14.871; 97.5% OR = 15.540
+### RESULTS: Balance:   OR = 0.960;  2.5% OR = 0.957;  97.5% OR = 0.962
+###          g0_Delinq: OR = 16.681; 2.5% OR = 15.336; 97.5% OR = 16.033
 # - Yeo-Johnson transformed variable [BalanceYJ]
 round(exp(cbind(OR = coef(logitMod_Test_yj_Bal2), confint.default(logitMod_Test_yj_Bal2))), 3)
 ### RESULTS: Balance:   OR = 0.998;  2.5% OR = 0.997;  97.5% OR = 0.998
-###          g0_Delinq: OR = 14.583; 2.5% OR = 14.271; 97.5% OR = 14.901
+###          g0_Delinq: OR = 15.112; 2.5% OR = 14.785; 97.5% OR = 15.446
 
 # --- ROC analysis
 # - Raw variable [Balance]
 datCredit_valid[, prob_Test_Bal2 := predict(logitMod_Test_Bal2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_Test_Bal2)
-### RESULTS:~ 76.36%
+### RESULTS:~ 75.97%
 # - Transformed variable [BalanceLog]
 datCredit_valid[, prob_Test_log_Bal2 := predict(logitMod_Test_log_Bal2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_Test_log_Bal2)
-### RESULTS:~ 76.36%
+### RESULTS:~ 75.97%
 # - Yeo-Johnson transformed variable [BalanceYJ]
 datCredit_valid[, prob_Test_yj_Bal2 := predict(logitMod_Test_yj_Bal2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_Test_yj_Bal2)
-### RESULTS:~ 76.36%
+### RESULTS:~ 75.97%
 
 # --- Graph for comparison of model statistics
 # - Getting the summary statistics for each model
@@ -311,41 +311,41 @@ logitMod_Test_RepoRate_YJ <- glm(DefaultStatus1_lead_12_max ~ M_Repo_RateYJ,
 # --- Basic model statistics
 # - Raw variable [M_Repo_Rate]
 summary(logitMod_Test_RepoRate)
-### RESULTS: Null deviance = 279124; Residual deviance = 276379; AIC = 276383
-###          Standard error = 0.24030
+### RESULTS: Null deviance = 274496; Residual deviance = 271654; AIC = 271658
+###          Standard error = 0.24275
 # - Transformed variable [M_Repo_RateSquared]
 summary(logitMod_Test_log_RepoRate_Sqaured)
-### RESULTS: Null deviance = 279124; Residual deviance = 276208; AIC = 276212
-###          Standard error = 0.0001442
+### RESULTS: Null deviance = 274496; Residual deviance = 271471; AIC = 271475
+###          Standard error = 0.0001461
 # - Yeo-Johnson transformed variable [M_Repo_RateYJ]
 summary(logitMod_Test_RepoRate_YJ)
-### RESULTS: Null deviance = 279124; Residual deviance = 276556; AIC = 276560
-###          Standard error = 0.008895
+### RESULTS: Null deviance = 274496; Residual deviance = 271841; AIC = 271845
+###          Standard error = 0.008971
 
 # --- Odds ration analysis
 # - Raw variable [M_Repo_Rate]
 round(exp(cbind(OR = coef(logitMod_Test_RepoRate), confint.default(logitMod_Test_RepoRate))), 3)
-### RESULTS: OR = 454457.618; 2.5% OR = 283760.164; 97.5% OR = 727839.043
+### RESULTS: OR = 675800.709; 2.5% OR = 419941.928; 97.5% OR = 1087547.036
 # - Transformed variable [M_Repo_RateSquared]
 round(exp(cbind(OR = coef(logitMod_Test_log_RepoRate_Sqaured), confint.default(logitMod_Test_log_RepoRate_Sqaured))), 3)
-### RESULTS: OR = 1.008; 2.5% OR = 1.008; 97.5% OR = 1.009
+### RESULTS: OR = 1.009; 2.5% OR = 1.008; 97.5% OR = 1.009
 # - Yeo-Johnson transformed variable [M_Repo_RateYJ]
 round(exp(cbind(OR = coef(logitMod_Test_RepoRate_YJ), confint.default(logitMod_Test_RepoRate_YJ))), 3)
-### RESULTS: OR = 1.584; 2.5% OR = 1.556; 97.5% OR = 1.612
+### RESULTS: OR = 1.604; 2.5% OR = 1.576; 97.5% OR = 1.633
 
 # --- ROC analysis
 # - Raw variable [M_Repo_Rate]
 datCredit_valid[, prob_Test_M_Repo_Rate := predict(logitMod_Test_RepoRate, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_Test_M_Repo_Rate)
-### RESULTS:~ 56.95%
+### RESULTS:~ 56.75%
 # - Transformed variable [M_Repo_RateSquared]
 datCredit_valid[, prob_Test_M_Repo_RateSquared := predict(logitMod_Test_log_RepoRate_Sqaured, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_Test_M_Repo_RateSquared)
-### RESULTS:~ 56.95%
+### RESULTS:~ 56.75%
 # - Yeo-Johnson transformed variable [M_Repo_RateYJ]
 datCredit_valid[, prob_Test_M_Repo_RateYJ := predict(logitMod_Test_RepoRate_YJ, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_Test_M_Repo_RateYJ)
-### RESULTS:~ 56.95%
+### RESULTS:~ 56.75%
 
 
 # --- Graph for comparison of model statistics
@@ -388,7 +388,7 @@ label.v <- c("Raw"="Raw", "Squared"="Squared", "YJ-transformed"="YJ")
 # --- Clean up
 rm(logitMod_Test_RepoRate, logitMod_Test_log_RepoRate_Sqaured,  logitMod_Test_RepoRate_YJ2, sum_logitMod_Test_RepoRate2, sum_logitMod_Test_log_RepoRate_Sqaured2, sum_logitMod_Test_RepoRate_YJ2,
    col.v, col.v2, label.v, datPlot4, datPlot4_long, g_comp3)
-datCredit_valid[, `:=` (prob_Test_M_Repo_Rate=NULL, prob_Test_M_Repo_RateSquared=NULL, prob_Test_M_Repo_RateYJ=NULL)]
+datCredit_valid[, `:=` (prob_Test_M_Repo_Rate2=NULL, prob_Test_M_Repo_RateSquared2=NULL, prob_Test_M_Repo_RateYJ2=NULL)]
 
 
 # --- CONCLUSION
@@ -414,44 +414,44 @@ logitMod_Test_RepoRate_YJ2 <- glm(DefaultStatus1_lead_12_max ~ M_Repo_RateYJ + g
 # --- Basic model statistics
 # - Raw variable [M_Repo_Rate]
 summary(logitMod_Test_RepoRate2)
-### RESULTS: Null deviance = 279124; Residual deviance = 219972; AIC = 219978
-###          Standard error [M_Repo_Rate] = 0.26466; Standard error [g0_Delinq] = 0.01102
+### RESULTS: Null deviance = 274496; Residual deviance = 214551; AIC = 214557
+###          Standard error [M_Repo_Rate] = 0.26818; Standard error [g0_Delinq] = 0.01116
 # - Transformed variable [M_Repo_RateSquared]
 summary(logitMod_Test_log_RepoRate_Sqaured2)
-### RESULTS: Null deviance = 279124; Residual deviance = 219926; AIC = 219932
-###          Standard error [M_Repo_RateSqaured] = 0.000162; Standard error [g0_Delinq] = 0.011022
+### RESULTS: Null deviance = 274496; Residual deviance = 214497; AIC = 214503
+###          Standard error [M_Repo_RateSqaured] = 0.0117934; Standard error [g0_Delinq] = 0.0111570
 # - Yeo-Johnson transformed variable [M_Repo_RateYJ]
 summary(logitMod_Test_RepoRate_YJ2)
-### RESULTS: Null deviance = 279124; Residual deviance = 214604; AIC = 214610
-###          Standard error [M_Repo_RateYJ] = 0.009659; Standard error [g0_Delinq] = 0.011016
+### RESULTS: Null deviance = 274496; Residual deviance = 214604; AIC = 214610
+###          Standard error [M_Repo_RateYJ] = 0.009772; Standard error [g0_Delinq] = 0.011154
 
 # --- Odds ration analysis
 # - Raw variable [M_Repo_Rate]
 round(exp(cbind(OR = coef(logitMod_Test_RepoRate2), confint.default(logitMod_Test_RepoRate2))), 3)
-### RESULTS: M_Repo_Rate:   OR = 1482.429;  2.5% OR = 882.455;  97.5% OR = 2490.320
-###          g0_Delinq:     OR = 13.940; 2.5% OR = 13.642; 97.5% OR = 14.244
+### RESULTS: M_Repo_Rate:   OR = 2098.065;  2.5% OR = 1240.349;  97.5% OR = 3548.900
+###          g0_Delinq:     OR = 14.450; 2.5% OR = 14.137; 97.5% OR = 14.769
 # - Transformed variable [M_Repo_RateSquared]
 round(exp(cbind(OR = coef(logitMod_Test_log_RepoRate_Sqaured2), confint.default(logitMod_Test_log_RepoRate_Sqaured2))), 3)
-### RESULTS: M_Repo_RateSquared:   OR = 1.005;  2.5% OR = 1.004;  97.5% OR = 1.005
-###          g0_Delinq:            OR = 13.909; 2.5% OR = 13.611; 97.5% OR = 14.212
+### RESULTS: M_Repo_RateSquared:   OR = 1.005;  2.5% OR = 1.005;  97.5% OR = 1.005
+###          g0_Delinq:            OR = 14.415; 2.5% OR = 14.103; 97.5% OR = 14.733
 # - Yeo-Johnson transformed variable [M_Repo_RateYJ]
 round(exp(cbind(OR = coef(logitMod_Test_RepoRate_YJ2), confint.default(logitMod_Test_RepoRate_YJ2))), 3)
-### RESULTS: M_Repo_RateYJ:   OR = 1.292;  2.5% OR = 1.268;  97.5% OR = 1.317
-###          g0_Delinq:       OR = 13.974; 2.5% OR =  13.676; 97.5% OR = 14.279
+### RESULTS: M_Repo_RateYJ:   OR = 1.306;  2.5% OR = 1.281;  97.5% OR = 1.332
+###          g0_Delinq:       OR = 14.487; 2.5% OR = 14.174; 97.5% OR = 14.807
 
 # --- ROC analysis
 # - Raw variable [M_Repo_Rate]
 datCredit_valid[, prob_Test_M_Repo_Rate2 := predict(logitMod_Test_RepoRate2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_Test_M_Repo_Rate2)
-### RESULTS:~ 77.18%
+### RESULTS:~ 77.01%
 # - Transformed variable [M_Repo_RateSquared]
 datCredit_valid[, prob_Test_M_Repo_RateSquared2 := predict(logitMod_Test_log_RepoRate_Sqaured2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_Test_M_Repo_RateSquared2)
-### RESULTS:~ 77.18%
+### RESULTS:~ 77.01%
 # - Yeo-Johnson transformed variable [M_Repo_RateYJ]
 datCredit_valid[, prob_Test_M_Repo_RateYJ2 := predict(logitMod_Test_RepoRate_YJ2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_Test_M_Repo_RateYJ2)
-### RESULTS:~ 77.18%
+### RESULTS:~ 77.01%
 
 
 # --- Graph for comparison of model statistics
