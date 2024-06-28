@@ -166,6 +166,7 @@ datCredit_real <- datCredit_real %>% relocate(DefaultStatus1_lead_12_max, .after
 
 
 # --- Delinquency-themed variables on a loan-level
+
 # - Embed previous defaults into a new Boolean-valued input variable
 datCredit_real[, PrevDefaults := ifelse(all(is.na(PerfSpell_Num)), F, max(PerfSpell_Num,na.rm = T) > 1), by=list(LoanID)]
 cat( (datCredit_real[is.na(PrevDefaults), .N] == 0) %?% "SAFE: No missingness, [PrevDefaults] created successfully.\n" %:%
@@ -173,6 +174,7 @@ cat( (datCredit_real[is.na(PrevDefaults), .N] == 0) %?% "SAFE: No missingness, [
 describe(datCredit_real$PrevDefaults)
 describe(datCredit_real[Counter==1, PrevDefaults])
 ### RESULTS: 11.6% of records had previous defaults, which is 6.9% of accounts
+
 
 # - Spell-level indicator for when a shift occurs in the state of g0_Delinq (target event)
 # NOTE: This is an intermediary field used in the creation of subsequent fields
@@ -183,6 +185,7 @@ cat( (datCredit_real[is.na(g0_Delinq_Shift), .N] == 0) %?% "SAFE: No missingness
 datCredit_real$g0_Delinq_Shift %>% table() %>% prop.table()
 ### RESULT: 96.05% of the records had no change in their delinquency level from their associated previous record.
 
+
 # - Delinquency state number, where each change in g_0 denotes such a "state" that may span several periods
 datCredit_real[, g0_Delinq_Num := cumsum(g0_Delinq_Shift) + 1, by=list(LoanID)] # Assign state numbers over the entire loan history (add one to ensure that there are no delinquency spell numbers equal to zero)
 cat( (datCredit_real[is.na(g0_Delinq_Num), .N] == 0) %?% "SAFE: No missingness, [g0_Delinq_Num] created successfully.\n" %:%
@@ -190,6 +193,7 @@ cat( (datCredit_real[is.na(g0_Delinq_Num), .N] == 0) %?% "SAFE: No missingness, 
 describe(datCredit_real$g0_Delinq_Num)
 ### RESULT: Mean state number of 3.28 across all rows; median: 1; max of 100. 
 # This high max suggests outlier-accounts with rapid and frequent changes in g0
+
 
 # - Account-level standard deviation of the delinquency state
 datCredit_real[, g0_Delinq_SD := sd(g0_Delinq, na.rm=T), by=list(LoanID)]
@@ -199,6 +203,7 @@ cat( (datCredit_real[is.na(g0_Delinq_SD), .N] == 0) %?% "SAFE: No missingness, [
 describe(datCredit_real[, list(g0_Delinq_SD=mean(g0_Delinq_SD, na.rm=T)), by=list(LoanID)]$g0_Delinq_SD)
 ### RESULT: mean account-level SD in delinquency states of 0.21; median: 0, but 95%-percentile of 1.19
 # This suggests that most accounts do not vary significantly in their delinquency states over loan life, which is sensible
+
 
 # - 4-,5-,6-,9- and 12 month rolling state standard deviation
 # NOTE: Usefulness of each time window length will yet be determined during prototyping/modelling
@@ -219,6 +224,7 @@ cat((anyNA(datCredit_real[,g0_Delinq_SD_12]) | anyNA(datCredit_real[,g0_Delinq_S
 
 #Clean-up
 rm(SD_LoanLevel,SD_Overall)
+
 
 # - Time in delinquency state
 # NOTE: This variable is conceptually different to [TimeInPerfSpell].
@@ -245,19 +251,22 @@ cat( ( datCredit_real[is.na(PerfSpell_g0_Delinq_SD),.N]==datCredit_real[is.na(Pe
        'SAFE: New feature [PerfSpell_g0_Delinq_SD] has logical values.\n' %:% 
        'WARNING: New feature [PerfSpell_g0_Delinq_SD] has illogical values \n' )
 
-# --- Create a portfolio level input variable, i.e., default incidence rate
+
+# --- Create portfolio-level input variables that vary over time
+
+# - Default incidence rate
+# Not the same as the 12-month default rate (a conditional probability)
 																			 																				
-# - Aggregate to monthly level and observe up to given point
-port.aggr <- datCredit_real[, list(DefaultStatus1_Aggr_Prop = sum(DefaultStatus1, na.rm=T)/.N),
-                      by=list(Date)]
-
-# - Quick plot for visual inspection
+# Aggregate to monthly level and observe up to given point
+port.aggr <- datCredit_real[, list(DefaultStatus1_Aggr_Prop = sum(DefaultStatus1, na.rm=T)/.N), by=list(Date)]
+# Quick plot for visual inspection
 plot(port.aggr[,1],as.matrix(port.aggr[,2]),type="l",xlab="Date", ylab="Probability", main="Default incidence rate")
-
-# - Merge default rate to credit dataset by date
+# Merge default incidence to credit dataset by date
 datCredit_real <- merge(datCredit_real, port.aggr, by="Date", all.x=T)
 # [Sanity Check] Check for any missingness in the DefaultStatus1_Aggr_Prop variable
-cat(anyNA(datCredit_real[,DefaultStatus1_Aggr_Prop]) %?% "Missingness detected in the DefaultStatus1_Aggr_Prop variable. \n" %:% "No Missingness detected in the DefaultStatus1_Aggr_Prop variable. \n")
+cat(anyNA(datCredit_real[,DefaultStatus1_Aggr_Prop]) %?% "Missingness detected in the DefaultStatus1_Aggr_Prop variable. \n" %:%
+      "No Missingness detected in the DefaultStatus1_Aggr_Prop variable. \n")
+
 
 # - Proportion of new loans vs existing portfolio over time
 # NOTE: we therefore measure credit demand within market, underlying market conditions, and the implicit effect of bank policies)

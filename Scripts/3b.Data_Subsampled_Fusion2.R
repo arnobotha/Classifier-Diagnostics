@@ -402,7 +402,7 @@ if (!exists('datMV')) unpack.ffdf(paste0(genPath,"datMV"), tempPath)
 # - Getting a range of inflation factors for each date in the sampling window
 date_range <- ceiling_date(unique(datCredit_smp$Date), unit="month")-days(1)
 datInflation <- data.table(Date=date_range)
-datInflation[,Inf_Factor:=adjInflation(datMacro=datMV, time="Date", Inflation_Growth="M_Inflation_Growth", g_start=Date, g_stop = date_range[length(date_range)]), by=Date]
+datInflation[,Inf_Factor:=adjInflation_MV(datMacro=datMV, time="Date", Inflation_Growth="M_Inflation_Growth", g_start=Date, g_stop = date_range[length(date_range)]), by=Date]
 datCredit_smp <- merge(datCredit_smp, datInflation, all.x=T, by="Date")
 
 # - [SANITY CHECK]
@@ -411,11 +411,8 @@ cat((anyNA(datCredit_smp$Inf_Factor)) %?% paste0('WARNING: Inflation factor(s) i
 ### RESULTS: [Inf_Factor] variables created successfully without any missingness
 
 # - Deflate the relevant variables
-# [Principal]
 datCredit_smp[, Principal_Real := Principal*Inf_Factor]
-# [Balance]
 datCredit_smp[, Balance_Real := Balance*Inf_Factor]
-# [Instalment]
 datCredit_smp[, Instalment_Real := Instalment*Inf_Factor]
 
 # - [SANITY CHECK]
@@ -425,7 +422,7 @@ cat( (all(anyNA(datCredit_smp$Principal_Real), anyNA(datCredit_smp$Balance_Real)
 (var_Info_Num$Principal_Real <- describe(datCredit_smp$Principal_Real))
 (var_Info_Num$Balance_Real <- describe(datCredit_smp$Balance_Real))
 (var_Info_Num$Instalment_Real <- describe(datCredit_smp$Instalment_Real))
-### RESULTS: [Principal_Real], [Balance_Real], and [Instalment_Real] variables created successfully without any missingness
+### RESULTS: Variables created successfully without any missingness
 
 # - Clean up
 rm(datMV, date_range, datInflation)

@@ -89,8 +89,7 @@ adjInflation <- function(g_start, g_stop) {
 }
 
 
-# - Advanced inflation factors 
-# NOTE: Marcel's version, overwriting the previous function definition for now
+# -  Adjuting for inflation (Robust version that accepts a macroeconomic dataset)
 # Generating an inflation factor for a given series of yearly inflation growth rates
 # Input:  [datMacro]: The dataset containing the yearly inflation growth rate
 #         [time]: Name of the time/date variable in [datMacro]
@@ -98,7 +97,7 @@ adjInflation <- function(g_start, g_stop) {
 #         [g_stop]:   The ending date for the series of inflation growth rates
 # Output: A factor indicating the cumulative inflation over the period starting at [g_start] and ending [g_stop]
 # --- Define custom function for computing inflation/deflation factors
-adjInflation <- function(datMacro, time, Inflation_Growth, g_start, g_stop) {
+adjInflation_MV <- function(datMacro, time, Inflation_Growth, g_start, g_stop) {
   # datMacro=datMV; time="Date"; g_start<-date("2015-02-28"); g_stop<-date("2022-12-31"); Inflation_Growth<-"M_Inflation_Growth"
   compFact <- as.numeric(datMacro[get(time) >= g_start & get(time) <= g_stop, list(Factor = prod(1 + (get(Inflation_Growth))/12))])
   return(compFact)
@@ -632,6 +631,8 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
 
 # ------------------------- DIAGNOSTIC FUNCTIONS FOR LOGIT MODELS ---------------------------
 
+
+# --- Pseudo R^2 measures for classifiers
 # Calculate a pseudo coefficient of determination (R^2) \in [0,1] for glm assuming binary
 # logistic regression as default, based on the "null deviance" in likelihoods
 # between the candidate model and the intercept-only (or "empty/worst/null") model.
@@ -711,8 +712,8 @@ coefDeter_glm <- function(model) {
 
 
 
-
-# - Perform residual analysis for a glm-model using deviances (difference between predicted probabilities and observed proportions of success)
+# --- Residual Deviance measures
+# Perform residual analysis for a glm-model using deviances (difference between predicted probabilities and observed proportions of success)
 # A standard normal distribution approximates the residual deviance distribution for a well-fitted model (assuming logistic regression)
 # Accordingly, min/max residuals should lie within [-3,3], median should be close to 0, and 1st/3rd quantiles 
 # should be similarly in their absolute value.
