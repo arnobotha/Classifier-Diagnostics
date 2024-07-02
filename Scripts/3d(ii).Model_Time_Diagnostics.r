@@ -27,7 +27,6 @@
 # ===========================================================================================================
 
 # ------ 1. Preliminaries
-
 ptm <- proc.time() # for runtime calculations (ignore)
 
 # - Graphing Parameters
@@ -45,11 +44,11 @@ datCredit_valid <- datCredit_valid %>% subset(DefaultStatus1==0)
 datCredit_smp <- datCredit_smp %>% subset(DefaultStatus1==0)
 
 # - Load in basic, intermediate, and advanced model formulas
-# Basic model(s)
+# Basic model
 unpack.ffdf(paste0(genObjPath, "Basic_Com_Formula"), tempPath)
-# Intermediate model(s)
+# Intermediate model
 unpack.ffdf(paste0(genObjPath, "Int_Formula"), tempPath)
-# Advanced model(s)
+# Advanced model
 unpack.ffdf(paste0(genObjPath, "Adv_Formula"), tempPath)
 
 
@@ -129,7 +128,8 @@ ExpRte_Adv <- datCredit_smp[,list(DefRate=mean(prob_adv,na.rm=T), Dataset="D"),b
   
 # - Bind rates
 PlotSet <- rbind(Actual,ExpRte_Bas,ExpRte_Int,ExpRte_Adv)
-  
+
+# - Location of annotations
 start_y<-0.06
 space<-0.00375
 y_vals<-c(start_y,start_y-space,start_y-space*2)
@@ -185,7 +185,128 @@ facet_names_full <- c("DefRate"="Tester")
 # - Pack away graph
 ggsave(Models_TimeDiag, file=paste0(genFigPath, "ModelsTimeDiagnostics.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
   
-# ------ 2. Wilcoxon Signed Rank Test
+# --- 2.3. Wilcoxon Signed Rank Test
 wilcox.test(Actual[,DefRate],ExpRte_Bas[,DefRate], alternative = "two.sided", conf.level = 0.95) #basic
+### RESULTS: p-value ~ 0
 wilcox.test(Actual[,DefRate],ExpRte_Int[,DefRate], alternative = "two.sided", conf.level = 0.95) #intermediate
+### RESULTS: p-value = 0.6136
 wilcox.test(Actual[,DefRate],ExpRte_Adv[,DefRate], alternative = "two.sided", conf.level = 0.95) #advanced
+### RESULTS: p-value = 0.3392
+
+# --- 2.4 AUC over time
+
+# - ROC Analysis by date
+
+AUC.Over.Time<-function(DataSet, DateName, Target, Predictions){
+ # DataSet<-datCredit_smp
+ # DateName<-"Date"
+ # Target<- "DefaultStatus1_lead_12_max"
+ # Predictions<- "prob_adv"
+  
+# - Get unique dates and create data table to store results in
+UDates<-DataSet[!duplicated(get(DateName)),list(Date=get(DateName), AUC_Val=-99, AUC_LowerCI=-99, AUC_UpperCI=-99)]
+
+counter<-1
+for(k in UDates$Date){
+  TempDat<-DataSet[Date==k,list(target_var=get(Target), predicted_var=get(Predictions))]
+  TempObj<-roc(response=TempDat$target_var, predictor=TempDat$predicted_var, ci=T,ci.method="delong", conf.level=0.95, trace=FALSE)
+  UDates[counter, "AUC_Val"]<-TempObj$auc
+  UDates[counter, "AUC_LowerCI"]<-TempObj$ci[1]
+  UDates[counter, "AUC_UpperCI"]<-TempObj$ci[3]
+  counter<-counter+1
+}
+return(UDates)
+}
+
+AUC.Over.Time(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_adv")
+
+
+
+plot(UDates$Date, UDates$AUC_LowerCI, type="l",ylim=c(0,1))
+lines(UDates$Date, UDates$AUC_UpperCI, type="l")
+
+PlottingSet<-rbind(AucBas,AucInt,AucAdv)
+
+
+
+# - Graphing parameters
+col.v<-brewer.pal(9, "Set1")[c(2,1,4)]
+
+label.v <- c("A"=": Basic",
+             "B"=": Intermediate",
+             "C"=": Advanced")
+
+shape.v <- c(18,20,16); 
+linetype.v <- c("solid","solid","solid")
+
+(gg_TS <- ggplot(PlottingSet, aes(x=Date, y=Value)) + 
+    theme_minimal() +
+    labs(x="Calendar date (months)", y=bquote(" AUC (%)"), family=chosenFont) + 
+    theme(text=element_text(family=chosenFont),legend.position = "bottom",legend.margin=margin(-10, 0, 0, 0),
+          axis.text.x=element_text(angle=90), 
+          strip.background=element_rect(fill="snow2", colour="snow2"),
+          strip.text=element_text(size=11, colour="gray50"), strip.text.y.right=element_text(angle=90)) +
+    # main line graph with overlaid points
+    geom_line(aes(colour=Dataset, linetype=Dataset), linewidth=0.6) +
+    geom_point(aes(colour=Dataset, shape=Dataset),size=1.7) + 
+    # facets & scale options
+    scale_colour_manual(name=bquote("Model"), values=col.v, labels=label.v) + 
+    scale_shape_manual(name=bquote("Model"), values=shape.v, labels=label.v) + 
+    scale_linetype_manual(name=bquote("Model"), values=linetype.v, labels=label.v) + 
+    scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y") +
+    scale_y_continuous(breaks=pretty_breaks(), label=percent, limits=c(0,1)))
+
+
+##################################################################################
+##################################################################################
+# - Create 95% confidence interval for point estimate (mean) : Population-training set comparison
+datPlot[, ErrMargin := (qnorm(1-(1-0.95)/2)*SD/sqrt(N))]
+datPlot[, Value_lower := Value - ErrMargin]
+datPlot[, Value_upper := Value + ErrMargin]
+datPlot[, Measure2 := ifelse(is.na(SD), NA, Measure)]
+
+# - Prepare summaries for annotating the eventual graph
+datAnnotate <- subset(datPlot, Threshold==b_value)
+if (NROW(datAnnotate) == 0) stop("Threshold not found!")
+datAnnotate[Measure=="FalseEnd_mean", Value:=NA] # void the non-varying quantity for graphical purposes
+datAnnotate[, Label := paste0("'Value at chosen '*italic(b^{'*'})==", b_value, "*':  ", sprintf("%.2f", Value), " ± ", sprintf("%.2f", ErrMargin), " months'")]
+datAnnotate[, x_Label := 4500]
+datAnnotate[, y_Label := case_when(Measure=="TruEnd_mean"~Value*1.005,
+                                   Measure=="TZB_Length_mean"~Value*0.95,
+                                   NA~NA)]
+
+# - graphing parameters
+vCol <- brewer.pal(8, "Dark2")[c(2,1,3)]; vCol2 <- brewer.pal(8, "Set2")[c(1,3,2)]
+vLabel <- c("FalseEnd_mean"="Age (No TruEnd)", "TruEnd_mean"="Age (TruEnd)", "TZB_Length_mean" = "Length of TZB-period")
+vLabel2 <- c("TruEnd_mean"="Age (TruEnd)", "TZB_Length_mean" = "Length of TZB-period")
+
+# - Graph results
+(g3 <- ggplot(datPlot, aes(x=Threshold, y=Value, group=Measure)) + theme_minimal() + 
+    labs(y="Months", x=bquote("Threshold (ZAR) "*italic(b))) + 
+    theme(legend.position="bottom", legend.box="vertical",
+          text=element_text(family=chosenFont),
+          strip.background = element_rect(fill="snow2", colour="snow2"),
+          strip.text=element_text(size=8, colour="gray50"), strip.text.y.right=element_text(angle=90)) + 
+    # Main graph
+    geom_ribbon(aes(fill=Measure2, ymin=Value_lower, ymax=Value_upper), alpha=0.4) + 
+    geom_line(aes(colour=Measure, linetype=Measure), linewidth=0.5) +    
+    geom_point(aes(colour=Measure, shape=Measure), size=2) + 
+    # Annotations
+    geom_point(data=datAnnotate, aes(x=Threshold, y=Value, colour=Measure), size=4, shape=1, show.legend=F) + 
+    geom_hline(data=datAnnotate, aes(yintercept=Value, colour=Measure), linewidth=0.3, linetype="dotted", show.legend=F) + 
+    geom_text(data=datAnnotate, aes(x=x_Label, y=y_Label, group=Measure, label=Label), size=4, family=chosenFont, parse=T) + 
+    # Facets & scale options
+    facet_grid(Facet~., scales="free") + 
+    scale_colour_manual(name="Mean of", values=vCol, labels=vLabel) + 
+    scale_linetype_discrete(name="Mean of", labels=vLabel) + 
+    scale_shape_discrete(name="Mean of", labels=vLabel) + 
+    scale_fill_manual(name="95% CI for means", values=vCol2, labels=vLabel2, na.translate=F) +
+    scale_y_continuous(labels=comma) + scale_x_continuous(labels=comma)
+)
+
+
+
+
+
+
+
