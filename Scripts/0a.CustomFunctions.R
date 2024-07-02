@@ -966,3 +966,50 @@ Gen_Youd_Ind<-function(Trained_Model, Train_DataSet, Target, a){
 # 
 # # - Wrtitten Gen_Youd_Ind function
 # Gen_Youd_Ind(logit_model,datTrain,"default",4) # Optimal Cut-off = 0.2120438; Optimal Criterion = -6.673423
+
+
+
+
+
+# --------------------------------------------- AUC By Date Function --------------------------------------------------
+# - This function computes the AUC and its confidence interval for each unique date in the datatable.
+### INPUT:
+# - DataSet: A dataset in datatable format containing 1)Dates; 2) a Target Variable; 3) Probability Scores
+# - DateName: Character String containing the name of the DATE column in the dataset
+# - Target: Character String containing the name of the TARGET column in the dataset
+# - Predictions: Character String containing the name of the PROBABILITY SCORES column in the dataset
+
+### OUTPUT: 
+# - A datatable which has columns --> Date: Unique Dates; AUC_Val: Estimated AUC values; AUC_LowerCI: Estimated 
+#   lower CI values of the AUC values; AUC_UpperCI: Estimated upper CI values of the AUC values
+
+AUC.Over.Time<-function(DataSet, DateName, Target, Predictions){
+  # DataSet<-datCredit_smp
+  # DateName<-"Date"
+  # Target<- "DefaultStatus1_lead_12_max"
+  # Predictions<- "prob_adv"
+  
+  # - Safety Check for missingness in predictions
+  if(anyNA(DataSet[,list(get(DateName), get(Target), get(Predictions))])){
+    stop("Missingness in data, Exit function...")
+  }
+  
+  # - Get unique dates and create the data table to store results in
+  UDates<-DataSet[!duplicated(get(DateName)),list(Date=get(DateName), AUC_Val=-99, AUC_LowerCI=-99, AUC_UpperCI=-99)]
+  
+  # - Looping over dates and obtaining AUC and CI
+  counter<-1
+  for(k in UDates$Date){
+    TempDat<-DataSet[Date==k,list(target_var=get(Target), predicted_var=get(Predictions))]
+    TempObj<-roc(response=TempDat$target_var, predictor=TempDat$predicted_var, ci=T,ci.method="delong", conf.level=0.95, trace=FALSE)
+    UDates[counter, "AUC_Val"]<-TempObj$auc
+    UDates[counter, "AUC_LowerCI"]<-TempObj$ci[1]
+    UDates[counter, "AUC_UpperCI"]<-TempObj$ci[3]
+    counter<-counter+1
+  }
+  # - Return the Dataset
+  return(UDates[order(Date),])
+}
+
+# - Call AUC.Over.Time Function 
+# AUC.Over.Time(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
