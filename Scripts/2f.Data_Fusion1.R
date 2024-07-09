@@ -264,8 +264,8 @@ plot(port.aggr[,1],as.matrix(port.aggr[,2]),type="l",xlab="Date", ylab="Probabil
 # Merge default incidence to credit dataset by date
 datCredit_real <- merge(datCredit_real, port.aggr, by="Date", all.x=T)
 # [Sanity Check] Check for any missingness in the DefaultStatus1_Aggr_Prop variable
-cat(anyNA(datCredit_real[,DefaultStatus1_Aggr_Prop]) %?% "Missingness detected in the DefaultStatus1_Aggr_Prop variable. \n" %:%
-      "No Missingness detected in the DefaultStatus1_Aggr_Prop variable. \n")
+cat(anyNA(datCredit_real[,DefaultStatus1_Aggr_Prop]) %?% "WARNING: Missingness detected in the DefaultStatus1_Aggr_Prop variable. \n" %:%
+      "SAFE: No Missingness detected in the DefaultStatus1_Aggr_Prop variable. \n")
 
 
 # - Proportion of new loans vs existing portfolio over time
