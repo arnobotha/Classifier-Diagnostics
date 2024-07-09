@@ -638,11 +638,11 @@ logitMod_Adv <- glm(inputs_adv, data=datCredit_train, family="binomial")
 # --- 6.2 Assessment
 # - Deviance and AIC
 summary(logitMod_Adv)
-### RESULTS: Null deviance = 279124; Residual deviance = 187837; AIC = 187887
+### RESULTS: Null deviance = 279124; Residual deviance = 187833; AIC = 187883
 
 # - Evaluate fit using R^2 based on deviance vs null deviance
 coefDeter_glm(logitMod_Adv)
-### RESULTS: 32.7%
+### RESULTS: 32.71%
 
 # - Odds Ratio analysis 
 round(exp(cbind(OR = coef(logitMod_Adv), confint.default(logitMod_Adv))), 3)

@@ -22,9 +22,12 @@
 
 # -- Inputs:
 #   - datCredit_real | Prepared from script 2f.
+#   - creditdata_input1 | Imported input space from script 2a
 #
 # -- Outputs:
 #   - datCredit_smp | Subsampled set, fused with input space, duly prepared
+#   - datCredit_train | Training set, created from subsampled set
+#   - datCredit_valid | Validation set, created from subsampled set
 # ------------------------------------------------------------------------------------------------------
 
 
@@ -37,9 +40,6 @@ ptm <- proc.time() # for runtime calculations (ignore)
 # - Confirm prepared datasets are loaded into memory
 if (!exists('datCredit_real')) unpack.ffdf(paste0(genPath,"creditdata_final4a"), tempPath)
 if (!exists('datExclusions')) unpack.ffdf(paste0(genObjPath,"Exclusions-TruEnd-Enriched"), tempPath)
-
-# - Confidence interval parameter
-confLevel <- 0.95
 
 # - Field names
 stratifiers <- c("DefaultStatus1_lead_12_max", "Date") # Must at least include target variable used in graphing event rate
@@ -68,6 +68,7 @@ if (diag.real_subsamp_5a > 0) {
   
   # - Apply Exclusion (not necessary to mark within dataset any more, given advanced stage of data process at this point)
   # NOTE: Double conversion necessary as annoying fix; see https://github.com/Rdatatable/data.table/issues/3745
+  gc()
   datCredit_real <- datCredit_real %>% drop_na(all_of(stratifiers)) %>% as_tibble() %>% as.data.table()
   
   # [SANITY CHECK] Treatment success?
@@ -103,7 +104,7 @@ if (diag.real_subsamp_5a > 0) {
 smp_perc <- smp_size / ( datCredit_real[complete.cases(mget(stratifiers)), mget(stratifiers)][,.N] ) # Implied sampling fraction for downsampling step
 
 # - Downsample data into a set with a fixed size (using stratified sampling) before implementing resampling scheme
-set.seed(1)
+set.seed(1, kind="Mersenne-Twister")
 datCredit_smp <- datCredit_real %>% drop_na(all_of(stratifiers)) %>% group_by(across(all_of(stratifiers))) %>% slice_sample(prop=smp_perc) %>% as.data.table()
 cat( (datCredit_smp[is.na(get(targetVar)), .N] == 0) %?% 'SAFE: No missingness in target variable.\n' %:% 
        'WARNING: Missingness detected in target variable.\n')
@@ -268,7 +269,7 @@ cat( ( datCredit_smp[is.na(slc_acct_pre_lim_perc_imputed_med), .N ] == 0) %?%
 # - Number of times an account was in arrears over last 24 months
 var_Info_Num$slc_acct_roll_ever_24; hist(datCredit_smp$slc_acct_roll_ever_24, breaks='FD')
 datCredit_smp[is.na(slc_acct_roll_ever_24), .N] / datCredit_smp[,.N] * 100
-### RESULTS: Highly right-skewed distribution with mean of 0.4871, though discrete values with 80% of data having 0-value.
+### RESULTS: Highly right-skewed distribution with mean of 0.4892, though discrete values with 80% of data having 0-value.
 # Use mean imputation, given 8.45% missingness degree, trading off the minor distributional distortion as a result
 datCredit_smp[, slc_acct_roll_ever_24_imputed_mean := 
                 ifelse(is.na(slc_acct_roll_ever_24) | slc_acct_roll_ever_24 == "", 
@@ -278,7 +279,8 @@ cat( ( datCredit_smp[is.na(slc_acct_roll_ever_24_imputed_mean), .N ] == 0) %?%
        'SAFE: Treatment successful for [slc_acct_roll_ever_24_imputed_mean].\n' %:% 
        'ERROR: Treatment failed for [slc_acct_roll_ever_24_imputed_mean] \n' )
 (var_Info_Num$slc_acct_roll_ever_24_imputed_mean <- describe(datCredit_smp$slc_acct_roll_ever_24_imputed_mean)); hist(datCredit_smp$slc_acct_roll_ever_24_imputed_mean, breaks='FD')
-### RESULTS: Imputation successful, categorical variable now has 6 distinct classes, with majority having 0-value and 0.48 having the second most (these are the imputed cases)
+### RESULTS: Imputation successful, categorical variable now has 6 distinct classes, with majority having 0-value, while
+# the imputed cases (value of 0.48) being the second most prevalent.
 
 # - Percentage-valued direction of prepaid/available funds - current compared to 12 months ago
 var_Info_Num$slc_acct_prepaid_perc_dir_12; hist(datCredit_smp[slc_acct_prepaid_perc_dir_12<=5, slc_acct_prepaid_perc_dir_12])
@@ -296,7 +298,7 @@ cat( ( datCredit_smp[is.na(slc_acct_prepaid_perc_dir_12_imputed_med), .N] == 0) 
        'ERROR: Treatment failed for [slc_acct_prepaid_perc_dir_12_imputed_med] \n' )
 describe(datCredit_smp$slc_acct_prepaid_perc_dir_12_imputed_med); hist(datCredit_smp[slc_acct_prepaid_perc_dir_12_imputed_med<=5, slc_acct_prepaid_perc_dir_12_imputed_med])
 ### RESULTS: Imputation successful, with mean of ~2m vs median of 0,
-# bounded by [0, 2.989] for 5%-95% percentiles; extreme outliers
+# bounded by [0, 2.99] for 5%-95% percentiles; extreme outliers
 
 # - Amount by which the account is overdue at the associated reporting date
 var_Info_Num$slc_past_due_amt; hist(datCredit_smp$slc_past_due_amt, breaks='FD')
@@ -314,7 +316,7 @@ cat( ( datCredit_smp[is.na(slc_past_due_amt_imputed_med), .N] == 0) %?%
        'ERROR: Treatment failed for [slc_past_due_amt_imputed_med] \n' )
 (var_Info_Num$slc_past_due_amt_imputed_med <- describe(datCredit_smp$slc_past_due_amt_imputed_med)); hist(datCredit_smp$slc_past_due_amt_imputed_med, breaks='FD')
 ### RESULTS: Imputation successful, with mean of 2491 vs median of 0,
-# bounded by [0, 4639] for 5%-95% percentiles; extreme outliers
+# bounded by [0, 4638] for 5%-95% percentiles; extreme outliers
 
 # - InterestRate_Margin (incorporating risk-based pricing info)
 var_Info_Num$InterestRate_Margin; hist(datCredit_smp$InterestRate_Margin, breaks="FD")
@@ -496,7 +498,7 @@ cat((anyNA(datCredit_smp$DefaultStatus1_Aggr_Prop_Lag_12)) %?% 'WARNING: Merge u
       'SAFE: Merge successful, no NA values present. \n')
 (var_Info_Num$DefaultRate_12 <- describe(datCredit_smp$DefaultStatus1_Aggr_Prop_Lag_12))
 ### RESULTS: No missingness after merge, merge successful. Original DefaultRate_12 has mean of 0.05 and median of 0.046; 
-# bounded by [0.028, 0.083] for 5%-95% percentiles; no outliers
+# bounded by [0.028, 0.084] for 5%-95% percentiles; no outliers
 
 
 # - Ratio type variables (portfolio-level) during performance spells
@@ -674,10 +676,13 @@ pack.ffdf(paste0(genPath, "creditdata_smp"), datCredit_smp); gc()
 
 
 # ------ 5. Apply basic cross-validation resampling scheme with 2-way stratified sampling
+
+# - Loading in the raw dataset
+if (!exists('datCredit_smp')) unpack.ffdf(paste0(genPath,"creditdata_smp"), tempPath)
 datCredit_smp[, Ind := 1:.N] # prepare for resampling scheme
 
 # - Implement resampling scheme using given main sampling fraction
-set.seed(1)
+set.seed(1, kind="Mersenne-Twister")
 datCredit_train <- datCredit_smp %>% group_by(across(all_of(stratifiers))) %>% slice_sample(prop=train_prop) %>% as.data.table()
 datCredit_valid <- subset(datCredit_smp, !(Ind %in% datCredit_train$Ind)) %>% as.data.table()
 
@@ -697,6 +702,6 @@ pack.ffdf(paste0(genPath, "creditdata_valid"), datCredit_valid); gc()
 rm(varList_Cat, varList_Num, var_Info_Cat, var_Info_Num, datExcl, datExclusions,
    stratifiers, smp_perc, smp_size, targetVar, timeVar, train_prop,
    datMV_Check1, datMV_Check2, list_merge_variables, results_missingness,
-   ColNames, lags, confLevel, datCredit_smp)
+   ColNames, lags, datCredit_smp)
 
 proc.time() - ptm # IGNORE: elapsed runtime

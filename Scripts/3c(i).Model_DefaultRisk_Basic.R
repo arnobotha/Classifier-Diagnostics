@@ -307,39 +307,39 @@ logitMod_Basic  <- glm(inputs_bas, data=datCredit_train, family="binomial")
 
 # --- 4.2 Assessment
 # - Deviance and AIC
-summary(logitMod_Basic )
+summary(logitMod_Basic)
 ### RESULTS: Null deviance = 279124; Residual deviance = 262800; AIC = 262814
 
 # - Evaluate fit using generic R^2 based on deviance vs null deviance
-coefDeter_glm(logitMod_Basic )
+coefDeter_glm(logitMod_Basic)
 ### RESULTS: 5.85%
 
 # - Odds Ratio analysis
-round(exp(cbind(OR = coef(logitMod_Basic ), confint.default(logitMod_Basic ))), 3)
+round(exp(cbind(OR = coef(logitMod_Basic), confint.default(logitMod_Basic))), 3)
 ### RESULTS: odds ratios of [Term], [Principal_Real], and [Balance_Real] are all close to 1, which limits their usefulness (however, the range of these variables may be influencing this result; a standardised odds ratio may be more insightful)
 
 # - Residual deviance analysis
-resid_deviance_glm(logitMod_Basic )
+resid_deviance_glm(logitMod_Basic)
 ### RESULTS: Model fit is strained (3 diagnostics gave warnings)
 
 # - Variable importance
-varImport_logit(logitMod_Basic , method="stdCoef_Goodman", sig_level=0.1, impPlot=T, plotVersionName="Basic")
+varImport_logit(logitMod_Basic, method="stdCoef_Goodman", sig_level=0.1, impPlot=T, plotVersionName="Basic")
 ### RESULTS: Top three variables: [PerfSpell_Num], [Balance_Real], and [Principal_Real]
 
 # - ROC analysis
-datCredit_train[, prob_bas := predict(logitMod_Basic , newdata = datCredit_train, type="response")]
-datCredit_valid[, prob_bas := predict(logitMod_Basic , newdata = datCredit_valid, type="response")]
+datCredit_train[, prob_bas := predict(logitMod_Basic, newdata = datCredit_train, type="response")]
+datCredit_valid[, prob_bas := predict(logitMod_Basic, newdata = datCredit_valid, type="response")]
 auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_bas)
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_bas)
 ### RESULTS: Training dataset = 69.73%
 ###          Validation dataset = 69.96%
 
 # - VIF analysis
-car::vif(logitMod_Basic )
+car::vif(logitMod_Basic)
 ### RESULTS:  [Principal_Real] and [Balance_Real] have a high VIF (> 10), which is expected
 
 # - Clean up
-rm(inputs_fin_bas, logitMod_Basic ); gc()
+rm(inputs_bas, logitMod_Basic); gc()
 datCredit_train[,prob_bas:=NULL]; datCredit_valid[,prob_bas:=NULL]
 
 ### RESULTS:  All variables are significant and have reasonable standard errors.

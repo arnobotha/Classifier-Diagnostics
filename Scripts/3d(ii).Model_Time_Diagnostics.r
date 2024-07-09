@@ -195,9 +195,9 @@ wilcox.test(Actual[,DefRate],ExpRte_Adv[,DefRate], alternative = "two.sided", co
 
 # --- 2.4 AUC over time
 # - Call AUC.Over.Time Function for each of the three PD-models
-BasAUC<-AUC.Over.Time(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
-IntAUC<-AUC.Over.Time(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_int")
-AdvAUC<-AUC.Over.Time(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_adv")
+BasAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
+IntAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_int")
+AdvAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_adv")
 
 # - Differentiation for plotting
 BasAUC[,Dataset:="A"]
@@ -211,30 +211,32 @@ PlottingSet<-rbind(BasAUC,IntAUC,AdvAUC)
 vCol<-brewer.pal(9, "Set1")[c(2,1,4)]
 
 vCol <- brewer.pal(8, "Dark2")[c(2,1,3)]
-label.v <- c("A"=": Basic",
-             "B"=": Intermediate",
-             "C"=": Advanced")
-shape.v <- c(17,20,4) 
-linetype.v <- rep("solid",3)
+vLabel <- c("A"="Basic",
+             "B"="Intermediate",
+             "C"="Advanced")
+vShape <- c(17,20,4) 
 
 # - Graph results
 (g3 <- ggplot(PlottingSet, aes(x=Date, y=AUC_Val)) + theme_minimal() + 
-    labs(y="Area Under the Curve (%)", x="Calendar date (months)") + 
+    labs(y=bquote("Prediction Accuracy: AUC (%) "*italic(A[X])), x="Calendar date (months)") + 
     theme(text=element_text(family=chosenFont),legend.position = "bottom",legend.margin=margin(-10, 0, 0, 0),
           axis.text.x=element_text(angle=90), 
           strip.background=element_rect(fill="snow2", colour="snow2"),
           strip.text=element_text(size=11, colour="gray50"), strip.text.y.right=element_text(angle=90)) + 
     # Main graph
     geom_ribbon(aes(fill=Dataset, ymin=AUC_LowerCI, ymax=AUC_UpperCI), alpha=0.2,show.legend = FALSE) + 
-    geom_line(aes(colour=Dataset, linetype=Dataset), linewidth=0.5) +    
-    geom_point(aes(colour=Dataset, shape=Dataset), size=2) + 
+    geom_line(aes(colour=Dataset, linetype=Dataset), linewidth=0.3) +    
+    geom_point(aes(colour=Dataset, shape=Dataset), size=1.8) + 
     # Facets & scale options
-    scale_colour_manual(name="Model", values=vCol, labels=label.v) + 
-    scale_fill_manual(name="Model", values=vCol, labels=label.v) +
-    scale_shape_manual(name=bquote("Model"), values=shape.v, labels=label.v) + 
-    scale_linetype_manual(name=bquote("Model"), values=linetype.v, labels=label.v) + 
+    scale_colour_manual(name="Model", values=vCol, labels=vLabel) + 
+    scale_fill_manual(name="Model", values=vCol, labels=vLabel) +
+    scale_shape_manual(name=bquote("Model"), values=vShape, labels=vLabel) + 
+    scale_linetype_discrete(name=bquote("Model"), labels=vLabel) + 
     scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y") +
     scale_y_continuous(breaks=pretty_breaks(), label=percent, limits=c(0.5,1))
 )
+
+### AB: refinements: Calculate mean of the AUC and annotate for each model. Also, graph minimum AUC-level of 70% using black line
+
 # - Pack away graph
-ggsave(g3, file=paste0(genFigPath, "AUC.Over.Time.png"), width=1400/dpi, height=1000/dpi, dpi="retina", bg="white")
+ggsave(g3, file=paste0(genFigPath, "AUC-time.png"), width=1400/dpi, height=1000/dpi, dpi="retina", bg="white")

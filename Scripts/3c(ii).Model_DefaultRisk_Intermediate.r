@@ -1781,11 +1781,11 @@ logitMod_Int <- glm(inputs_int, data=datCredit_train, family="binomial")
 # --- 13.2 Assessment
 # - Deviance and AIC
 summary(logitMod_Int)
-### RESULTS: Null deviance = 279124; Residual deviance = 219687; AIC = 219705
+### RESULTS: Null deviance = 279124; Residual deviance = 219678; AIC = 219696
 
 # - Evaluate fit using generic R^2 based on deviance vs null deviance
 coefDeter_glm(logitMod_Int)
-### RESULTS: 21.29%
+### RESULTS: 21.3%
 
 # - Odds Ratio analysis 
 round(exp(cbind(OR = coef(logitMod_Int), confint.default(logitMod_Int))), 3)
@@ -1804,8 +1804,8 @@ datCredit_train[, prob_final := predict(logitMod_Int, newdata = datCredit_train,
 datCredit_valid[, prob_final := predict(logitMod_Int, newdata = datCredit_valid, type="response")]
 auc(datCredit_train$DefaultStatus1_lead_12_max, datCredit_train$prob_final)
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_final)
-### RESULTS: Training dataset = 77.39%
-###          Validation dataset = 77.55%
+### RESULTS: Training dataset = 77.42%
+###          Validation dataset = 77.6%
 
 # - VIF analysis
 car::vif(logitMod_Int)

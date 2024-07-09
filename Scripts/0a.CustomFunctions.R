@@ -983,7 +983,7 @@ Gen_Youd_Ind<-function(Trained_Model, Train_DataSet, Target, a){
 # - A datatable which has columns --> Date: Unique Dates; AUC_Val: Estimated AUC values; AUC_LowerCI: Estimated 
 #   lower CI values of the AUC values; AUC_UpperCI: Estimated upper CI values of the AUC values
 
-AUC.Over.Time<-function(DataSet, DateName, Target, Predictions){
+AUC_overTime<-function(DataSet, DateName, Target, Predictions){
   # DataSet<-datCredit_smp
   # DateName<-"Date"
   # Target<- "DefaultStatus1_lead_12_max"
@@ -1012,4 +1012,4 @@ AUC.Over.Time<-function(DataSet, DateName, Target, Predictions){
 }
 
 # - Call AUC.Over.Time Function 
-# AUC.Over.Time(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
+AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
