@@ -207,6 +207,27 @@ AdvAUC[,Dataset:="C"]
 # - Create final dataset for ggplot
 PlottingSet<-rbind(BasAUC,IntAUC,AdvAUC)
 
+# - Location of annotations
+start_y<-0.625
+space<-0.025
+y_vals<-c(start_y,start_y-space,start_y-space*2)
+
+# - Creating an annotation dataset for easier annotations
+dat_anno1 <- data.table(MeanAUC = NULL,
+                        Dataset = c("A-B","A-C","A-D"),
+                        Label = c(paste0("Mean AUC for the basic PD-model"),
+                                  paste0("Mean AUC for the intermediate PD-model"),
+                                  paste0("Mean AUC for the advanced PD-model")),
+                        x = rep(as.Date("2013-05-31"),3), # Text x coordinates
+                        y = y_vals)
+# - MAE Calculations
+dat_anno1[1, MeanAUC := round(mean(BasAUC$AUC_Val, na.rm = T),4)]
+dat_anno1[2, MeanAUC := round(mean(IntAUC$AUC_Val, na.rm = T),4)]
+dat_anno1[3, MeanAUC := round(mean(AdvAUC$AUC_Val, na.rm = T),4)]
+
+# - Last adjustments before plotting
+dat_anno1[, Label := paste0(Label, " = ", sprintf("%.2f",MeanAUC*100), "%")]
+
 # - Graphing parameters
 vCol<-brewer.pal(9, "Set1")[c(2,1,4)]
 
@@ -227,6 +248,8 @@ vShape <- c(17,20,4)
     geom_ribbon(aes(fill=Dataset, ymin=AUC_LowerCI, ymax=AUC_UpperCI), alpha=0.2,show.legend = FALSE) + 
     geom_line(aes(colour=Dataset, linetype=Dataset), linewidth=0.3) +    
     geom_point(aes(colour=Dataset, shape=Dataset), size=1.8) + 
+    geom_hline(yintercept = 0.7, linewidth=0.75) +
+    geom_text(data=dat_anno1, aes(x=x, y=y, label = Label), family=chosenFont, size=3.5, hjust=0) +
     # Facets & scale options
     scale_colour_manual(name="Model", values=vCol, labels=vLabel) + 
     scale_fill_manual(name="Model", values=vCol, labels=vLabel) +

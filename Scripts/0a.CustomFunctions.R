@@ -1012,4 +1012,4 @@ AUC_overTime<-function(DataSet, DateName, Target, Predictions){
 }
 
 # - Call AUC.Over.Time Function 
-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
+# AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
