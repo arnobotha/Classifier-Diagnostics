@@ -248,6 +248,10 @@ Get_MCC(datCredit_train$DefaultStatus1_lead_12_max,datCredit_train$prob_adv,cuto
 # Get cutoff value (set equal to mean of DefaultStatus1_lead_12_max)
 (cutoff_V<-mean(datCredit_valid$DefaultStatus1_lead_12_max))
 
+datCredit_valid[, prob_basic := predict(logitMod_Basic, newdata = datCredit_valid, type="response")]
+datCredit_valid[, prob_int := predict(logitMod_Int, newdata = datCredit_valid, type="response")]
+datCredit_valid[, prob_adv := predict(logitMod_Adv, newdata = datCredit_valid, type="response")]
+
 (MCC_V_Bas<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_basic,cutoff_V)) # MCC = 0.100
 Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_int,cutoff_V)   # MCC = 0.355
 Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_adv,cutoff_V)   # MCC = 0.343
@@ -309,11 +313,7 @@ ggsave(MCCPlot, file=paste0(genFigPath, "MCC_Scaled_vs_Unscaled.png"), width=120
 									  
 label.v <- c("a_Bas"="Basic","b_Int"="Intermediate","c_Adv"="Advanced")
 linetype.v <- c("solid","solid","solid")
-
-					   
-					   
 		  
-
 # - Create annotation object
 datAnnotate_max <- data.table(Set=c("a_Bas", "b_Int","c_Adv"),HighestMCC[,"Cutoff"], HighestMCC[,"MCC"],
                               Label=c(paste0("' '*rho[M]*' = ", as.character(round(HighestMCC[Model=="a_Bas","MCC"],3)),";  '*italic(p[c])*' = ",round(HighestMCC[1,Cutoff],3),"'"),
@@ -357,14 +357,6 @@ rm(roc_obj_basic, roc_obj_int, roc_obj_adv,
 # - Call GYI Function for advanced model with a=4
 Gen_Youd_Ind(logitMod_Adv,datCredit_train,"DefaultStatus1_lead_12_max",4)
 ### RESULTS: pc = 0.1758
-
-
-
-
-
-
-
-
 
 
 # --- Create a plot displaying default rate as a function of a
