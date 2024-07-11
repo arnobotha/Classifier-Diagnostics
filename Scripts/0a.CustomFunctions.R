@@ -1013,3 +1013,41 @@ AUC_overTime<-function(DataSet, DateName, Target, Predictions){
 
 # - Call AUC.Over.Time Function 
 # AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
+
+
+
+
+
+# --------------------------------------------- Wilcoxon Signed Rank Test --------------------------------------------------
+# - This function computes the WSR-Test to determine if two paired samples are statistically similar.
+# - H0: Population median of differences between the two samples = 0
+# - Ha: Population median of differences between the two samples does not equal 0
+
+### INPUT:
+# - Actuals: Actual event rate (time series)
+# - Expected: Expected event rate (time series)
+# - Alpha: Hypothesis test significance level
+
+### OUTPUT: 
+# - A list containing: 1) the test statistic; 2) the p-value of the hypothesis test; 3) test outcome
+
+Wilcoxon_SR_Test<-function(Actuals ,Expected , Alpha=0.05){
+  # - Safety Check for NA's
+  if(anyNA(c(Actuals ,Expected))){
+    stop("Input fields are not allowed NA values, exiting...")
+  }
+  # - Safety Check for equal input length
+  if(length(Actuals)!=length(Expected)){
+    stop("Input fields are not of the same length, exiting...")
+  }
+  
+  # - Call R Wilcoxon Signed Rank Function
+  WSR_Test <- wilcox.test(Actuals, Expected, alternative = "two.sided")
+  
+  # - Initialise result list
+  WSR_OUTPUT <- list(test_stat=WSR_Test$statistic, p_val=WSR_Test$p.value, outcome=ifelse(WSR_Test$p.value<=Alpha, paste0("WSR-Test: rejected"), paste0("WSR-Test: not rejected")))
+  
+  # - Return Output
+  return(WSR_OUTPUT)
+}
+

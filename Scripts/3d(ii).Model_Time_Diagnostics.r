@@ -129,6 +129,14 @@ ExpRte_Adv <- datCredit_smp[,list(DefRate=mean(prob_adv,na.rm=T), Dataset="D"),b
 # - Bind rates
 PlotSet <- rbind(Actual,ExpRte_Bas,ExpRte_Int,ExpRte_Adv)
 
+# --- Wilcoxon Signed Rank Test
+(Bas_WSR<-Wilcoxon_SR_Test(Actual[,DefRate], ExpRte_Bas[,DefRate], Alpha = 0.05)) #basic
+### RESULTS: p-value ~ 0
+(IntWSR<-Wilcoxon_SR_Test(Actual[,DefRate], ExpRte_Int[,DefRate], Alpha = 0.05)) #intermediate
+### RESULTS: p-value = 0.6136
+(AdvWSR<-Wilcoxon_SR_Test(Actual[,DefRate], ExpRte_Adv[,DefRate], Alpha = 0.05)) #advanced
+### RESULTS: p-value = 0.3392
+
 # - Location of annotations
 start_y<-0.06
 space<-0.00375
@@ -137,18 +145,20 @@ y_vals<-c(start_y,start_y-space,start_y-space*2)
 # - Creating an annotation dataset for easier annotations
 dat_anno1 <- data.table(MAE = NULL,
                           Dataset = c("A-B","A-C","A-D"),
-                          Label = c(paste0("'MAE between '*italic(A[t])*' and '*italic(B[t])*'"),
-                                    paste0("'MAE between '*italic(A[t])*' and '*italic(C[t])*'"),
-                                    paste0("'MAE between '*italic(A[t])*' and '*italic(D[t])*'")),
-                          x = rep(as.Date("2016-01-31"),3), # Text x coordinates
+                          Label = c(paste0("' '*italic(bar(r)(A[t],B[t]))*'"),
+                                    paste0("' '*italic(bar(r)(A[t],C[t]))*'"),
+                                    paste0("' '*italic(bar(r)(A[t],D[t]))*'")),
+                          outcome = c(Bas_WSR$outcome, IntWSR$outcome, AdvWSR$outcome), # WSR-Test p-values
+                          x = rep(as.Date("2010-05-31"),3), # Text x coordinates
                           y = y_vals)
+
 # - MAE Calculations
 dat_anno1[1, MAE := mean(abs(PlotSet[Dataset=="A", DefRate] - PlotSet[Dataset=="B", DefRate]), na.rm = T)]
 dat_anno1[2, MAE := mean(abs(PlotSet[Dataset=="A", DefRate] - PlotSet[Dataset=="C", DefRate]), na.rm = T)]
 dat_anno1[3, MAE := mean(abs(PlotSet[Dataset=="A", DefRate] - PlotSet[Dataset=="D", DefRate]), na.rm = T)]
   
 # - Last adjustments before plotting
-dat_anno1[, Label := paste0(Label, " = ", sprintf("%.4f",MAE*100), "%'")]
+dat_anno1[, Label := paste0(Label, " = ", sprintf("%.4f",MAE*100), "%;", ifelse(outcome=="WSR-Test: rejected", paste0("  WSR-Test: '*italic(H[0])*' rejected'"), paste0("  WSR-Test: '*italic(H[0])*' not rejected'")) )]
   
 # - Graphing parameters
 col.v<-brewer.pal(9, "Set1")[c(2,1,4,3)]
@@ -175,7 +185,7 @@ facet_names_full <- c("DefRate"="Tester")
     geom_line(aes(colour=Dataset, linetype=Dataset), linewidth=0.6) +
     geom_point(aes(colour=Dataset, shape=Dataset),size=1.7) + 
     # facets & scale options
-    geom_text(data=dat_anno1, aes(x=x, y=y, label = Label), family=chosenFont, size=3.5, parse=T) +
+    geom_text(data=dat_anno1, aes(x=x, y=y, label = Label), family=chosenFont, size=3.5, parse=T, hjust=0) +
     scale_colour_manual(name=bquote("Event rate: "),  values=col.v, labels=label.v) + 
     scale_shape_manual(name=bquote("Event rate: "),  values=shape.v, labels=label.v) + 
     scale_linetype_manual(name=bquote("Event rate: "),  values=linetype.v, labels=label.v) + 
@@ -184,14 +194,6 @@ facet_names_full <- c("DefRate"="Tester")
   
 # - Pack away graph
 ggsave(Models_TimeDiag, file=paste0(genFigPath, "ModelsTimeDiagnostics.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
-  
-# --- 2.3. Wilcoxon Signed Rank Test
-wilcox.test(Actual[,DefRate],ExpRte_Bas[,DefRate], alternative = "two.sided", conf.level = 0.95) #basic
-### RESULTS: p-value ~ 0
-wilcox.test(Actual[,DefRate],ExpRte_Int[,DefRate], alternative = "two.sided", conf.level = 0.95) #intermediate
-### RESULTS: p-value = 0.6136
-wilcox.test(Actual[,DefRate],ExpRte_Adv[,DefRate], alternative = "two.sided", conf.level = 0.95) #advanced
-### RESULTS: p-value = 0.3392
 
 # --- 2.4 AUC over time
 # - Call AUC.Over.Time Function for each of the three PD-models
