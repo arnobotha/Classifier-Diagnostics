@@ -65,9 +65,9 @@ logitMod_Adv <- glm(inputs_adv, data=datCredit_train, family="binomial")
 # - Computing the coefficient of determination
 # Basic model
 (coefDeter_Basic <- coefDeter_glm(logitMod_Basic))
-### RESULTS: McFadden = 5.76%
-###          Cox Snell = 1.60%
-###          Nagelkerke = 6.55%
+### RESULTS: McFadden = 5.85%
+###          Cox Snell = 1.63%
+###          Nagelkerke = 6.65%
 # Intermediate model
 (coefDeter_Int <- coefDeter_glm(logitMod_Int))
 ### RESULTS: McFadden = 21.30%
@@ -75,9 +75,9 @@ logitMod_Adv <- glm(inputs_adv, data=datCredit_train, family="binomial")
 ###          Nagelkerke = 23.71%
 # Advanced model
 (coefDeter_Adv <- coefDeter_glm(logitMod_Adv))
-### RESULTS: McFadden = 32.76%
-###          Cox Snell = 8.78%
-###          Nagelkerke = 35.89%
+### RESULTS: McFadden = 32.71%
+###          Cox Snell = 8.76%
+###          Nagelkerke = 35.84%
 
 # - Create a single table containing the three R^2 measures for each of the models
 (PseudoR2_Table<-data.table(Model=c("Basic","Intermediate","Advance"),CoxSnell=c(coefDeter_Basic$CoxSnell,coefDeter_Int$CoxSnell,coefDeter_Adv$CoxSnell),McFadden=c(coefDeter_Basic$McFadden,coefDeter_Int$McFadden,coefDeter_Adv$McFadden),
@@ -124,7 +124,7 @@ cat((anyNA(datCredit_valid[,prob_basic])) %?% "WARNING: Missingness detected in 
      "SAFE: No missingness in predicted probabilities.\n")
 roc_obj_basic <- pROC::roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_basic, ci.method="bootstrap", ci=T, conf.level = 1-alpha, percent=T)
 roc_obj_basic$auc; paste0(sprintf("%.2f",(roc_obj_basic$ci[3]-roc_obj_basic$ci[1])/2),"%")
-### RESULTS: 69.87% +- 0.44%
+### RESULTS: 69.96% +- 0.45%
 # - Intermediate model
 datCredit_valid[, prob_int := predict(logitMod_Int, newdata = datCredit_valid, type="response")]
 # [SANITY CHECK] Check for no missingness in probability scores
@@ -132,7 +132,7 @@ cat((anyNA(datCredit_valid[,prob_int])) %?% "WARNING: Missingness detected in pr
       "SAFE: No missingness in predicted probabilities.\n")
 roc_obj_int <- roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_int, ci.method="bootstrap", ci=T, conf.level = 1-alpha, percent=T)
 roc_obj_int$auc; paste0(sprintf("%.2f",(roc_obj_int$ci[3]-roc_obj_int$ci[1])/2),"%")
-### RESULTS: 77.6% +- 0.49%
+### RESULTS: 77.6% +- 0.50%
 # - Advanced model
 datCredit_valid[, prob_adv := predict(logitMod_Adv, newdata = datCredit_valid, type="response")]
 # [SANITY CHECK] Check for no missingness in probability scores
@@ -140,7 +140,7 @@ cat((anyNA(datCredit_valid[,prob_adv])) %?% "WARNING: Missingness detected in pr
       "SAFE: No missingness in predicted probabilities.\n")
 roc_obj_adv <- roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_adv, ci.method="bootstrap", ci=T, conf.level = 1-alpha, percent=T)
 roc_obj_adv$auc; paste0(sprintf("%.2f",(roc_obj_adv$ci[3]-roc_obj_adv$ci[1])/2),"%")
-### RESULTS: 89.99% +- 0.28%
+### RESULTS: 90.02% +- 0.27%
 ### CONCLUSION: Use the advanced model as it has strongest predictive power
 
 
@@ -240,7 +240,7 @@ datCredit_train[, prob_basic := predict(logitMod_Basic, newdata = datCredit_trai
 datCredit_train[, prob_int := predict(logitMod_Int, newdata = datCredit_train, type="response")]
 datCredit_train[, prob_adv := predict(logitMod_Adv, newdata = datCredit_train, type="response")]
 
-Get_MCC(datCredit_train$DefaultStatus1_lead_12_max,datCredit_train$prob_basic,cutoff_T) # MCC = 0.097
+Get_MCC(datCredit_train$DefaultStatus1_lead_12_max,datCredit_train$prob_basic,cutoff_T) # MCC = 0.094
 Get_MCC(datCredit_train$DefaultStatus1_lead_12_max,datCredit_train$prob_int,cutoff_T)   # MCC = 0.351
 Get_MCC(datCredit_train$DefaultStatus1_lead_12_max,datCredit_train$prob_adv,cutoff_T)   # MCC = 0.339
 
@@ -252,7 +252,7 @@ datCredit_valid[, prob_basic := predict(logitMod_Basic, newdata = datCredit_vali
 datCredit_valid[, prob_int := predict(logitMod_Int, newdata = datCredit_valid, type="response")]
 datCredit_valid[, prob_adv := predict(logitMod_Adv, newdata = datCredit_valid, type="response")]
 
-(MCC_V_Bas<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_basic,cutoff_V)) # MCC = 0.100
+(MCC_V_Bas<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_basic,cutoff_V)) # MCC = 0.097
 Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_int,cutoff_V)   # MCC = 0.355
 Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_adv,cutoff_V)   # MCC = 0.343
 
@@ -283,7 +283,7 @@ HighestMCC<-rbind(BASIC_MCCs[which.max(as.matrix(BASIC_MCCs[,"MCC"])),],INT_MCCs
 # Unscaled vs Scaled at each optimal cutoff
 (MCC_B<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_basic,HighestMCC[1,Cutoff])) # MCC = 0.150
 (MCC_I<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_int,HighestMCC[2,Cutoff]))   # MCC = 0.355
-(MCC_A<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_adv,HighestMCC[3,Cutoff]))   # MCC = 0.398
+(MCC_A<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_adv,HighestMCC[3,Cutoff]))   # MCC = 0.399
 
 
 MCC_PlotSet<-data.table(MCC_Version=rep(c(" ", "  "),each=3),Model=rep(c("a_Basic","b_Intermediate", "c_Advanced"),times=2),Value=round(c(MCC_B,MCC_I,MCC_A,(MCC_B+1)/2,(MCC_I+1)/2,(MCC_A+1)/2),3))
@@ -356,7 +356,7 @@ rm(roc_obj_basic, roc_obj_int, roc_obj_adv,
 # ---  2.8 Generalised Youden Index
 # - Call GYI Function for advanced model with a=4
 Gen_Youd_Ind(logitMod_Adv,datCredit_train,"DefaultStatus1_lead_12_max",4)
-### RESULTS: pc = 0.1758
+### RESULTS: pc = 0.1876
 
 
 # --- Create a plot displaying default rate as a function of a
