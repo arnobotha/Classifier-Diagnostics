@@ -108,7 +108,7 @@ fill.v <- brewer.pal(8, "Set2")[c(1,2)]
 
 # - Create graph to evidence minimum strata sizes
 (g0 <- ggplot(datStrata, aes(x=Time, y=Freq, group=Target)) + theme_minimal() + 
-    labs(x=bquote("Reporting date (months) "*italic(t)), y=bquote("Proporionate volume of default outcomes (%) within "*italic(D[T])~"("*.(round(train_prop*smp_size/1000))*"k)")) + 
+    labs(x=bquote("Reporting date (months) "*italic(t)), y=bquote("Account volumes in "*italic(D[T])~": "*.(round(train_prop*smp_size/1000))*"k observations")) + 
     theme(text=element_text(family=chosenFont),legend.position = "bottom",
           axis.text.x=element_text(angle=90), #legend.text=element_text(family=chosenFont), 
           strip.background=element_rect(fill="snow2", colour="snow2"),
@@ -123,8 +123,8 @@ fill.v <- brewer.pal(8, "Set2")[c(1,2)]
                           sprintf("%.0f", datStrata_aggr$StratumSize_Min))) +     
     # facets & scale options
     facet_grid(Facet_label ~ .) + 
-    scale_colour_manual(name="Default outcome", values=col.v) + 
-    scale_fill_manual(name="Default outcome", values=fill.v) + 
+    scale_colour_manual(name="Default outcome (12-months)", values=col.v) + 
+    scale_fill_manual(name="Default outcome (12-months)", values=fill.v) + 
     scale_y_continuous(breaks=pretty_breaks(), label=comma) + 
     scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y") )
 
