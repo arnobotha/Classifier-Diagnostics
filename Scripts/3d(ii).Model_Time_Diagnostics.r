@@ -1,6 +1,6 @@
 # ========================== MODEL DEFAULT RISK - TIME DIAGNOSTICS ========================================
 # This script performs time diagnostics on the three logit models. Mainly it tests the realised default rate 
-# against the predictions thereof, by using the MAE.
+# against the predictions thereof, by using the MAE and the Wilcoxon Signed Rank Test.
 # -----------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
 # SCRIPT AUTHOR(S): Roland Breedt
@@ -21,6 +21,7 @@
 # -- Inputs:
 #   - datCredit_train | Prepared credit data from script 3b
 #   - datCredit_valid | Prepared credit data from script 3b
+#   - datCredit_smp   | Prepared credit data from script 3b
 #   - Final model input variables
 # -- Outputs:
 #   - Some graphs showcasing model performance over time
@@ -91,11 +92,10 @@ dat_anno1[, Label := paste0(Label, " = ", sprintf("%.4f",MAE*100), "%'")]
 col.v<-brewer.pal(9, "Set1")[c(2,1)]
 shape.v <- c(18,20) 
 linetype.v <- c("dashed","solid")
-  
 label.v <- c("Act"=bquote(italic(A)[t]*": Actual event rate"),
                "Exp"=bquote(italic(B)[t]*": Expected event rate"))
   
-# - Actual Plot
+# - Actual Plot (Only for advanced model)
   (gg_TimeDiag <- ggplot(PlotSet, aes(x=Date, y=DefRate)) + 
     theme_minimal() +
     labs(x="Calendar date (months)", y=bquote(" Conditional 12-month default rate (%)"), family=chosenFont) + 
@@ -117,10 +117,11 @@ label.v <- c("Act"=bquote(italic(A)[t]*": Actual event rate"),
 ggsave(gg_TimeDiag, file=paste0(genFigPath, "Adv_Model_TimeDiagnostics.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
   
 # - Clean up
-rm(ActRte_Dset, ExpRte_Adv)
+rm(ActRte_Dset, ExpRte_Adv, gg_TimeDiag, PlotSet)
 
 # --- 2.3 Plot for all 3 models
-# - Create plotting dataset
+# - Create plotting dataset by obtaining the actual and expected event rates over time
+# - Aggregation is done by taking the mean of the probability scores at each date
 Actual <- datCredit_smp[,list(DefRate=mean(DefaultStatus1_lead_12_max,na.rm=T), Dataset="A"),by=list(Date)]
 ExpRte_Bas <- datCredit_smp[,list(DefRate=mean(prob_bas,na.rm=T), Dataset="B"),by=list(Date)]
 ExpRte_Int <- datCredit_smp[,list(DefRate=mean(prob_int,na.rm=T), Dataset="C"),by=list(Date)]
@@ -131,11 +132,11 @@ PlotSet <- rbind(Actual,ExpRte_Bas,ExpRte_Int,ExpRte_Adv)
 
 # --- Wilcoxon Signed Rank Test
 (Bas_WSR<-Wilcoxon_SR_Test(Actual[,DefRate], ExpRte_Bas[,DefRate], Alpha = 0.05)) #basic
-### RESULTS: p-value ~ 0
+### RESULTS: p-value ~ 0; i.e., WSR-Test: rejected
 (IntWSR<-Wilcoxon_SR_Test(Actual[,DefRate], ExpRte_Int[,DefRate], Alpha = 0.05)) #intermediate
-### RESULTS: p-value = 0.6136
+### RESULTS: p-value = 0.6136; i.e., WSR-Test: not rejected
 (AdvWSR<-Wilcoxon_SR_Test(Actual[,DefRate], ExpRte_Adv[,DefRate], Alpha = 0.05)) #advanced
-### RESULTS: p-value = 0.3392
+### RESULTS: p-value = 0.3392; i.e., WSR-Test: not rejected
 
 # - Location of annotations
 start_y<-0.06
@@ -145,9 +146,9 @@ y_vals<-c(start_y,start_y-space,start_y-space*2)
 # - Creating an annotation dataset for easier annotations
 dat_anno1 <- data.table(MAE = NULL,
                           Dataset = c("A-B","A-C","A-D"),
-                          Label = c(paste0("' '*italic(bar(r)(A[t],B[t]))*'"),
-                                    paste0("' '*italic(bar(r)(A[t],C[t]))*'"),
-                                    paste0("' '*italic(bar(r)(A[t],D[t]))*'")),
+                          Label = c(paste0("'MAE  '*italic(bar(r)(A[t],B[t]))*'"),
+                                    paste0("'MAE  '*italic(bar(r)(A[t],C[t]))*'"),
+                                    paste0("'MAE  '*italic(bar(r)(A[t],D[t]))*'")),
                           outcome = c(Bas_WSR$outcome, IntWSR$outcome, AdvWSR$outcome), # WSR-Test p-values
                           x = rep(as.Date("2010-05-31"),3), # Text x coordinates
                           y = y_vals)
@@ -164,9 +165,9 @@ dat_anno1[, Label := paste0(Label, " = ", sprintf("%.4f",MAE*100), "%;", ifelse(
 col.v<-brewer.pal(9, "Set1")[c(2,1,4,3)]
   
 label.v <- c("A"=bquote(italic(A)[t]*": Actual"),
-               "B"=bquote(italic(B)[t]*": Basic"),
-               "C"=bquote(italic(C)[t]*": Intermediate"),
-               "D"=bquote(italic(D)[t]*": Advanced"))
+             "B"=bquote(italic(B)[t]*": Basic"),
+             "C"=bquote(italic(C)[t]*": Intermediate"),
+             "D"=bquote(italic(D)[t]*": Advanced"))
 shape.v <- c(18,20,16,17); 
 linetype.v <- c("dashed","solid","solid","solid")
   
@@ -191,12 +192,16 @@ facet_names_full <- c("DefRate"="Tester")
     scale_linetype_manual(name=bquote("Event rate: "),  values=linetype.v, labels=label.v) + 
     scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y") +
     scale_y_continuous(breaks=pretty_breaks(), label=percent))
-  
+### RESULTS:
+# MAE between Actuals and Basic Expected = 0.9714%
+# MAE between Actuals and Intermediate Expected = 0.2146%
+# MAE between Actuals and Advanced Expected = 0.2486%
+
 # - Pack away graph
 ggsave(Models_TimeDiag, file=paste0(genFigPath, "ModelsTimeDiagnostics.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
 
 # --- 2.4 AUC over time
-# - Call AUC.Over.Time Function for each of the three PD-models
+# - Call AUC_overTime Function for each of the three PD-models
 BasAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
 IntAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_int")
 AdvAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_adv")
@@ -261,7 +266,9 @@ vShape <- c(17,20,4)
     scale_y_continuous(breaks=pretty_breaks(), label=percent, limits=c(0.5,1))
 )
 
-### AB: refinements: Calculate mean of the AUC and annotate for each model. Also, graph minimum AUC-level of 70% using black line
-
 # - Pack away graph
 ggsave(g3, file=paste0(genFigPath, "AUC-time.png"), width=1400/dpi, height=1000/dpi, dpi="retina", bg="white")
+
+# - Final Clean up
+rm(g3,BasAUC, IntAUC, AdvAUC, label.v, logitMod_Adv, logitMod_Basic, logitMod_Int, IntWSR, Bas_WSR, AdvWSR, Models_TimeDiag,
+   PlottingSet, PlotSet, ExpRte_Bas, ExpRte_Int, ExpRte_Adv, dat_anno1, Actual); gc()
