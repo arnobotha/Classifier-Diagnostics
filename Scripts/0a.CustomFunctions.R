@@ -1031,9 +1031,9 @@ AUC_overTime<-function(DataSet, DateName, Target, Predictions){
 ### OUTPUT: 
 # - A list containing: 1) the test statistic; 2) the p-value of the hypothesis test; 3) test outcome
 
-Wilcoxon_SR_Test<-function(Actuals ,Expected , Alpha=0.05){
+Wilcoxon_SR_Test<-function(Actuals, Expected, Alpha=0.05){
   # - Safety Check for NA's
-  if(anyNA(c(Actuals ,Expected))){
+  if(anyNA(c(Actuals, Expected))){
     stop("Input fields are not allowed NA values, exiting...")
   }
   # - Safety Check for equal input length
