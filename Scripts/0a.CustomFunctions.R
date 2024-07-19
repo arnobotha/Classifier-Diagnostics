@@ -811,7 +811,7 @@ resid_deviance_glm <- function(model, err_Median = 0.025, err_quantiles = 0.05, 
 
 
 
-# - Matthews Correlation Coefficient 
+# --- Matthews Correlation Coefficient 
 # This function gives the Matthews Correlation Coefficient, as calculated from the confusion matrix entries
 # Input: 1) Actual values for a classifier problem in vector form, e.g., [1,1,0,1,0,0]
 #        2) Corresponding probability scores for classier in vector form, e.g., [0.74, 0.92, 0.38, 0.53, 0.02, 0.6]
@@ -871,107 +871,10 @@ Get_MCC<-function(Actual, Predicted, Cutoff=0.5){
   
   return(MCC)
 }
-# ------------------------- Missingness before fitting a model ---------------------------
-# This function gives the number of NA values of each target/input field required to fit a formulated model
-# Input: 1) Model_Formula - Formula of a model for which you want to test the input fields
-#        2) DataSet - The dataset that you want to check the missingness on, could be the Full, Training, Validation or Test set
-# Output: A data table displaying the amount of NA's present for each variable. The data table is sorted in decreasing missingness
-
-Amt_Missing<-function(Model_Formula, DataSet){
-# - Safety Check if Model_Formula is of class "formula"
-  if(class(Model_Formula)!="formula"){
-    stop("Model_Formula should be of class formula.\n    Tip: use as.formula() function to create formula before fitting a model
-    or alternatively use formula() on a saved model object, i.e., formula(Model). \n")
-  }
-  
-# - Obtain target and input variables from provided formula
-vInputs<-labels(terms(Model_Formula))
-
-# - Calculate the number of NA values per field
-DT<-data.table(InputV=vInputs,Missingness=sapply(1:NROW(vInputs),function(i,v,D){
-  D[,sum(is.na(get(v[i])))]}
-  ,v=vInputs,D=DataSet))
-
-# - Sort such that the variables with the most missingness are displayed on top
-DT<-DT[order(DT[,"Missingness"], decreasing=TRUE)]
-
-# - Cleanup
-rm(vInputs)
-
-# - Return results
-return(DT)
-}
-
-# Amt_Missing(inputs_adv1,datCredit_train)
 
 
 
-
-
-# ------------------------- Generalised Youden Index Function ---------------------------
-# - This function runs an optimisation procedure to find the Generalised Youden Index for a trained model.
-### INPUT:
-# - Trained_Model: the trained classifier for which you want to obtain the optimal cutoff p_c
-# - Train_DataSet: The training dataset (in datatable format) which will be used to find p_c
-# - Target: Character string containing the name of the target variable (target variable should be numeric 0/1)
-# - a: The cost multiple (or ratio) of a false negative relative to a false positive
-### OUTPUT: 
-# - The output of the optimisation procedure; i.e., the optimal cut-off p_c and other information detailing whether the 
-#   algorithm converged.
-
-Gen_Youd_Ind<-function(Trained_Model, Train_DataSet, Target, a){
-  # Trained_Model<-logitMod_Adv
-  # Train_DataSet<-datCredit_train[960000:965000,]
-  # Target<-"DefaultStatus1_lead_12_max"
-  # a<-4
-  
-  # - Calculate Prevalence Rate q1
-  q1 <- mean(Train_DataSet[,get(Target)],na.rm=TRUE)
-  
-  # - Objective Function to be minimized (negative the function to be maximized)
-  GYI_a <- function(pc){
-    Train_DataSet[, prob_vals := predict(Trained_Model, Train_DataSet, type="response")] # Obtain predicted probabilities for the model
-    Train_DataSet[, class_vals := ifelse(prob_vals<=pc,0,1)] # Dichotomise the probability scores according to the cutoff pc
-    
-    # - Safety Check for missingness in predictions
-    if(anyNA(Train_DataSet[,list(prob_vals,class_vals)])){
-      stop("Missingness in predicted probabilities, Exit function...")
-    }
-    
-    # - Calculate the True Positive Rate & True Negative Rate given pc
-    TPR<-sum(Train_DataSet[,class_vals]==1 & Train_DataSet[,get(Target)==1], na.rm=TRUE)/Train_DataSet[get(Target)==1,.N]
-    TNR<-sum(Train_DataSet[,class_vals]==0 & Train_DataSet[,get(Target)==0], na.rm=TRUE)/Train_DataSet[get(Target)==0,.N]
-    
-    # - Clean Up the Created Input Fields
-    Train_DataSet[, prob_vals := NULL]
-    Train_DataSet[, class_vals := NULL]
-    
-    # - The function to minimize
-    -(TPR + (1-q1)/(a*q1)*TNR - 1)
-  }
-  # - Run Optimisation via a Differential Evolution algorithm
-  JDEoptim(lower=0, upper=1, fn=GYI_a)
-}
-# # - Unit test
-# install.packages("ISLR"); require(ISLR); install.packages("OptimalCutpoints"); require(OptimalCutpoints)
-# datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=ifelse(default=="No",0,1), student=as.factor(student))]
-# logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
-# 
-# # - optimal.cutpoints function from OptimalCutpoints
-# datTrain[, prob_vals := predict(logit_model, type="response")]
-# opti<-optimal.cutpoints(X = "prob_vals", status = "default", tag.healthy = 0,
-#                         methods = "Youden", data = datTrain, ci.fit = FALSE, trace = FALSE,
-#                         control = control.cutpoints(CFP=1, CFN=4, generalized.Youden=T))
-# summary(opti) # Optimal Cut-off = 0.2127908; Optimal Criterion = 6.6734234
-# 
-# # - Wrtitten Gen_Youd_Ind function
-# Gen_Youd_Ind(logit_model,datTrain,"default",4) # Optimal Cut-off = 0.2120438; Optimal Criterion = -6.673423
-
-
-
-
-
-# --------------------------------------------- AUC By Date Function --------------------------------------------------
+# --- AUC By Date Function 
 # - This function computes the AUC and its confidence interval for each unique date in the datatable.
 ### INPUT:
 # - DataSet: A dataset in datatable format containing 1)Dates; 2) a Target Variable; 3) Probability Scores
@@ -1015,10 +918,43 @@ AUC_overTime<-function(DataSet, DateName, Target, Predictions){
 # AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
 
 
+# # --- Degree of Missingness
+# This function gives the number of NA values of each target/input field required to fit a formulated model
+# Input: 1) Model_Formula - Formula of a model for which you want to test the input fields
+#        2) DataSet - The dataset that you want to check the missingness on, could be the Full, Training, Validation or Test set
+# Output: A data table displaying the amount of NA's present for each variable. The data table is sorted in decreasing missingness
+
+Amt_Missing<-function(Model_Formula, DataSet){
+  # - Safety Check if Model_Formula is of class "formula"
+    if(class(Model_Formula)!="formula"){
+      stop("Model_Formula should be of class formula.\n    Tip: use as.formula() function to create formula before fitting a model
+      or alternatively use formula() on a saved model object, i.e., formula(Model). \n")
+    }
+    
+  # - Obtain target and input variables from provided formula
+  vInputs<-labels(terms(Model_Formula))
+  
+  # - Calculate the number of NA values per field
+  DT<-data.table(InputV=vInputs,Missingness=sapply(1:NROW(vInputs),function(i,v,D){
+    D[,sum(is.na(get(v[i])))]}
+    ,v=vInputs,D=DataSet))
+  
+  # - Sort such that the variables with the most missingness are displayed on top
+  DT<-DT[order(DT[,"Missingness"], decreasing=TRUE)]
+  
+  # - Cleanup
+  rm(vInputs)
+  
+  # - Return results
+  return(DT)
+}
+
+# Amt_Missing(inputs_adv1,datCredit_train)
 
 
 
-# --------------------------------------------- Wilcoxon Signed Rank Test --------------------------------------------------
+
+# --- Wilcoxon Signed Rank Test
 # - This function computes the WSR-Test to determine if two paired samples are statistically similar.
 # - H0: Population median of differences between the two samples = 0
 # - Ha: Population median of differences between the two samples does not equal 0
@@ -1045,9 +981,230 @@ Wilcoxon_SR_Test<-function(Actuals, Expected, Alpha=0.05){
   WSR_Test <- wilcox.test(Actuals, Expected, alternative = "two.sided")
   
   # - Initialise result list
-  WSR_OUTPUT <- list(test_stat=WSR_Test$statistic, p_val=WSR_Test$p.value, outcome=ifelse(WSR_Test$p.value<=Alpha, paste0("WSR-Test: rejected"), paste0("WSR-Test: not rejected")))
+  WSR_OUTPUT <- list(test_stat=WSR_Test$statistic, p_val=WSR_Test$p.value, 
+                     outcome=ifelse(WSR_Test$p.value<=Alpha, paste0("WSR-Test: rejected"), 
+                                    paste0("WSR-Test: not rejected")))
   
   # - Return Output
   return(WSR_OUTPUT)
+}
+
+
+
+
+# ------------------------- Generalised Youden Index Function ---------------------------
+# - This function runs an optimisation procedure to find the Generalised Youden Index for a trained model.
+### INPUT:
+# - Trained_Model: the trained classifier for which you want to obtain the optimal cutoff p_c
+# - Train_DataSet: The training dataset (in datatable format) which will be used to find p_c
+# - Target: Character string containing the name of the target variable (target variable should be numeric 0/1)
+# - a: The cost multiple (or ratio) of a false negative relative to a false positive
+### OUTPUT: 
+# - The output of the optimisation procedure; i.e., the optimal cut-off p_c and other information detailing whether the 
+#   algorithm converged.
+
+Gen_Youd_Ind<-function(Trained_Model, Train_DataSet, Target, a){
+  # Trained_Model<-logitMod_Adv
+  # Train_DataSet<-datCredit_train[960000:965000,]
+  # Target<-"DefaultStatus1_lead_12_max"
+  # a<-4
+  
+  require(data.table, DEoptimR)
+  
+  # - ensure given target name does not coincide with the intended name used internally in this function
+  # If not, then ensure the field doesn't already exist
+  if (Target != "Target" & "Target" %in% colnames(Train_DataSet)){
+    Train_DataSet[, Target := NULL]
+  }
+  
+  # - ensure target variable is numeric (and not factor)
+  if (class(Train_DataSet[,get(Target)]) == "factor") {
+    Train_DataSet[, Target := as.numeric(levels(get(Target)))[get(Target)]]
+  } else Train_DataSet[, Target := get(Target)]
+  
+  # - Calculate Prevalence Rate q1
+  q1 <- mean(Train_DataSet$Target,na.rm=TRUE)
+  
+  # - Objective Function to be minimized (negative the function to be maximized)
+  GYI_a <- function(pc){
+    Train_DataSet[, prob_vals := predict(Trained_Model, Train_DataSet, type="response")] # Obtain predicted probabilities for the model
+    Train_DataSet[, class_vals := ifelse(prob_vals<=pc,0,1)] # Dichotomise the probability scores according to the cutoff pc
+    
+    # - Safety Check for missingness in predictions
+    if(anyNA(Train_DataSet[,list(prob_vals,class_vals)])){
+      stop("Missingness in predicted probabilities, Exit function...")
+    }
+    
+    # - Calculate the True Positive Rate & True Negative Rate given pc
+    TPR<-sum(Train_DataSet[,class_vals]==1 & Train_DataSet[,Target==1], na.rm=TRUE)/Train_DataSet[Target==1,.N]
+    TNR<-sum(Train_DataSet[,class_vals]==0 & Train_DataSet[,Target==0], na.rm=TRUE)/Train_DataSet[Target==0,.N]
+    
+    # - Clean Up the Created Input Fields
+    Train_DataSet[, prob_vals := NULL]
+    Train_DataSet[, class_vals := NULL]
+    
+    # - The function to minimize
+    -(TPR + (1-q1)/(a*q1)*TNR - 1)
+  }
+  # - Run Optimisation via a Differential Evolution algorithm
+  results <- JDEoptim(lower=0, upper=1, fn=GYI_a)
+  #optim(par=c(0,1), fn=GYI_a, lower=0, upper=1)
+  
+  return(list(cutoff=results$par, value=results$value, iterations=results$iter))
+}
+# # - Unit test
+# require(ISLR); require(OptimalCutpoints); require(DEoptimR) # Robust Optimisation Tool		
+# datTrain <- data.table(ISLR::Default); datTrain[, `:=`(default=ifelse(default=="No",0,1), student=as.factor(student))]
+# datTrain[, default_fac := as.factor(default)]
+# logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
+# # - optimal.cutpoints function from OptimalCutpoints
+# datTrain[, prob_vals := predict(logit_model, type="response")]
+# opti<-optimal.cutpoints(X = "prob_vals", status = "default", tag.healthy = 0, methods = "Youden", data = datTrain, ci.fit = FALSE, trace = FALSE, control = control.cutpoints(CFP=1, CFN=4, generalized.Youden=T))
+# summary(opti) # Optimal Cut-off = 0.2127908; Optimal Criterion = 6.6734234
+# # - Custom Gen_Youd_Ind function
+#Gen_Youd_Ind(logit_model,datTrain,"default",4) # Optimal Cut-off = 0.2120438; Optimal Criterion = -6.673423
+#Gen_Youd_Ind(logit_model,datTrain,"default_fac",4) # Optimal Cut-off = 0.2120438; Optimal Criterion = -6.673423
+
+
+
+
+# ------------------------------- DIVERGENCE MEASURES ---------------------------------
+# Calculates Shannon entropy H(q), Cross-entropy H_q(p_1), Kullback-Leibler (KL) Divergence D_q(p_1),
+# and Jeffrey Divergence J(q,p_1) for a binary classifier
+
+### INPUTS:
+# - datGiven: given dataset
+# - Target: Field name of target variable, i.e, actual class observations
+# - TargetValue: Value in target variable that is considered as the main event
+# - Prediction: Field name of prediction variable, i.e., probability score p_1(x) or dichotomised variant thereof
+# - cutOff: Probability cut-off beyond which probability scores are classified into main event [TargetValue]
+### OUTPUTS: a list of prevalences and divergence measures
+
+divergences_binary <- function(datGiven, Target, TargetValue=1, Prediction, cutOff=0.5) {
+  require(data.table)
+  
+  # ----- 0. Initialisation and checks
+  
+  # - ensure given target name does not coincide with the intended name used internally in this function
+  # If not, then ensure the field doesn't already exist
+  if (Target != "Target" & "Target" %in% colnames(datGiven)){
+    datGiven[, Target := NULL]
+  }
+  
+  # - ensure given Prediction name does not coincide with the intended name used internally in this function
+  # If not, then ensure the field doesn't already exist
+  if (Target != "Prediction" & "Prediction" %in% colnames(datGiven)){
+    datGiven[, Prediction := NULL]
+  }
+  
+  # - ensure given probability score name does not coincide with the intended name used internally in this function
+  # If not, then ensure the field doesn't already exist
+  if ("Prediction_score" %in% colnames(datGiven)){
+    datGiven[, Prediction_score := NULL]
+  }
+  
+  # - ensure target variable is numeric (and not factor)
+  if (class(datGiven[,get(Target)]) == "factor") {
+    datGiven[, Target := as.numeric(levels(get(Target)))[get(Target)]]
+  } else datGiven[, Target := get(Target)]
+  
+  # - ensure prediction variable is numeric (and not factor)
+  if (class(datGiven[,get(Prediction)]) == "factor") {
+    datGiven[, Prediction := as.numeric(levels(get(Prediction)))[get(Prediction)]]
+  } else datGiven[, Prediction := get(Prediction)]
+  
+  # - enumerate outcome space
+  q_outcomes <- unique(datGiven$Target)
+  
+  # - ensure outcome space is only binary
+  if (length(q_outcomes) > 2) {
+    stop("Given classifier is polychotomous and not binary as required")
+  }
+  
+  # - find class 0 
+  NonTargetVal <- q_outcomes[q_outcomes!=TargetValue]
+  
+  # - Are the predictions already probability scores or should we dichotomise?
+  if (!isTRUE( all.equal( datGiven$Prediction, c(0,1)) )) {
+    cat("NOTE: Predictions are probability scores that can be dichotomised with the cut-off: ",
+        cutOff,"\n   However, expected prevalences and divergence measures are still calculated using the mean of these scores.\n")
+    datGiven[, Prediction_score := Prediction]
+    datGiven[, Prediction := ifelse(Prediction_score > cutOff, TargetValue, NonTargetVal)]
+    probScore_Ind <- T
+  } else probScore_Ind <- F
+  
+  
+  # ----- 1. Prevalences
+  # - Actual prevalence q_1
+  q1 <- sum(datGiven$Target==TargetValue) / datGiven[, .N]
+  # - Expected prevalence p_1(X)
+  if (probScore_Ind) {
+    p1 <- mean(datGiven$Prediction_score, na.rm=T)
+    p1_1 <- mean(datGiven[Target==TargetValue, Prediction_score], na.rm=T) # Class 1 prevalence
+    p1_0 <- mean(datGiven[Target==NonTargetVal, Prediction_score], na.rm=T) # Class 0 prevalence
+  } else p1 <- sum(datGiven$Prediction==TargetValue) / datGiven[, .N]
+  
+  # ----- 2. Divergence measures
+  # - Shannon entropy of q
+  H_qq <- -1*(q1 *log2(q1) + (1-q1)*log2(1-q1))
+  # - Binary Cross-Entropy (BCE) of p relative to q
+  H_qp <- -1*(q1 *log2(p1) + (1-q1)*log2(1-p1))
+  # - Kullback-Leibler (KL) divergence of p relative to q
+  D_qp <- q1 *log2(q1/p1) + (1-q1)*log2((1-q1)/(1-p1))
+  # - Jeffreys' J-divergence (information value) of p relative to q
+  J_qp <- (q1-p1)*log2(q1/p1) + ((1-q1)-(1-p1))*log2((1-q1)/(1-p1))
+  
+  cat("Shannon entropy H(q): \t\t\t\t\t", H_qq, "\nCross-entropy of p relative to q, H_q(p): \t\t", H_qp, 
+      "\nKullback-Leibler D-divergence of p to q, D_q(p): \t", D_qp, 
+      "\nJeffreys J-divergence between q and p, J(q,p): \t\t", J_qp, "\n\n")
+  
+  
+  # ----- 3. Prepare result set
+  # Stich together prevalences
+  resultSet <- list(Prevalence_Actual=q1, Prevalence_Expected=p1)
+  if (probScore_Ind) {
+    resultSet <- c(resultSet, list(Prevalence_Expected_1=p1_1, Prevalence_Expected_0=p1_0))
+  }
+  # Stitch together the divergences
+  resultSet <- c(resultSet, list(ShannonEntropy=H_qq, CrossEntropy=H_qp,
+                                 KullbackLeibler_divergence=D_qp, Jeffrey_divergence=J_qp))
+  
+  return(resultSet)
+}
+
+
+
+
+# --------------------- KOLMOGOROV-SMIRNOV DISCRIMINATION TEST ------------------------
+# Conduct two-sample Kolmogorov-Smirnov test of score CDFs between class subpopulations
+### INPUTS: 
+# - class0: probability score distribution within class 0
+# - class1: probability score distribution within class 1
+### OUTPUTS: results from KS-test, along with interpretation using rules of thumb
+
+KS_discimination <- function(class0, class1, alpha=0.05) {
+  
+  suppressWarnings(result <- ks.test(class0,class1))
+  
+  # - Decide on null hypothsis (that score distributions are identical)
+  if (result$p.value <= alpha){
+    hypoDecision <- "KS-test: null rejected"
+  } else hypoDecision <- "KS-test: null not rejected"
+  
+  # - Interpret K (or D) statistic as maximum deviance between cumulative distributions of each class
+  # Degree of discrimination/separateion between class
+  if (result$statistic < 0.2) {
+    KS_discrimation <- "poor"
+  } else if (result$statistic < 0.4) {
+    KS_discrimation <- "negligible"
+  } else if (result$statistic < 0.7) {
+    KS_discrimation <- "good"
+  } else KS_discrimation <- "unrealistically excellent"
+  
+  cat(paste0("KS-statistic: ", result$statistic, "; signifying ", KS_discrimation, " discrimination between classes.\n"))
+  
+  # - Stitch together result set
+  resultSet <- list(KS_statistic=result$statistic, KS_discrimation=KS_discrimation, KS_decision=hypoDecision)
+  return( resultSet )
 }
 

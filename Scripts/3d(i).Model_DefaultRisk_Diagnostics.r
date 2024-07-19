@@ -54,11 +54,9 @@ unpack.ffdf(paste0(genObjPath, "Adv_Formula"), tempPath)
 
 
 
-# ------ 2. Model comparison
+# ------ 2. Model fitting and probability scoring 
 
-# --- 2.1 Model fitting and probability scoring 
-
-# -- Fitting the models
+# --- 2.1 Fitting the models
 # - Basic model
 logitMod_Basic <- glm(inputs_bas, data=datCredit_train, family="binomial")
 # - Intermediate model
@@ -66,7 +64,8 @@ logitMod_Int <- glm(inputs_int, data=datCredit_train, family="binomial")
 # - Advanced model
 logitMod_Adv <- glm(inputs_adv, data=datCredit_train, family="binomial")
 
-# -- Necessary data preparation
+
+# -- 2.2 Probability scoring
 # - Training Set
 datCredit_train[, prob_basic := predict(logitMod_Basic, newdata = datCredit_train, type="response")]
 datCredit_train[, prob_int := predict(logitMod_Int, newdata = datCredit_train, type="response")]
@@ -86,8 +85,31 @@ cat((anyNA(datCredit_valid[,prob_adv])) %?% "WARNING: Missingness detected in pr
       "SAFE: No missingness in predicted probabilities.\n")
 
 
+# --- 2.3 Create ROC objects
+alpha <- 0.05 # Set confidence interval level
 
-# --- 2.2 Coefficient of determination | Pseudo R^2-measures
+# - Basic model
+roc_obj_basic <- pROC::roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_basic, ci.method="delong", ci=T, conf.level = 1-alpha, percent=T)
+roc_obj_basic$auc; paste0(sprintf("%.2f",(roc_obj_basic$ci[3]-roc_obj_basic$ci[1])/2),"%")
+### RESULTS: 69.96% +- 0.45%
+
+# - Intermediate model
+roc_obj_int <- roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_int, ci.method="delong", ci=T, conf.level = 1-alpha, percent=T)
+roc_obj_int$auc; paste0(sprintf("%.2f",(roc_obj_int$ci[3]-roc_obj_int$ci[1])/2),"%")
+### RESULTS: 77.6% +- 0.50%
+
+# - Advanced model
+roc_obj_adv <- roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_adv, ci.method="delong", ci=T, conf.level = 1-alpha, percent=T)
+roc_obj_adv$auc; paste0(sprintf("%.2f",(roc_obj_adv$ci[3]-roc_obj_adv$ci[1])/2),"%")
+### RESULTS: 90.02% +- 0.29%
+### CONCLUSION: Use the advanced model as it has strongest predictive power
+
+
+
+
+# ------ 3. Model-level diagnostics and associated analytics
+
+# --- 3.1 Coefficient of determination | Pseudo R^2-measures
 
 # - Computing the coefficient of determination
 # Basic model
@@ -148,29 +170,7 @@ rm(datPlot, gPlot, PseudoR2_Table)
 
 
 
-# --- 2.3 Create ROC objects (no plotting)
-
-# - Set confidence interval level
-alpha <- 0.05
-# - Basic model
-roc_obj_basic <- pROC::roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_basic, ci.method="delong", ci=T, conf.level = 1-alpha, percent=T)
-roc_obj_basic$auc; paste0(sprintf("%.2f",(roc_obj_basic$ci[3]-roc_obj_basic$ci[1])/2),"%")
-### RESULTS: 69.96% +- 0.45%
-
-# - Intermediate model
-roc_obj_int <- roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_int, ci.method="delong", ci=T, conf.level = 1-alpha, percent=T)
-roc_obj_int$auc; paste0(sprintf("%.2f",(roc_obj_int$ci[3]-roc_obj_int$ci[1])/2),"%")
-### RESULTS: 77.6% +- 0.50%
-
-# - Advanced model
-roc_obj_adv <- roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_adv, ci.method="delong", ci=T, conf.level = 1-alpha, percent=T)
-roc_obj_adv$auc; paste0(sprintf("%.2f",(roc_obj_adv$ci[3]-roc_obj_adv$ci[1])/2),"%")
-### RESULTS: 90.02% +- 0.29%
-### CONCLUSION: Use the advanced model as it has strongest predictive power
-
-
-
-# --- 2.4 Plotting the ROC curves
+# --- 3.2 Plotting the ROC curves
 
 # - Creating the plotting dataset
 datPlot_ROC <- rbind(data.table(TPR=roc_obj_basic$sensitivities/100,
@@ -224,7 +224,7 @@ rm(datPlot_ROC, dat_anno, g_ROC_compar)
 
 
 
-# --- 2.5 Plotting model diagnostics: AUC vs pseudo R^2-measures
+# --- 3.3 Plotting model diagnostics: AUC vs pseudo R^2-measures
 
 # - Creating the plotting dataset
 datPlot_diag <- rbind(data.table(Statistic=c("Coef_Deter", "AUC"),
@@ -270,7 +270,7 @@ rm(datPlot_diag, g_model_diag_compar,coefDeter_Adv, coefDeter_Basic, coefDeter_I
 
 
 
-# --- 2.6 Matthews Correlation Coefficient for measuring prediction accuracy
+# --- 3.4 Matthews Correlation Coefficient for measuring prediction accuracy
 # NOTE: A robust alternative to the AUC, though MCC requires a cut-off for probabilistic classifiers
 
 # -- Enumerate MCC-values by varying the cutoff
@@ -304,7 +304,7 @@ datPlot<-data.table(MCC_Version=rep(c(" ", "  "),each=3),Model=rep(c("a_Basic","
 datPlot[, Label:=Value]
 
 # - Set aesthetic parameters
-dpi <- 180
+dpi <- 200
 vCol1 <- brewer.pal(9, "Reds")[c(6,8,9)]
 vCol3 <- rep("white", 3*2)
 vLabel <- c("a_Basic"=bquote("Basic ("*italic(p[c])*" = "*.(round(HighestMCC[1,Cutoff],3))*")"),
@@ -322,7 +322,7 @@ vLabel <- c("a_Basic"=bquote("Basic ("*italic(p[c])*" = "*.(round(HighestMCC[1,C
     scale_x_discrete(labels=c(" "=bquote("MCC "*rho[M]),"  "=bquote("Scaled MCC "*rho*"'"[M]))))
 
 # Saving the graph to specified path
-ggsave(gMCC, file=paste0(genFigPath, "MCC_Scaled_vs_Unscaled.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
+ggsave(gMCC, file=paste0(genFigPath, "MCC_Scaled_vs_Unscaled.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
 
 # -- Comparison to discrete AUC, having imposed the same cut-offs
@@ -358,7 +358,7 @@ cat("NOTE: Improvement in MCC of basic to intermediate classifier:", percent(MCC
 datMCC <- rbind(datMCC_Basic, datMCC_Int, datMCC_Adv)
 
 # - Set graphing parameters
-dpi <- 180
+dpi <- 200
 vLabel <- c("a_Bas"="Basic","b_Int"="Intermediate","c_Adv"="Advanced")
 vLineType <- c("solid","solid","solid")
 		  
@@ -390,7 +390,7 @@ datAnnotate_max <- data.table(Set=c("a_Bas", "b_Int","c_Adv"),HighestMCC[,"Cutof
   scale_y_continuous(breaks=pretty_breaks()))
 
 # Saving the graph to specified path
-ggsave(gMCC_cutoffs, file=paste0(genFigPath, "MCC_Cut-Offs.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
+ggsave(gMCC_cutoffs, file=paste0(genFigPath, "MCC_Cut-Offs.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
 # - Clean up
 rm(gMCC_cutoffs, datPlot, datMCC, datMCC_Adv, datMCC_Basic, datMCC_Int, gMCC, datAnnotate_max,
@@ -399,7 +399,7 @@ rm(gMCC_cutoffs, datPlot, datMCC, datMCC_Adv, datMCC_Basic, datMCC_Int, gMCC, da
 
 
 
-# ---  2.7 Generalised Youden Index
+# ---  3.5 Generalised Youden Index
 # Create a plot displaying time graphs of actual vs expected default rate as a function of the cost multiple (a)
 
 # - Graphing Parameters
@@ -411,7 +411,7 @@ DefRte_Plotter<-function(a){
   
   # - Obtain Generalised Youden Index cut-off pc for the cost ratio a
   (Algo_Results<-Gen_Youd_Ind(logitMod_Adv, datCredit_train, "DefaultStatus1_lead_12_max", a))
-  pc<-Algo_Results$par
+  pc<-Algo_Results$cutoff
   
   # - Dichotomise the probability scores according to the cutoff pc
   datCredit_valid[, class_vals := ifelse(prob_adv <= pc, 0,1)]
@@ -437,6 +437,7 @@ DefRte_Plotter<-function(a){
   dat_anno1[, Label := paste0(Label, " = ", sprintf("%.4f",MAE*100), "%'")]
   
   # - More graphing parameters
+  dpi <- 180
   vCol1<-brewer.pal(9, "Set1")[c(2,1)]
   vShape <- c(18,20) 
   vLineType <- c("dashed","solid")
@@ -483,10 +484,166 @@ DefRte_Plotter<-function(a){
 (gCombined<-grid.arrange(a_1, a_3 ,a_4 ,a_6 ,ncol=2))
 
 # Saving the graph to a specified path
-ggsave(gCombined, file=paste0(genFigPath, "ACTvsEXP_DefRate.png"), width=2200/dpi, height=1800/dpi, dpi="retina", bg="white")
+dpi <- 180
+ggsave(gCombined, file=paste0(genFigPath, "ACTvsEXP_DefRate.png"), width=2200/dpi, height=1800/dpi, dpi=dpi, bg="white")
 
 # - Cleanup
 rm(a_1, a_3,a_4,a_6, gCombined)
+
+
+
+# ---  3.6 Comparison of probability score densities by class
+
+# - Dichotomise probability scores using Generalised Youden Index
+cutoff_basic <- Gen_Youd_Ind(logitMod_Basic, datCredit_train, "DefaultStatus1_lead_12_max", a=4)
+cutoff_int <- Gen_Youd_Ind(logitMod_Int, datCredit_train, "DefaultStatus1_lead_12_max", a=4)
+cutoff_adv <- Gen_Youd_Ind(logitMod_Adv, datCredit_train, "DefaultStatus1_lead_12_max", a=4)
+
+# - Obtain prevalences and divergence measures
+phi <- mean(datCredit_valid$DefaultStatus1_lead_12_max) # actual prevalence
+div_basic <- divergences_binary(datCredit_valid, Target="DefaultStatus1_lead_12_max", Prediction="prob_basic", cutOff=cutoff_basic$cutoff)
+div_int <- divergences_binary(datCredit_valid, Target="DefaultStatus1_lead_12_max", Prediction="prob_int", cutOff=cutoff_basic$cutoff)
+div_adv <- divergences_binary(datCredit_valid, Target="DefaultStatus1_lead_12_max", Prediction="prob_adv", cutOff=cutoff_basic$cutoff)
+
+# - Two-sample Kolmogorov-Smirnov test of score CDFs between class subpopulations
+KS_results_basic <- KS_discimination(datCredit_valid[DefaultStatus1_lead_12_max==0, prob_basic],
+                                     datCredit_valid[DefaultStatus1_lead_12_max==1, prob_basic])
+KS_results_int <- KS_discimination(datCredit_valid[DefaultStatus1_lead_12_max==0, prob_int],
+                                     datCredit_valid[DefaultStatus1_lead_12_max==1, prob_int])
+KS_results_adv <- KS_discimination(datCredit_valid[DefaultStatus1_lead_12_max==0, prob_adv],
+                                   datCredit_valid[DefaultStatus1_lead_12_max==1, prob_adv])
+
+
+# --- Basic model
+hist(datCredit_valid$prob_basic, breaks="FD")
+
+# - Find extreme percentile of each class probability distribution for graphing purposes
+percX <- quantile(datCredit_valid$prob_basic, 0.997)
+
+# - Aesthetic engineering: Statistical Summaries
+maxDensPhi_1 <- max(density(datCredit_valid[DefaultStatus1_lead_12_max==1, prob_basic])$y)
+maxDensPhi_0 <- max(density(datCredit_valid[DefaultStatus1_lead_12_max==0, prob_basic])$y)
+
+# - Graphing parameters
+chosenFont <- "Cambria"; dpi <- 220
+vCol1<-brewer.pal(8, "Dark2")[c(1,2)]
+vFill<-brewer.pal(8, "Set2")[c(1,2)]
+vLabels <- c(bquote(italic(C)[0]), 
+              bquote(italic(C)[1]))
+binNum <- round(2*datCredit_valid[,.N]^(1/3)*0.7) # using Rice's rule
+
+# - Plot double density across both classes
+(gPlot <- ggplot( data=datCredit_valid, aes(x=prob_basic)) + theme_bw() + 
+  labs(x=bquote("Expected class probability "*italic(p[y](bold(x)))*" in "*italic(D[V])), 
+       #y=bquote("Cumulative distribution "*italic(F[Y]))) + 
+       y="Histogram and empirical density") + 
+  theme(legend.position="bottom", text=element_text(family=chosenFont)) + 
+  #stat_ecdf(geom="step",linewidth=0.3, aes(linetype=factor(DefaultStatus1_lead_12_max), 
+   #                                        colour=factor(DefaultStatus1_lead_12_max))) + 
+  geom_histogram(aes(y=after_stat(density), colour=factor(DefaultStatus1_lead_12_max), 
+                     fill=factor(DefaultStatus1_lead_12_max)), alpha=0.5, bins=binNum, position="identity") + 
+  geom_density(aes(colour=factor(DefaultStatus1_lead_12_max), fill=factor(DefaultStatus1_lead_12_max)), 
+               linewidth=0.3, alpha=0.4) + 
+  # Annotations: actual prevalence
+  geom_vline(xintercept=phi_basic, linewidth=0.5, colour="black") + 
+  annotate(geom="text", x=phi*0.87, y=max(maxDensPhi_1, maxDensPhi_0)*0.25, 
+           label=paste0("'Actual prevalence '*italic(q[1])==",sprintf("%.3f", phi*100), "*'%'"),
+           family=chosenFont, size=3, colour="black", angle=90, parse=T) +
+  # Annotations: expected prevalences
+  annotate(geom="text", x=phi*4.1, y=max(maxDensPhi_1, maxDensPhi_0)*0.6, 
+           label=paste0("'Expected prevalence (overall) '*italic(p[1](bold(x)))*' = ",
+                        percent(div_basic$Prevalence_Expected, accuracy=0.001),"'"),
+           family=chosenFont, size=3, colour="black", parse=T) +    
+  annotate(geom="text", x=phi*4, y=max(maxDensPhi_1, maxDensPhi_0)*0.55, 
+       label=paste0("'Expected prevalence in '*italic(C)[1]*': '*italic(p[1](bold(x)))*' = ",
+                    percent(div_basic$Prevalence_Expected_1, accuracy=0.001),"'"),
+       family=chosenFont, size=3, colour=vCol1[2], parse=T) +    
+  annotate(geom="text", x=phi*4, y=max(maxDensPhi_1, maxDensPhi_0)*0.50, 
+           label=paste0("'Expected prevalence in '*italic(C)[0]*': '*italic(p[1](bold(x)))*' = ",
+                        percent(div_basic$Prevalence_Expected_0, accuracy=0.001),"'"),
+           family=chosenFont, size=3, colour=vCol1[1], parse=T) +    
+  # Annotations: KS-test of discrimination
+  annotate(geom="text", x=phi*4.2, y=max(maxDensPhi_1, maxDensPhi_0)*0.4, 
+           label=paste0("'KS-statistic '*italic(K)*' = ",
+                        percent(KS_results_basic$KS_statistic, accuracy=0.1),"; discriminiation level: ",
+                        KS_results_basic$KS_discrimation, "'"),
+           family=chosenFont, size=2.5, colour="black", parse=T) +   
+  annotate(geom="text", x=phi*3.3, y=max(maxDensPhi_1, maxDensPhi_0)*0.37, 
+           label=paste0("Two-sample ",KS_results_basic$KS_decision),
+           family=chosenFont, size=2.5, colour="black") +     
+  scale_color_manual(name=bquote("Class "*italic(Y)), labels=vLabels, values=vCol1) + 
+  scale_fill_manual(name=bquote("Class "*italic(Y)), labels=vLabels, values=vFill) + 
+  scale_x_continuous(breaks=pretty_breaks(), label=percent, limits=c(0,percX)))
+
+# Saving the graph to a specified path
+ggsave(gPlot, file=paste0(genFigPath, "ProbScoreDensity_Basic.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
+
+
+
+# --- Intermediate model
+hist(datCredit_valid$prob_int, breaks="FD")
+
+# - Find extreme percentile of each class probability distribution for graphing purposes
+percX <- quantile(datCredit_valid$prob_int, 0.999)
+
+# - Graphing parameters
+chosenFont <- "Cambria"; dpi <- 220
+vCol1<-brewer.pal(8, "Dark2")[c(1,2)]
+vFill<-brewer.pal(8, "Set2")[c(1,2)]
+vLabels <- c(bquote(italic(C)[0]), 
+             bquote(italic(C)[1]))
+binNum <- 32
+
+# - Plot double density across both classes
+(gPlot <- ggplot( data=datCredit_valid, aes(x=prob_int)) + theme_bw() + 
+    labs(x=bquote("Expected class probability "*italic(p[y](bold(x)))*" in "*italic(D[V])), 
+         y="Histogram (density)") + 
+    theme(legend.position="bottom", text=element_text(family=chosenFont)) + 
+    geom_histogram(aes(y=after_stat(density), colour=factor(DefaultStatus1_lead_12_max), 
+                       fill=factor(DefaultStatus1_lead_12_max)), alpha=0.5, bins=binNum, position="identity") + 
+    #geom_density(aes(colour=factor(DefaultStatus1_lead_12_max), fill=factor(DefaultStatus1_lead_12_max)), 
+                 #linewidth=0.3, alpha=0.4, position="identity", trim=F) + 
+    # Annotations: actual prevalence
+    annotate(geom="text", x=phi*0.5, y=10, 
+             label=paste0("'Actual prevalence '*italic(q[1])==",sprintf("%.3f", phi*100), "*'%'"),
+             family=chosenFont, size=3, colour="black", angle=90, parse=T) +
+    # Annotations: expected prevalences
+    annotate(geom="text", x=0.4, y=28, 
+             label=paste0("'Expected prevalence (overall) '*italic(p[1](bold(x)))*' = ",
+                          percent(div_int$Prevalence_Expected, accuracy=0.001),"'"),
+             family=chosenFont, size=3, colour="black", parse=T) +    
+    annotate(geom="text", x=0.39, y=26, 
+             label=paste0("'Expected prevalence in '*italic(C)[1]*': '*italic(p[1](bold(x)))*' = ",
+                          percent(div_int$Prevalence_Expected_1, accuracy=0.001),"'"),
+             family=chosenFont, size=3, colour=vCol1[2], parse=T) +    
+    annotate(geom="text", x=0.385, y=24, 
+             label=paste0("'Expected prevalence in '*italic(C)[0]*': '*italic(p[1](bold(x)))*' = ",
+                          percent(div_int$Prevalence_Expected_0, accuracy=0.001),"'"),
+             family=chosenFont, size=3, colour=vCol1[1], parse=T) +    
+    # Annotations: KS-test of discrimination
+    annotate(geom="text", x=0.38, y=20, 
+             label=paste0("'KS-statistic '*italic(K)*' = ",
+                          percent(KS_results_int$KS_statistic, accuracy=0.1),"; discriminiation level: ",
+                          KS_results_int$KS_discrimation, "'"),
+             family=chosenFont, size=2.5, colour="black", parse=T) +   
+    annotate(geom="text", x=0.315, y=19, 
+             label=paste0("Two-sample ",KS_results_int$KS_decision),
+             family=chosenFont, size=2.5, colour="black") +      
+    geom_vline(xintercept=phi_basic, linewidth=0.5, colour="black") + 
+    scale_color_manual(name=bquote("Class "*italic(Y)), labels=vLabels, values=vCol1) + 
+    scale_fill_manual(name=bquote("Class "*italic(Y)), labels=vLabels, values=vFill) + 
+    scale_x_continuous(breaks=pretty_breaks(), label=percent))
+
+# Saving the graph to a specified path
+ggsave(gPlot, file=paste0(genFigPath, "ProbScoreDensity_Intermediate.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
+
+
+
+
+
+### AB: Embed divergence function as a standalone graph
+divergences_binary(datCredit_valid, Target="DefaultStatus1_lead_12_max", Prediction="prob_basic", cutOff=cutoff_basic$cutoff)
+
 
 
 # --- Final Clean up
