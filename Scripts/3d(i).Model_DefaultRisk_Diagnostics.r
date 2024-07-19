@@ -56,13 +56,34 @@ unpack.ffdf(paste0(genObjPath, "Adv_Formula"), tempPath)
 
 # ------ 2. Model comparison
 
-# --- 2.1 Fitting the models
+# --- 2.1 Model fitting and probability scoring 
+
+# -- Fitting the models
 # - Basic model
 logitMod_Basic <- glm(inputs_bas, data=datCredit_train, family="binomial")
 # - Intermediate model
 logitMod_Int <- glm(inputs_int, data=datCredit_train, family="binomial")
 # - Advanced model
 logitMod_Adv <- glm(inputs_adv, data=datCredit_train, family="binomial")
+
+# -- Necessary data preparation
+# - Training Set
+datCredit_train[, prob_basic := predict(logitMod_Basic, newdata = datCredit_train, type="response")]
+datCredit_train[, prob_int := predict(logitMod_Int, newdata = datCredit_train, type="response")]
+datCredit_train[, prob_adv := predict(logitMod_Adv, newdata = datCredit_train, type="response")]
+
+# - Validation Set
+datCredit_valid[, prob_basic := predict(logitMod_Basic, newdata = datCredit_valid, type="response")]
+datCredit_valid[, prob_int := predict(logitMod_Int, newdata = datCredit_valid, type="response")]
+datCredit_valid[, prob_adv := predict(logitMod_Adv, newdata = datCredit_valid, type="response")]
+
+# [SANITY CHECKS] Check for no missingness in probability scores in validation set
+cat((anyNA(datCredit_valid[,prob_basic])) %?% "WARNING: Missingness detected in predicted probabilities of the Validation Set.\n" %:%
+      "SAFE: No missingness in predicted probabilities.\n")
+cat((anyNA(datCredit_valid[,prob_int])) %?% "WARNING: Missingness detected in predicted probabilities of the Validation Set.\n" %:%
+      "SAFE: No missingness in predicted probabilities.\n")
+cat((anyNA(datCredit_valid[,prob_adv])) %?% "WARNING: Missingness detected in predicted probabilities of the Validation Set.\n" %:%
+      "SAFE: No missingness in predicted probabilities.\n")
 
 
 
@@ -95,34 +116,35 @@ pack.ffdf(paste0(genObjPath,"PseudoR2_Table"), PseudoR2_Table)
 
 # -- Graph these measures together
 # - Create a dataset to feed into ggplot2 (also change character R^2 values to numeric)
-R2_PlotSet<-data.table(Statistic=rep(c("McFadden", "Nagelkerke"),
+datPlot<-data.table(Statistic=rep(c("McFadden", "Nagelkerke"),
                                      each=3),Model=rep(c("a_Basic","b_Intermediate", "c_Advanced"),times=2),Value=
                          as.numeric(sub("%","",c(PseudoR2_Table$McFadden,PseudoR2_Table$Nagelkerke)))/100)
 
 # - Aesthetic engineering
-R2_PlotSet[, Label:=paste0(sprintf("%.2f", Value*100),"%")]
+datPlot[, Label:=paste0(sprintf("%.2f", Value*100),"%")]
 
 # - Plotting parameters
 chosenFont <- "Cambria"; dpi<-180
-col.v <- c("a_Basic"=brewer.pal(9, "BuGn")[5], "b_Intermediate"=brewer.pal(9, "BuGn")[7], "c_Advanced"=brewer.pal(9, "BuGn")[9])
-col.v2 <- rep(c(col.v[1],col.v[2],col.v[3]),2)
-col.v3 <- rep("white", 3*2)
-label.v <- list("a_Basic"="Basic",
-                "b_Intermediate"="Intermediate",
-                "c_Advanced"="Advanced")
+vCol1 <- c("a_Basic"=brewer.pal(9, "BuGn")[5], "b_Intermediate"=brewer.pal(9, "BuGn")[7], "c_Advanced"=brewer.pal(9, "BuGn")[9])
+vCol2 <- rep(c(vCol1[1],vCol1[2],vCol1[3]),2)
+vCol3 <- rep("white", 3*2)
+vLabel <- list("a_Basic"="Basic", "b_Intermediate"="Intermediate", "c_Advanced"="Advanced")
 
 # - Create the plot
-(R2Plot<-ggplot(R2_PlotSet, aes(group=Model, y=Value, x=Statistic)) + 
+(gPlot<-ggplot(datPlot, aes(group=Model, y=Value, x=Statistic)) + 
     theme_minimal() + theme(legend.position = "bottom", text=element_text(family=chosenFont), axis.title.x = element_text(margin = margin(t = 5))) + labs(x=bquote("Pseudo"~italic(R^{2})*"-measure"), y="Value", family=chosenFont) +
     geom_col(aes(colour=Model, fill=Model), position="dodge") +
-    geom_label(aes(label=Label), fill = col.v2, colour = col.v3, position=position_dodge(0.90), size=2.75,label.padding = unit(0.15, "lines")) +
-    scale_colour_manual(name="Model:", values=col.v, labels=label.v) +
-    scale_fill_manual(name="Model:", values=col.v, labels=label.v) +
+    geom_label(aes(label=Label), fill = vCol2, colour = vCol3, position=position_dodge(0.90), size=2.75,label.padding = unit(0.15, "lines")) +
+    scale_colour_manual(name="Model:", values=vCol1, labels=vLabel) +
+    scale_fill_manual(name="Model:", values=vCol1, labels=vLabel) +
     scale_x_discrete(labels=c("McFadden"="McFadden","Nagelkerke"="Nagelkerke")) +
     scale_y_continuous(limits = c(0, 0.4), breaks = seq(0, 1, by = 0.1),label=percent))
 
 # Saving the graph to specified path
-ggsave(R2Plot, file=paste0(genFigPath, "R2Plot_V2.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
+ggsave(gPlot, file=paste0(genFigPath, "R2Plot_V2.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
+
+# - Cleanup
+rm(datPlot, gPlot, PseudoR2_Table)
 
 
 
@@ -131,28 +153,16 @@ ggsave(R2Plot, file=paste0(genFigPath, "R2Plot_V2.png"), width=1200/dpi, height=
 # - Set confidence interval level
 alpha <- 0.05
 # - Basic model
-datCredit_valid[, prob_basic := predict(logitMod_Basic, newdata = datCredit_valid, type="response")]
-# [SANITY CHECK] Check for no missingness in probability scores
-cat((anyNA(datCredit_valid[,prob_basic])) %?% "WARNING: Missingness detected in predicted probabilities of the Validation Set.\n" %:%
-     "SAFE: No missingness in predicted probabilities.\n")
 roc_obj_basic <- pROC::roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_basic, ci.method="delong", ci=T, conf.level = 1-alpha, percent=T)
 roc_obj_basic$auc; paste0(sprintf("%.2f",(roc_obj_basic$ci[3]-roc_obj_basic$ci[1])/2),"%")
 ### RESULTS: 69.96% +- 0.45%
 
 # - Intermediate model
-datCredit_valid[, prob_int := predict(logitMod_Int, newdata = datCredit_valid, type="response")]
-# [SANITY CHECK] Check for no missingness in probability scores
-cat((anyNA(datCredit_valid[,prob_int])) %?% "WARNING: Missingness detected in predicted probabilities of the Validation Set.\n" %:%
-      "SAFE: No missingness in predicted probabilities.\n")
 roc_obj_int <- roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_int, ci.method="delong", ci=T, conf.level = 1-alpha, percent=T)
 roc_obj_int$auc; paste0(sprintf("%.2f",(roc_obj_int$ci[3]-roc_obj_int$ci[1])/2),"%")
 ### RESULTS: 77.6% +- 0.50%
 
 # - Advanced model
-datCredit_valid[, prob_adv := predict(logitMod_Adv, newdata = datCredit_valid, type="response")]
-# [SANITY CHECK] Check for no missingness in probability scores
-cat((anyNA(datCredit_valid[,prob_adv])) %?% "WARNING: Missingness detected in predicted probabilities of the Validation Set.\n" %:%
-      "SAFE: No missingness in predicted probabilities.\n")
 roc_obj_adv <- roc(response=datCredit_valid$DefaultStatus1_lead_12_max, predictor=datCredit_valid$prob_adv, ci.method="delong", ci=T, conf.level = 1-alpha, percent=T)
 roc_obj_adv$auc; paste0(sprintf("%.2f",(roc_obj_adv$ci[3]-roc_obj_adv$ci[1])/2),"%")
 ### RESULTS: 90.02% +- 0.29%
@@ -160,52 +170,7 @@ roc_obj_adv$auc; paste0(sprintf("%.2f",(roc_obj_adv$ci[3]-roc_obj_adv$ci[1])/2),
 
 
 
-# --- 2.4 Plotting model diagnostics: AUC vs pseudo R^2-measures
-
-# - Creating the plotting dataset
-datPlot_diag <- rbind(data.table(Statistic=c("Coef_Deter", "AUC"),
-                                 Value = c(as.numeric(sub("%","",coefDeter_Basic[[1]])), roc_obj_basic$auc),
-                                 Model=rep("a_Basic",2)),
-                      data.table(Statistic=c("Coef_Deter","AUC"),
-                                 Value = c(as.numeric(sub("%","",coefDeter_Int[[1]])), roc_obj_int$auc),
-                                 Model=rep("b_Intermediate",2)),
-                      data.table(Statistic=c("Coef_Deter","AUC"),
-                                 Value = c(as.numeric(sub("%","",coefDeter_Adv[[1]])),roc_obj_adv$auc),
-                                 Model=rep("c_Advanced",2)))
-datPlot_diag[, Label:=paste0(as.character(sprintf("%.2f", Value)),"%")]
-datPlot_diag[Statistic=="AUC" & Model=="a_Basic",Label:=paste0(sprintf("%.2f", Value),"% ± ", sprintf("%.2f", (roc_obj_basic$ci[3]-roc_obj_basic$ci[1])/2), "%")]
-datPlot_diag[Statistic=="AUC" & Model=="b_Intermediate",Label:=paste0(sprintf("%.2f", Value),"% ± ", sprintf("%.2f", (roc_obj_int$ci[3]-roc_obj_int$ci[1])/2), "%")]
-datPlot_diag[Statistic=="AUC" & Model=="c_Advanced",Label:=paste0(sprintf("%.2f", Value),"% ± ", sprintf("%.2f", (roc_obj_adv$ci[3]-roc_obj_adv$ci[1])/2), "%")]
-
-# - Plotting parameters
-chosenFont <- "Cambria"; dpi<-180
-col.v <- c("a_Basic"=brewer.pal(9, "Blues")[4], "b_Intermediate"=brewer.pal(9, "Blues")[7], "c_Advanced"=brewer.pal(9, "Blues")[9])
-col.v2 <- c(rep(col.v[1],2), rep(col.v[2],2), rep(col.v[3],2))
-col.v3 <- rep("white", 3*2)
-linetype.v <- c(3,4)
-label.v <- list("a_Basic"="Basic",
-                "b_Intermediate"="Intermediate",
-                "c_Advanced"="Advanced")
-
-# - Creating the clustered column chart
-(g_model_diag_compar <- ggplot(datPlot_diag, aes(x=Statistic, y=Value, group=Model)) +
-    theme_minimal() + theme(legend.position = "bottom", text=element_text(family=chosenFont)) + labs(x="Statistic", y="Value") +
-    geom_col(aes(colour=Model, fill=Model), position="dodge") +
-    geom_label(aes(label=Label), fill = col.v2, colour = col.v3, position=position_dodge(0.9)) +
-    scale_colour_manual(name="Model:", values=col.v, labels=label.v) +
-    scale_fill_manual(name="Model:", values=col.v, labels=label.v) +
-    scale_x_discrete(labels=c("AUC"="AUC","Coef_Deter"="Coeffcient of Determination")) +
-    scale_y_continuous(breaks=pretty_breaks(), label=percent))
-
-# - Saving the graph
-ggsave(g_model_diag_compar, file=paste0(genFigPath, "Diagnostics_Comparison.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
-
-# - Clean up
-rm(col.v, col.v2, col.v3, linetype.v, label.v, datPlot_diag, g_model_diag_compar); gc()
-
-
-
-# --- 2.5 Plotting the ROC curves
+# --- 2.4 Plotting the ROC curves
 
 # - Creating the plotting dataset
 datPlot_ROC <- rbind(data.table(TPR=roc_obj_basic$sensitivities/100,
@@ -228,10 +193,10 @@ dat_anno[Model=="c_Advanced",Label:=paste0("AUC=",sprintf("%.2f",AUC),"% ± ", s
 
 # - Plotting parameters
 chosenFont <- "Cambria"; dpi<-200
-col.v <- brewer.pal(10, "Paired")[c(8,6,4)]
-fill.v <- brewer.pal(10, "Paired")[c(7,5,3)]
-linetype.v <- c(3,4)
-label.v <- list("a_Basic"="Basic",
+vCol1 <- brewer.pal(10, "Paired")[c(8,6,4)]
+vFill <- brewer.pal(10, "Paired")[c(7,5,3)]
+vLineType <- c(3,4)
+vLabel <- list("a_Basic"="Basic",
                 "b_Intermediate"="Intermediate",
                 "c_Advanced"="Advanced")
 
@@ -246,53 +211,88 @@ label.v <- list("a_Basic"="Basic",
     # geom_area(aes(x=FPR, y=TPR, colour=Model, alpha=0.4)) +
     geom_abline(intercept=0, slope=1, linetype=1, linewidth=0.3) +
     geom_label(data=dat_anno, aes(x=x, label=Label, y=y, colour=Model), show.legend=F, size=2) +
-    scale_colour_manual(name="Model", values=col.v, label=label.v) +
-    scale_linetype_manual(name="Model", values=linetype.v, label=label.v) +
+    scale_colour_manual(name="Model", values=vCol1, label=vLabel) +
+    scale_linetype_manual(name="Model", values=vLineType, label=vLabel) +
     scale_x_continuous(breaks=pretty_breaks(), label=percent) +
     scale_y_continuous(breaks=pretty_breaks(), label=percent))
 
 # - Saving the graph
 ggsave(g_ROC_compar, file=paste0(genFigPath, "ROC_Curves_Comparison.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
+# - Cleanup
+rm(datPlot_ROC, dat_anno, g_ROC_compar)
+
+
+
+# --- 2.5 Plotting model diagnostics: AUC vs pseudo R^2-measures
+
+# - Creating the plotting dataset
+datPlot_diag <- rbind(data.table(Statistic=c("Coef_Deter", "AUC"),
+                                 Value = c(as.numeric(sub("%","",coefDeter_Basic[[1]])), roc_obj_basic$auc),
+                                 Model=rep("a_Basic",2)),
+                      data.table(Statistic=c("Coef_Deter","AUC"),
+                                 Value = c(as.numeric(sub("%","",coefDeter_Int[[1]])), roc_obj_int$auc),
+                                 Model=rep("b_Intermediate",2)),
+                      data.table(Statistic=c("Coef_Deter","AUC"),
+                                 Value = c(as.numeric(sub("%","",coefDeter_Adv[[1]])),roc_obj_adv$auc),
+                                 Model=rep("c_Advanced",2)))
+datPlot_diag[, Label:=paste0(as.character(sprintf("%.2f", Value)),"%")]
+datPlot_diag[Statistic=="AUC" & Model=="a_Basic",Label:=paste0(sprintf("%.2f", Value),"% ± ", sprintf("%.2f", (roc_obj_basic$ci[3]-roc_obj_basic$ci[1])/2), "%")]
+datPlot_diag[Statistic=="AUC" & Model=="b_Intermediate",Label:=paste0(sprintf("%.2f", Value),"% ± ", sprintf("%.2f", (roc_obj_int$ci[3]-roc_obj_int$ci[1])/2), "%")]
+datPlot_diag[Statistic=="AUC" & Model=="c_Advanced",Label:=paste0(sprintf("%.2f", Value),"% ± ", sprintf("%.2f", (roc_obj_adv$ci[3]-roc_obj_adv$ci[1])/2), "%")]
+
+# - Plotting parameters
+chosenFont <- "Cambria"; dpi<-180
+vCol1 <- c("a_Basic"=brewer.pal(9, "Blues")[4], "b_Intermediate"=brewer.pal(9, "Blues")[7], "c_Advanced"=brewer.pal(9, "Blues")[9])
+vCol2 <- c(rep(vCol1[1],2), rep(vCol1[2],2), rep(vCol1[3],2))
+vCol3 <- rep("white", 3*2)
+vLineType <- c(3,4)
+vLabel <- list("a_Basic"="Basic",
+                "b_Intermediate"="Intermediate",
+                "c_Advanced"="Advanced")
+
+# - Creating the clustered column chart
+(g_model_diag_compar <- ggplot(datPlot_diag, aes(x=Statistic, y=Value, group=Model)) +
+    theme_minimal() + theme(legend.position = "bottom", text=element_text(family=chosenFont)) + labs(x="Statistic", y="Value") +
+    geom_col(aes(colour=Model, fill=Model), position="dodge") +
+    geom_label(aes(label=Label), fill = vCol2, colour = vCol3, position=position_dodge(0.9)) +
+    scale_colour_manual(name="Model:", values=vCol1, labels=vLabel) +
+    scale_fill_manual(name="Model:", values=vCol1, labels=vLabel) +
+    scale_x_discrete(labels=c("AUC"="AUC","Coef_Deter"="Coeffcient of Determination")) +
+    scale_y_continuous(breaks=pretty_breaks(), label=percent))
+
+# - Saving the graph
+ggsave(g_model_diag_compar, file=paste0(genFigPath, "Diagnostics_Comparison.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
+
+# - Clean up
+rm(datPlot_diag, g_model_diag_compar,coefDeter_Adv, coefDeter_Basic, coefDeter_Int,
+   roc_obj_basic, roc_obj_int, roc_obj_adv); gc()
+
 
 
 # --- 2.6 Matthews Correlation Coefficient for measuring prediction accuracy
 # NOTE: A robust alternative to the AUC, though MCC requires a cut-off for probabilistic classifiers
-
-# -- Necessary data preparation
-# - Training Set
-datCredit_train[, prob_basic := predict(logitMod_Basic, newdata = datCredit_train, type="response")]
-datCredit_train[, prob_int := predict(logitMod_Int, newdata = datCredit_train, type="response")]
-datCredit_train[, prob_adv := predict(logitMod_Adv, newdata = datCredit_train, type="response")]
-
-# - Validation Set
-datCredit_valid[, prob_basic := predict(logitMod_Basic, newdata = datCredit_valid, type="response")]
-datCredit_valid[, prob_int := predict(logitMod_Int, newdata = datCredit_valid, type="response")]
-datCredit_valid[, prob_adv := predict(logitMod_Adv, newdata = datCredit_valid, type="response")]
-
 
 # -- Enumerate MCC-values by varying the cutoff
 # - Set sequence of cutoffs
 cutoff_seq<-seq(0,1, by = 0.0025)
 
 # - Initialise data table to store results
-BASIC_MCCs<- data.table(Cutoff=cutoff_seq,Model="a_Bas",MCC=0)
-INT_MCCs<- data.table(Cutoff=cutoff_seq,Model="b_Int",MCC=0)
-ADV_MCCs<- data.table(Cutoff=cutoff_seq,Model="c_Adv",MCC=0)
+datMCC_Basic<- data.table(Cutoff=cutoff_seq,Model="a_Bas",MCC=0)
+datMCC_Int<- data.table(Cutoff=cutoff_seq,Model="b_Int",MCC=0)
+datMCC_Adv<- data.table(Cutoff=cutoff_seq,Model="c_Adv",MCC=0)
 
 # - Fill data table with MCC values
 counter<-1
 for(k in cutoff_seq){
-  BASIC_MCCs[counter,"MCC"]<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_basic,k)
-  INT_MCCs[counter,"MCC"]<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_int,k)
-  ADV_MCCs[counter,"MCC"]<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_adv,k)
+  datMCC_Basic[counter,"MCC"]<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_basic,k)
+  datMCC_Int[counter,"MCC"]<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_int,k)
+  datMCC_Adv[counter,"MCC"]<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_adv,k)
   counter<-counter+1
 }
 
-# - Create a dataset in long format for ggplot2
-PlottingSet<-rbind(BASIC_MCCs,INT_MCCs,ADV_MCCs)
 # - Obtain highest MCCs for each of the models for annotation purposes
-HighestMCC<-rbind(BASIC_MCCs[which.max(as.matrix(BASIC_MCCs[,"MCC"])),],INT_MCCs[which.max(as.matrix(INT_MCCs[,"MCC"])),],ADV_MCCs[which.max(as.matrix(ADV_MCCs[,"MCC"])),])
+HighestMCC<-rbind(datMCC_Basic[which.max(as.matrix(datMCC_Basic[,"MCC"])),],datMCC_Int[which.max(as.matrix(datMCC_Int[,"MCC"])),],datMCC_Adv[which.max(as.matrix(datMCC_Adv[,"MCC"])),])
 (MCC_B<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_basic,HighestMCC[1,Cutoff])) # MCC = 0.150
 (MCC_I<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_int,HighestMCC[2,Cutoff]))   # MCC = 0.355
 (MCC_A<-Get_MCC(datCredit_valid$DefaultStatus1_lead_12_max,datCredit_valid$prob_adv,HighestMCC[3,Cutoff]))   # MCC = 0.399
@@ -300,29 +300,29 @@ HighestMCC<-rbind(BASIC_MCCs[which.max(as.matrix(BASIC_MCCs[,"MCC"])),],INT_MCCs
 
 # -- Graph MCC and scaled MCC across three candidate classifiers
 # - Create graphing dataset
-MCC_PlotSet<-data.table(MCC_Version=rep(c(" ", "  "),each=3),Model=rep(c("a_Basic","b_Intermediate", "c_Advanced"),times=2),Value=round(c(MCC_B,MCC_I,MCC_A,(MCC_B+1)/2,(MCC_I+1)/2,(MCC_A+1)/2),3))
-MCC_PlotSet[,Label:=Value]
+datPlot<-data.table(MCC_Version=rep(c(" ", "  "),each=3),Model=rep(c("a_Basic","b_Intermediate", "c_Advanced"),times=2),Value=round(c(MCC_B,MCC_I,MCC_A,(MCC_B+1)/2,(MCC_I+1)/2,(MCC_A+1)/2),3))
+datPlot[, Label:=Value]
 
 # - Set aesthetic parameters
 dpi <- 180
-col.v <- brewer.pal(9, "Reds")[c(6,8,9)]
-col.v3 <- rep("white", 3*2)
-label.v <- c("a_Basic"=bquote("Basic ("*italic(p[c])*" = "*.(round(HighestMCC[1,Cutoff],3))*")"),
+vCol1 <- brewer.pal(9, "Reds")[c(6,8,9)]
+vCol3 <- rep("white", 3*2)
+vLabel <- c("a_Basic"=bquote("Basic ("*italic(p[c])*" = "*.(round(HighestMCC[1,Cutoff],3))*")"),
              "b_Intermediate"=bquote("Intermediate ("*italic(p[c])*" = "*.(round(HighestMCC[2,Cutoff],3))*")"),
              "c_Advanced"=bquote("Advanced ("*italic(p[c])*" = "*.(round(HighestMCC[3,Cutoff],3))*")"))
 
 # - Create the plot
-(MCCPlot<-ggplot(MCC_PlotSet, aes(group=Model, y=Value, x=MCC_Version)) + 
+(gMCC<-ggplot(datPlot, aes(group=Model, y=Value, x=MCC_Version)) + 
     theme_minimal() + theme(legend.position = "bottom", text=element_text(family=chosenFont), axis.title.x = element_text(margin = margin(t = 5))) + labs(x="Matthews Correlation Coefficients", y="Value", family=chosenFont) +
     geom_col(aes(colour=Model, fill=Model), position="dodge") +
     facet_wrap(~MCC_Version, scales="free") +
     geom_label(aes(label=Label,fill=Model),colour="white", position=position_dodge(0.90), size=2.75,label.padding = unit(0.15, "lines"),show.legend = F) +
-    scale_colour_manual(name="Model:", values=col.v, labels=label.v) +
-    scale_fill_manual(name="Model:", values=col.v, labels=label.v) +
+    scale_colour_manual(name="Model:", values=vCol1, labels=vLabel) +
+    scale_fill_manual(name="Model:", values=vCol1, labels=vLabel) +
     scale_x_discrete(labels=c(" "=bquote("MCC "*rho[M]),"  "=bquote("Scaled MCC "*rho*"'"[M]))))
 
 # Saving the graph to specified path
-ggsave(MCCPlot, file=paste0(genFigPath, "MCC_Scaled_vs_Unscaled.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
+ggsave(gMCC, file=paste0(genFigPath, "MCC_Scaled_vs_Unscaled.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
 
 
 # -- Comparison to discrete AUC, having imposed the same cut-offs
@@ -354,10 +354,13 @@ cat("NOTE: Improvement in MCC of basic to intermediate classifier:", percent(MCC
 
 # -- Graph MCC across all cut-offs for three candidate classifiers
 
+# - Create gCombined MCC dataset
+datMCC <- rbind(datMCC_Basic, datMCC_Int, datMCC_Adv)
+
 # - Set graphing parameters
 dpi <- 180
-label.v <- c("a_Bas"="Basic","b_Int"="Intermediate","c_Adv"="Advanced")
-linetype.v <- c("solid","solid","solid")
+vLabel <- c("a_Bas"="Basic","b_Int"="Intermediate","c_Adv"="Advanced")
+vLineType <- c("solid","solid","solid")
 		  
 # - Create annotation object
 datAnnotate_max <- data.table(Set=c("a_Bas", "b_Int","c_Adv"),HighestMCC[,"Cutoff"], HighestMCC[,"MCC"],
@@ -366,8 +369,7 @@ datAnnotate_max <- data.table(Set=c("a_Bas", "b_Int","c_Adv"),HighestMCC[,"Cutof
                                       paste0("' '*rho[M]*' = ", as.character(round(HighestMCC[Model=="c_Adv","MCC"],3)),";  '*italic(p[c])*' = ",round(HighestMCC[3,Cutoff],3),"'")))
 
 # - Create graph
-(gg_TS <- ggplot(PlottingSet, aes(x=Cutoff, y=MCC)) + 
-  theme_minimal() +
+(gMCC_cutoffs <- ggplot(datMCC, aes(x=Cutoff, y=MCC)) + theme_minimal() +
   labs(x=bquote("Cut-off "*italic(p[c])), y=bquote("Matthews Correlation Coefficient "*rho[M]), family=chosenFont) + 
   theme(text=element_text(family=chosenFont),legend.position = "bottom",legend.margin=margin(-10, 0, 0, 0),
         axis.text.x=element_text(angle=90), 
@@ -381,34 +383,30 @@ datAnnotate_max <- data.table(Set=c("a_Bas", "b_Int","c_Adv"),HighestMCC[,"Cutof
   geom_label(data=datAnnotate_max, aes(x=Cutoff, label=Label, y=MCC, colour=Set), show.legend = F, 
                nudge_y=0.015, nudge_x=0.06, size=2.5,label.padding = unit(0.2, "lines"), parse = T) +
   # facets & scale options
-  scale_colour_manual(name="Model:", values=col.v, labels=label.v) + 
-  #scale_shape_manual(name="Model:", values=shape.v, labels=label.v) + 
-  scale_linetype_manual(name="Model:", values=linetype.v, labels=label.v) + 
+  scale_colour_manual(name="Model:", values=vCol1, labels=vLabel) + 
+  #scale_shape_manual(name="Model:", values=vShape, labels=vLabel) + 
+  scale_linetype_manual(name="Model:", values=vLineType, labels=vLabel) + 
   scale_x_continuous(breaks=pretty_breaks()) +
   scale_y_continuous(breaks=pretty_breaks()))
 
 # Saving the graph to specified path
-ggsave(gg_TS, file=paste0(genFigPath, "MCC_Cut-Offs.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
+ggsave(gMCC_cutoffs, file=paste0(genFigPath, "MCC_Cut-Offs.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
 
 # - Clean up
-datCredit_valid[, `:=`(prob_basic=NULL, prob_int=NULL, prob_adv=NULL, pred_basic=NULL, pred_int=NULL, pred_adv=NULL)]
-rm(roc_obj_basic, roc_obj_int, roc_obj_adv,
-   chosenFont, col.v, fill.v, linetype.v, label.v, datPlot_ROC, dat_anno, g_ROC_compar); gc()
+rm(gMCC_cutoffs, datPlot, datMCC, datMCC_Adv, datMCC_Basic, datMCC_Int, gMCC, datAnnotate_max,
+   HighestMCC,  roc_obj_adv_disc, roc_obj_basic_disc, roc_obj_int_disc); gc()
 
 
 
 
 # ---  2.7 Generalised Youden Index
-
-# -- Create a plot displaying default rate as a function of a
-# - Add probability scores to the validation set
-datCredit_valid[, prob_adv := predict(logitMod_Adv, newdata = datCredit_valid, type="response")]
+# Create a plot displaying time graphs of actual vs expected default rate as a function of the cost multiple (a)
 
 # - Graphing Parameters
 chosenFont <- "Cambria"
 dpi <- 180
 
-# - Function to create a actual vs expected 12-month conditional default rate as a function of the TPR:TNR cost ratio a
+# - Function to create the time graph given a particular TPR:TNR cost ratio a
 DefRte_Plotter<-function(a){
   
   # - Obtain Generalised Youden Index cut-off pc for the cost ratio a
@@ -439,17 +437,18 @@ DefRte_Plotter<-function(a){
   dat_anno1[, Label := paste0(Label, " = ", sprintf("%.4f",MAE*100), "%'")]
   
   # - More graphing parameters
-  col.v<-brewer.pal(9, "Set1")[c(2,1)]
-  shape.v <- c(18,20) 
-  linetype.v <- c("dashed","solid")
+  vCol1<-brewer.pal(9, "Set1")[c(2,1)]
+  vShape <- c(18,20) 
+  vLineType <- c("dashed","solid")
   
-  label.v <- c("Act"=bquote(italic(A)[t]*": Actual"),
+  vLabel <- c("Act"=bquote(italic(A)[t]*": Actual"),
                "Exp"=bquote(italic(B)[t]*": Expected"))
   
   # - Aesthetics engineering
   PlotSet[, Facet_label := paste0("' Cost ratio  '*italic(a)*' = ", as.character(a),"'")]
+  
   # - Actual Plot
-  gg_TS <- ggplot(PlotSet, aes(x=Date, y=DefRate)) + 
+  gPlot <- ggplot(PlotSet, aes(x=Date, y=DefRate)) + 
     theme_minimal() +
     labs(x="Calendar date (months)", y=bquote(" Conditional 12-month default rate (%)"), family=chosenFont) + 
     theme(text=element_text(family=chosenFont),legend.position = "bottom",legend.margin=margin(-10, 0, 0, 0),
@@ -463,14 +462,14 @@ DefRte_Plotter<-function(a){
     facet_grid(Facet_label ~ .,labeller = label_parsed) + 
     geom_text(data=dat_anno1, aes(x=x, y=y, label = Label), family=chosenFont, size=4.5, parse=T) +
     geom_text(data=dat_anno2, aes(x=x, y=y, label = Label), family=chosenFont, size=4.5, parse=T) +
-    scale_colour_manual(name=bquote("Event Rate: "), values=col.v, labels=label.v) + 
-    scale_shape_manual(name=bquote("Event Rate: "), values=shape.v, labels=label.v) + 
-    scale_linetype_manual(name=bquote("Event Rate: "), values=linetype.v, labels=label.v) + 
+    scale_colour_manual(name=bquote("Event Rate: "), values=vCol1, labels=vLabel) + 
+    scale_shape_manual(name=bquote("Event Rate: "), values=vShape, labels=vLabel) + 
+    scale_linetype_manual(name=bquote("Event Rate: "), values=vLineType, labels=vLabel) + 
     scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y") +
     scale_y_continuous(breaks=pretty_breaks(), label=percent)
   
   # - Return plot 
-  return(gg_TS)
+  return(gPlot)
 }
 
 # - Call function for various "a" values
@@ -481,13 +480,15 @@ DefRte_Plotter<-function(a){
 #(a_5<-DefRte_Plotter(5))
 
 # - Bind graphs together
-(combined<-grid.arrange(a_1, a_3 ,a_4 ,a_6 ,ncol=2))
+(gCombined<-grid.arrange(a_1, a_3 ,a_4 ,a_6 ,ncol=2))
 
 # Saving the graph to a specified path
-ggsave(combined, file=paste0(genFigPath, "ACTvsEXP_DefRate.png"), width=2200/dpi, height=1800/dpi, dpi="retina", bg="white")
+ggsave(gCombined, file=paste0(genFigPath, "ACTvsEXP_DefRate.png"), width=2200/dpi, height=1800/dpi, dpi="retina", bg="white")
 
-# - Clean up
-rm(logitMod_Basic, logitMod_Int, logitMod_Adv, a_1, a_3,a_4,a_6, ADV_MCCs, BASIC_MCCs, INT_MCCs,
-   coefDeter_Adv, coefDeter_Basic, coefDeter_Int, combined, datAnnotate_max, datCredit_train, datCredit_valid,
-   gg_TS, HighestMCC, MCC_PlotSet,MCCPlot, PlottingSet, PseudoR2_Table, R2_PlotSet, R2Plot, roc_obj_adv_disc,
-   roc_obj_basic_disc, roc_obj_int_disc, roc_obj_basic, roc_obj_int, roc_obj_adv); gc()
+# - Cleanup
+rm(a_1, a_3,a_4,a_6, gCombined)
+
+
+# --- Final Clean up
+rm(logitMod_Basic, logitMod_Int, logitMod_Adv, datCredit_train, datCredit_valid, 
+   vCol1, vCol2, vCol3, vLineType, vLabel, datPlot, gPlot); gc()
