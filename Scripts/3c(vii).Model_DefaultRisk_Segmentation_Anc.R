@@ -248,52 +248,52 @@ auc(datCredit_valid[,DefaultStatus1_lead_12_max], datCredit_valid[,prob_g0_Full_
 # ------ 4. Modelling per [g0_Delinq] segment: Fixed/constant input space
 # --- Model for delinquency segment 0
 # - Fitting the model for delinquency segment 0
-logitMod_g0_Delinq_0 <- glm(inputs_fin_bas, data=datCredit_train[g0_Delinq==0,], family="binomial")
+logitMod_g0_Delinq_0 <- glm(inputs_bas, data=datCredit_train[g0_Delinq==0,], family="binomial")
 # - Model analysis
 # Deviance and AIC
 summary(logitMod_g0_Delinq_0)
 ### RESULTS: Insignificant variables: None
 # Coefficient of determination (McFadden)
 coefDeter_glm(logitMod_g0_Delinq_0)
-### RESTULS: 1.59%
+### RESTULS: 3.81%
 # ROC analysis
 datCredit_valid[g0_Delinq==0, prob_g0_seg := predict(logitMod_g0_Delinq_0, newdata = datCredit_valid[g0_Delinq==0,], type="response")]
 auc(datCredit_valid[g0_Delinq==0,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==0,prob_g0_seg])
-### RESTULS: 62.06%
+### RESTULS: 66.75%
 
 # --- Model for delinquency segment 1
 # - Fitting the model for delinquency segment 1
-logitMod_g0_Delinq_1 <- glm(inputs_fin_bas, data=datCredit_train[g0_Delinq==1,], family="binomial")
+logitMod_g0_Delinq_1 <- glm(inputs_bas, data=datCredit_train[g0_Delinq==1,], family="binomial")
 # - Model analysis
 # Deviance and AIC
 summary(logitMod_g0_Delinq_1)
-### RESULTS: Insignificant variables: [AgeToTerm], [Balance]
+### RESULTS: Insignificant variables: [Principal_Real]
 # Coefficient of determination (McFadden)
 coefDeter_glm(logitMod_g0_Delinq_1)
-### RESTULS: 0.26%
+### RESTULS: 1.05%
 # ROC analysis
 datCredit_valid[g0_Delinq==1, prob_g0_seg := predict(logitMod_g0_Delinq_1, newdata = datCredit_valid[g0_Delinq==1,], type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_seg)
-### RESTULS: 76.44%
+### RESTULS: 81.85%
 
 # --- Model for delinquency segment 2
 # - Fitting the model for delinquency segment 2
-logitMod_g0_Delinq_2 <- glm(inputs_fin_bas, data=datCredit_train[g0_Delinq==2,], family="binomial")
+logitMod_g0_Delinq_2 <- glm(inputs_bas, data=datCredit_train[g0_Delinq==2,], family="binomial")
 # - Model analysis
 summary(logitMod_g0_Delinq_2)
-### RESULTS: Insignificant variables: [AgeToTerm], [Term], [Balance], [Principal], [InterestRate_Margin_imputed_mean]
+### RESULTS: Insignificant variables: [Age_Adj], [Term], [PerfSpell_Num], [InterestRate_Margin_imputed_mean], [Principal_Real], [Balance_Real]
 # Coefficient of determination (McFadden)
 coefDeter_glm(logitMod_g0_Delinq_2)
-### RESTULS: 0.10%
+### RESTULS: 0.39%
 # ROC analysis
 datCredit_valid[g0_Delinq==2, prob_g0_seg := predict(logitMod_g0_Delinq_2, newdata = datCredit_valid[g0_Delinq==2,], type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_seg)
-### RESTULS: 79.64%
+### RESTULS: 81.85%
 
 # --- Combined predictions assessment (ensemble approach)
 ### Combine the predictions of the segments together and then assess the
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_seg)
-### RESULTS: 79.64%
+### RESULTS: 81.85%
 
 
 
@@ -301,15 +301,15 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_seg)
 # ------ 5. Modelling overall [g0_Delinq] segments: Fixed/constant input space
 # --- Model over all segments (model by input)
 # - Amending the basic model formula to include delinquency levels
-inputs_fin_bas_del <- as.formula(paste0("DefaultStatus1_lead_12_max ~", paste0(c(labels(terms(inputs_fin_bas)), "g0_Delinq"), collapse = "+")))
+inputs_bas_del <- as.formula(paste0("DefaultStatus1_lead_12_max ~", paste0(c(labels(terms(inputs_bas)), "g0_Delinq"), collapse = "+")))
 # - Fitting the model for delinquency segment 0
-logitMod_g0_Delinq_Full <- glm(inputs_fin_bas_del, data=datCredit_train, family="binomial")
+logitMod_g0_Delinq_Full <- glm(inputs_bas_del, data=datCredit_train, family="binomial")
 # - Model analysis
 summary(logitMod_g0_Delinq_Full)
-### RESULTS: Insignificant variables: [Term]
+### RESULTS: Insignificant variables: None
 # Coefficient of determination (McFadden)
 coefDeter_glm(logitMod_g0_Delinq_Full)
-### RESTULS: 22.13%
+### RESTULS: 22.55%
 # Overall ROC analysis
 datCredit_valid[, prob_full := predict(logitMod_g0_Delinq_Full, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full)
@@ -317,95 +317,78 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_full)
 auc(datCredit_valid[g0_Delinq==0,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==0,prob_full])
 auc(datCredit_valid[g0_Delinq==1,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==1,prob_full])
 auc(datCredit_valid[g0_Delinq==2,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==2,prob_full])
-### RESULTS: Overall: 79.55%
-###          [g0_Delinq]=0: 62.01%
-###          [g0_Delinq]=1: 50.61%
-###          [g0_Delinq]=2: 52.30%
-### NOTE: Are these results valid? We already have [g0_Delinq] included in the input space and we not constrain the predictions...?
+### RESULTS: Overall: 81.84%
+###          [g0_Delinq]=0: 66.82%
+###          [g0_Delinq]=1: 54.76%
+###          [g0_Delinq]=2: 50%
+### NOTE: The overall AUC is of interest since the segment-specific AUCs are misleading and shouldn't be evaluated individualy.
 
 
 
 
 # ------ 6. Comparison of segmented- vs full model : Fixed/constant input space
-### Segmented Model: [g0_Delinq]=0: AUC = 62.06% | Coef. of Deter. = 1.59%
-###                  [g0_Delinq]=1: AUC = 76.44% | Coef. of Deter. = 0.26%
-###                  [g0_Delinq]=2: AUC = 79.64% | Coef. of Deter. = 0.10%
-###                  Overall      : AUC = 79.64% | Coef. of Deter. = NA
-### Full Model:      [g0_Delinq]=0: AUC = 62.01% | Coef. of Deter. = NA
-###                  [g0_Delinq]=1: AUC = 00.61% | Coef. of Deter. = NA
-###                  [g0_Delinq]=2: AUC = 52.30% | Coef. of Deter. = NA
-###                  Overall      : AUC = 79.55% | Coef. of Deter. = 22.13%
+### Segmented Model: [g0_Delinq]=0: AUC = 66.75% | Coef. of Deter. = 1.59%
+###                  [g0_Delinq]=1: AUC = 81.85% | Coef. of Deter. = 0.26%
+###                  [g0_Delinq]=2: AUC = 81.85% | Coef. of Deter. = 0.10%
+###                  Overall      : AUC = 81.85% | Coef. of Deter. = NA
+### Full Model:      [g0_Delinq]=0: AUC = 66.82% | Coef. of Deter. = NA
+###                  [g0_Delinq]=1: AUC = 54.76% | Coef. of Deter. = NA
+###                  [g0_Delinq]=2: AUC = 50% | Coef. of Deter. = NA
+###                  Overall      : AUC = 81.84% | Coef. of Deter. = 22.13%
 
 
 
 
 # ------ 7. Modelling per [g0_Delinq] segment: Bespoke input space per segment
 # ---- 7.1 [g0_Delinq] = 0
-# --- 7.1.1 Dynamic variable selection
-# - Adjusting the input space
+# --- 7.1.1 Dynamic variable selection | Iteration 1
+# - Obtain advanced model's input space
 inputs_g0_Delinq_0_b <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_adv))[!(labels(terms(inputs_adv)) %in% "g0_Delinq")], collapse = "+")))
-# - Fitting the model for delinquency segment 2
-logitMod_g0_Delinq_0_b <- glm(inputs_g0_Delinq_0_b, data=datCredit_train[g0_Delinq==2,], family="binomial")
+# - Fitting the model for delinquency segment 0
+logitMod_g0_Delinq_0_b <- glm(inputs_g0_Delinq_0_b, data=datCredit_train[g0_Delinq==0,], family="binomial")
 # - Model analysis
 summary(logitMod_g0_Delinq_0_b)
-### RESULTS: Insignificant variables: [Term], [Principal], [InterestRate_Margin_imputed_mean], [M_DTI_Growth_6 ], [M_DTI_Growth_9], [slc_acct_roll_ever_24_imputed_mean],
-###                                   [slc_acct_arr_dir_3], [slc_past_due_amt_imputed_med], [slc_acct_pre_lim_perc_imputed_med], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop_5]
-### CONCLUSION: Remove insignificant variables sand refit model
+### RESULTS: Insignificant variables: [slc_past_due_amt_imputed_med]
+### CONCLUSION: Remove insignificant variables and refit model
 
-# --- 7.1.2 Dynamic variable selection
+# --- 7.1.2 Dynamic variable selection | Iteration 2
 # - Adjusting the input space
-inputs_g0_Delinq_0_b2 <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_g0_Delinq_0_b))[!(labels(terms(inputs_g0_Delinq_0_b)) %in%
-                                                                                                        c("Term", "Principal", "InterestRate_Margin_imputed_mean", "M_DTI_Growth_6", "M_DTI_Growth_9", "slc_acct_roll_ever_24_imputed_mean",
-                                                                                                          "slc_acct_arr_dir_3", "slc_past_due_amt_imputed_med", "slc_acct_pre_lim_perc_imputed_med", "NewLoans_Aggr_Prop_3", "NewLoans_Aggr_Prop_5"))], collapse = "+")))
-# - Fitting the model for delinquency segment 2
-logitMod_g0_Delinq_0_b2 <- glm(inputs_g0_Delinq_0_b2, data=datCredit_train[g0_Delinq==2,], family="binomial")
+inputs_g0_Delinq_0_b2 <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_g0_Delinq_0_b))[!(labels(terms(inputs_g0_Delinq_0_b)) %in%                                                                                                    c("slc_past_due_amt_imputed_med"))], collapse = "+")))
+# - Refitting the model for delinquency segment 0
+logitMod_g0_Delinq_0_b2 <- glm(inputs_g0_Delinq_0_b2, data=datCredit_train[g0_Delinq==0,], family="binomial")
 # - Model analysis
 summary(logitMod_g0_Delinq_0_b2)
-### RESULTS: Insignificant variables: [M_Emp_Growth_9], [M_RealGDP_Growth_12]
-### CONCLUSION: Remove insignificant variables sand refit model
-
-# --- 7.1.3 Dynamic variable selection
-# - Adjusting the input space
-inputs_g0_Delinq_0_b3 <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_g0_Delinq_0_b2))[!(labels(terms(inputs_g0_Delinq_0_b2)) %in%
-                                                                                                                           c("M_Emp_Growth_9", "M_RealGDP_Growth_12"))], collapse = "+")))
-# - Fitting the model for delinquency segment 2
-logitMod_g0_Delinq_0_b3 <- glm(inputs_g0_Delinq_0_b3, data=datCredit_train[g0_Delinq==2,], family="binomial")
-# - Model analysis
-summary(logitMod_g0_Delinq_0_b3)
 ### RESULTS: Insignificant variables: None
-### CONCLUSION: Proceed with model analysis
+### CONCLUSION: Proceed to model analysis
 
-# --- 7.1.4 Model analysis
+# --- 7.1.3 Model analysis
 # - Coefficient of determination (McFadden)
-coefDeter_glm(logitMod_g0_Delinq_0_b3)
-### RESTULS: 8.08%
+coefDeter_glm(logitMod_g0_Delinq_0_b2)
+### RESTULS: 18.52%
 # - ROC analysis
-datCredit_valid[g0_Delinq==0, prob_g0_seg_b := predict(logitMod_g0_Delinq_0_b3, newdata = datCredit_valid[g0_Delinq==0,], type="response")]
+datCredit_valid[g0_Delinq==0, prob_g0_seg_b := predict(logitMod_g0_Delinq_0_b2, newdata = datCredit_valid[g0_Delinq==0,], type="response")]
 auc(datCredit_valid[g0_Delinq==0,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==0,prob_g0_seg_b])
-### RESTULS: 79.88%
+### RESTULS: 84.21%
 
-# --- 7.1.5 Clean up
-rm(inputs_g0_Delinq_0_b, inputs_g0_Delinq_0_b2, logitMod_g0_Delinq_0_b, logitMod_g0_Delinq_0_b2); gc()
+# --- 7.1.4 Clean up
+rm(inputs_g0_Delinq_0_b, inputs_g0_Delinq_0_b2, logitMod_g0_Delinq_0_b); gc()
 
 
 
 # ---- 7.2 [g0_Delinq] = 1
-# --- 7.2.1 Dynamic variable selection
+# --- 7.2.1 Dynamic variable selection | Iteration 1
 # - Adjusting the input space
 inputs_g0_Delinq_1_b <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_adv))[!(labels(terms(inputs_adv)) %in% "g0_Delinq")], collapse = "+")))
 # - Fitting the model for delinquency segment 2
-logitMod_g0_Delinq_1_b <- glm(inputs_g0_Delinq_1_b, data=datCredit_train[g0_Delinq==2,], family="binomial")
+logitMod_g0_Delinq_1_b <- glm(inputs_g0_Delinq_1_b, data=datCredit_train[g0_Delinq==1,], family="binomial")
 # - Model analysis
 summary(logitMod_g0_Delinq_1_b)
-### RESULTS: Insignificant variables: [Term], [Principal], [InterestRate_Margin_imputed_mean], [M_DTI_Growth_6], [slc_acct_roll_ever_24_imputed_mean], [slc_acct_arr_dir_3],
-###                                   [slc_acct_pre_lim_perc_imputed_med], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop_5]
+### RESULTS: Insignificant variables: [Principal_Real], [Balance_Real], [TimeInPerfSpell], [NewLoans_Aggr_Prop_1]
 ### CONCLUSION: Remove insignificant variables sand refit model
 
-# --- 7.2.2 Dynamic variable selection
+# --- 7.2.2 Dynamic variable selection | Iteration 2
 # - Adjusting the input space
-inputs_g0_Delinq_1_b2 <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_g0_Delinq_1_b))[!(labels(terms(inputs_g0_Delinq_1_b)) %in%
-                                                                                                                           c("Term", "Principal", "InterestRate_Margin_imputed_mean", "M_DTI_Growth_6", "slc_acct_roll_ever_24_imputed_mean", "slc_acct_arr_dir_3",
-                                                                                                                             "slc_acct_pre_lim_perc_imputed_med", "NewLoans_Aggr_Prop_3", "NewLoans_Aggr_Prop_5"))], collapse = "+")))
+inputs_g0_Delinq_1_b2 <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_g0_Delinq_1_b))[!(labels(terms(inputs_g0_Delinq_1_b)) %in%                                                                                                                       c("Principal_Real", "Balance_Real", "TimeInPerfSpell", "NewLoans_Aggr_Prop_1"))], collapse = "+")))
 # - Fitting the model for delinquency segment 2
 logitMod_g0_Delinq_1_b2 <- glm(inputs_g0_Delinq_1_b2, data=datCredit_train[g0_Delinq==1,], family="binomial")
 # - Model analysis
@@ -416,11 +399,11 @@ summary(logitMod_g0_Delinq_1_b2)
 # --- 7.2.3 Model analysis
 # - Coefficient of determination (McFadden)
 coefDeter_glm(logitMod_g0_Delinq_1_b2)
-### RESTULS: 10.95%
+### RESTULS: 10.15%
 # - ROC analysis
 datCredit_valid[g0_Delinq==1, prob_g0_seg_b := predict(logitMod_g0_Delinq_1_b2, newdata = datCredit_valid[g0_Delinq==1,], type="response")]
 auc(datCredit_valid[g0_Delinq==1, DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==1, prob_g0_seg_b])
-### RESTULS: 72.38%
+### RESTULS: 72.11%
 
 # --- 7.2.4 Clean up
 rm(inputs_g0_Delinq_1_b, logitMod_g0_Delinq_1_b); gc()
@@ -428,41 +411,32 @@ rm(inputs_g0_Delinq_1_b, logitMod_g0_Delinq_1_b); gc()
 
 
 # ---- 7.3 [g0_Delinq] = 2
-# --- 7.3.1 Dynamic variable selection
+# --- 7.3.1 Dynamic variable selection | Iteration 1
 # - Adjusting the input space
 inputs_g0_Delinq_2_b <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_adv))[!(labels(terms(inputs_adv)) %in% "g0_Delinq")], collapse = "+")))
 # - Fitting the model for delinquency segment 2
 logitMod_g0_Delinq_2_b <- glm(inputs_g0_Delinq_2_b, data=datCredit_train[g0_Delinq==2,], family="binomial")
 # - Model analysis
 summary(logitMod_g0_Delinq_2_b)
-### RESULTS: Insignificant variables: [Term], [Principal], [InterestRate_Margin_imputed_mean], [M_DTI_Growth_6], [M_DTI_Growth_9], [slc_acct_roll_ever_24_imputed_mean], [slc_acct_arr_dir_3],
-###                                   [slc_acct_pre_lim_perc_imputed_med], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop_5]
+### RESULTS: Insignificant variables: [Age_Adj], [Term], [PerfSpell_Num], [InterestRate_Margin_imputed_mean], [Principal_Real], [Balance_Real],
+###                                   [TimeInPerfSpell], [slc_acct_roll_ever_24_imputed_mean], [slc_acct_arr_dir_3], [slc_acct_pre_lim_perc_imputed_med],
+###                                   [NewLoans_Aggr_Prop_1]
 ### CONCLUSION: Remove insignificant variables sand refit model
 
-# --- 7.3.2 Dynamic variable selection
+# --- 7.3.2 Dynamic variable selection | Iteration 2
 # - Adjusting the input space
 inputs_g0_Delinq_2_b2 <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_g0_Delinq_2_b))[!(labels(terms(inputs_g0_Delinq_2_b)) %in%
-                                                                                                                 c("Term", "Principal", "InterestRate_Margin_imputed_mean", "M_DTI_Growth_6", "M_DTI_Growth_9", "slc_acct_roll_ever_24_imputed_mean", "slc_acct_arr_dir_3",
-                                                                                                                   "slc_acct_pre_lim_perc_imputed_med", "NewLoans_Aggr_Prop_3", "NewLoans_Aggr_Prop_5"))], collapse = "+")))
+                                                                                                                 c("Age_Adj", "Term", "PerfSpell_Num", "InterestRate_Margin_imputed_mean", "Principal_Real", "Balance_Real",
+                                                                                                                   "TimeInPerfSpell", "slc_acct_roll_ever_24_imputed_mean", "slc_acct_arr_dir_3", "slc_acct_pre_lim_perc_imputed_med",
+                                                                                                                   "NewLoans_Aggr_Prop_1"))], collapse = "+")))
 # - Fitting the model for delinquency segment 2
 logitMod_g0_Delinq_2_b2 <- glm(inputs_g0_Delinq_2_b2, data=datCredit_train[g0_Delinq==2,], family="binomial")
 # - Model analysis
 summary(logitMod_g0_Delinq_2_b2)
-### RESULTS: Insignificant variables: [Balance], [M_Emp_Growth_9], [M_RealGDP_Growth_12]
-### CONCLUSION: Remove insignificant variables sand refit model
-
-# --- 7.3.3 Dynamic variable selection
-# - Adjusting the input space
-inputs_g0_Delinq_2_b3 <- as.formula(paste0("DefaultStatus1_lead_12_max ~ ", paste0(labels(terms(inputs_g0_Delinq_2_b2))[!(labels(terms(inputs_g0_Delinq_2_b2)) %in%
-                                                                                                                           c("Balance", "M_Emp_Growth_9", "M_RealGDP_Growth_12"))], collapse = "+")))
-# - Fitting the model for delinquency segment 2
-logitMod_g0_Delinq_2_b3 <- glm(inputs_g0_Delinq_2_b3, data=datCredit_train[g0_Delinq==2,], family="binomial")
-# - Model analysis
-summary(logitMod_g0_Delinq_2_b3)
 ### RESULTS: Insignificant variables: None
-### CONCLUSION: Proceed with model analysis
+### CONCLUSION: Proceed to model analysis
 
-# --- 7.3.4 Model analysis
+# --- 7.3.3 Model analysis
 # - Coefficient of determination (McFadden)
 coefDeter_glm(logitMod_g0_Delinq_2_b3)
 ### RESTULS: 8.20%
@@ -471,56 +445,59 @@ datCredit_valid[g0_Delinq==2, prob_g0_seg_b := predict(logitMod_g0_Delinq_2_b3, 
 auc(datCredit_valid[g0_Delinq==2, DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==2, prob_g0_seg_b])
 ### RESTULS: 68.08%
 
-# --- 7.3.5 Clean up
-rm(inputs_g0_Delinq_2_b, inputs_g0_Delinq_2_b2, logitMod_g0_Delinq_2_b, logitMod_g0_Delinq_2_b2); gc()
-
-
+# --- 7.3.4 Clean up
+rm(inputs_g0_Delinq_2_b, inputs_g0_Delinq_2_b2); gc()
 
 # ---- 7.4 Combined ROC analysis (ensemble approach)
 ### Combine the predictions of the segments together and then assess the
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_seg_b)
-### RESULTS: 73.65%
+### RESULTS: 90.26%
 
 
 
 
 # ------ 8. Modelling overall [g0_Delinq] segments: Bespoke input space per segment
-# --- Model over all segments (model by input)
-# - Amending the basic model formula to exclude delinquency levels
-inputs_fin_adv_delb <- as.formula(paste0("DefaultStatus1_lead_12_max ~", paste0(c(labels(terms(inputs_adv)), "g0_Delinq"), collapse = "+")))
+# --- 8.1 Model over all segments (model by input)
 # - Fitting the model for delinquency segment 0
-logitMod_g0_Delinq_Fullb <- glm(inputs_fin_adv_delb, data=datCredit_train, family="binomial")
+logitMod_g0_Delinq_Fullb <- glm(inputs_adv, data=datCredit_train, family="binomial")
 # - Model analysis
 summary(logitMod_g0_Delinq_Fullb)
-### RESULTS: Insignificant variables: [NewLoans_Aggr_Prop_3] - P-value is ~ 11%, but the variables is nevertheless kept in the model
-# Coefficient of determination (McFadden)
+### RESULTS: Insignificant variables: None
+### CONCLUSION: Procedd to model analysis
+
+# --- 8.2 Model analysis
+# - Coefficient of determination (McFadden)
 coefDeter_glm(logitMod_g0_Delinq_Fullb)
-### RESTULS: 34.17%
-# Overall ROC analysis
+### RESTULS: 32.71%
+# - Overall ROC analysis
 datCredit_valid[, prob_fullb := predict(logitMod_g0_Delinq_Fullb, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_fullb)
-# ROC analysis per "hypothetical" [g0_Delinq] segment
+# - ROC analysis per "hypothetical" [g0_Delinq] segment
 auc(datCredit_valid[g0_Delinq==0,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==0,prob_fullb])
 auc(datCredit_valid[g0_Delinq==1,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==1,prob_fullb])
 auc(datCredit_valid[g0_Delinq==2,DefaultStatus1_lead_12_max], datCredit_valid[g0_Delinq==2,prob_fullb])
-### RESULTS: Overall: 90.44%
-###          [g0_Delinq]=0: 84.39%
-###          [g0_Delinq]=1: 72.03%
-###          [g0_Delinq]=2: 66.46%
-### NOTE: Are these results valid? We already have [g0_Delinq] included in the input space and we not constrain the predictions...?
+### RESULTS: Overall: 90.02%
+###          [g0_Delinq]=0: 83.77%
+###          [g0_Delinq]=1: 71.10%
+###          [g0_Delinq]=2: 65.84%
 
 
 
 
-# ------ 9. Comparison of segmented- vs full model : Bespoke input space per segment
-### Segmented Model: [g0_Delinq]=0: AUC = 79.88% | Coef. of Deter. = 8.08%
-###                  [g0_Delinq]=1: AUC = 72.38% | Coef. of Deter. = 10.95%
+
+
+# ------ 9. AUC Comparison of segmented- vs full model : Bespoke input space per segment
+# --- 9.1 Model level AUC comparison
+### Segmented Model: [g0_Delinq]=0: AUC = 84.21% | Coef. of Deter. = 8.08%
+###                  [g0_Delinq]=1: AUC = 72.11% | Coef. of Deter. = 10.95%
 ###                  [g0_Delinq]=2: AUC = 68.08% | Coef. of Deter. = 8.20%
-###                  Overall      : AUC = 79.64% | Coef. of Deter. = NA
-### Full Model:      [g0_Delinq]=0: AUC = 84.39% | Coef. of Deter. = NA
-###                  [g0_Delinq]=1: AUC = 72.03% | Coef. of Deter. = NA
-###                  [g0_Delinq]=2: AUC = 66.46% | Coef. of Deter. = NA
-###                  Overall      : AUC = 90.44% | Coef. of Deter. = 34.17%
+###                  Overall      : AUC = 90.26% | Coef. of Deter. = NA
+### Full Model:      [g0_Delinq]=0: AUC = 83.77% | Coef. of Deter. = NA
+###                  [g0_Delinq]=1: AUC = 71.10% | Coef. of Deter. = NA
+###                  [g0_Delinq]=2: AUC = 65.84% | Coef. of Deter. = NA
+###                  Overall      : AUC = 90.02% | Coef. of Deter. = 34.17%
+
+# --- 9.2 Per-period AUC
 
 
 
