@@ -527,7 +527,7 @@ maxDensPhi_0 <- max(density(datCredit_valid[DefaultStatus1_lead_12_max==0, prob_
 datCredit_valid[, Facet_label := "Basic PD-model"]
 
 # - Graphing parameters
-chosenFont <- "Cambria"; dpi <- 220
+chosenFont <- "Cambria"; dpi <- 250
 vCol1<-brewer.pal(8, "Dark2")[c(1,2)]
 vFill<-brewer.pal(8, "Set2")[c(1,2)]
 vLabel <- c(bquote(italic(C)[0]), 
@@ -549,29 +549,29 @@ binNum <- round(2*datCredit_valid[,.N]^(1/3)*0.5) # using Rice's rule
   #             linewidth=0.3, alpha=0.4) + 
   # Annotations: actual prevalence
   geom_vline(xintercept=phi_basic, linewidth=0.5, colour="black") + 
-  annotate(geom="text", x=phi*0.87, y=max(maxDensPhi_1, maxDensPhi_0)*0.25, 
+  annotate(geom="text", x=phi*0.85, y=max(maxDensPhi_1, maxDensPhi_0)*0.25, 
            label=paste0("'Actual prevalence '*italic(q[1])==",sprintf("%.3f", phi*100), "*'%'"),
            family=chosenFont, size=3, colour="black", angle=90, parse=T) +
   # Annotations: expected prevalences
-  annotate(geom="text", x=phi*4.1, y=max(maxDensPhi_1, maxDensPhi_0)*0.6, 
+  annotate(geom="text", x=phi*4.4, y=max(maxDensPhi_1, maxDensPhi_0)*0.6, 
            label=paste0("'Expected prevalence (overall) '*italic(p[1](bold(x)))*' = ",
                         percent(div_basic$Prevalence_Expected, accuracy=0.001),"'"),
            family=chosenFont, size=3, colour="black", parse=T) +    
-  annotate(geom="text", x=phi*4, y=max(maxDensPhi_1, maxDensPhi_0)*0.55, 
+  annotate(geom="text", x=phi*4.2, y=max(maxDensPhi_1, maxDensPhi_0)*0.55, 
        label=paste0("'Expected prevalence in '*italic(C)[1]*': '*italic(p[1](bold(x)))*' = ",
                     percent(div_basic$Prevalence_Expected_1, accuracy=0.001),"'"),
        family=chosenFont, size=3, colour=vCol1[2], parse=T) +    
-  annotate(geom="text", x=phi*4, y=max(maxDensPhi_1, maxDensPhi_0)*0.50, 
+  annotate(geom="text", x=phi*4.2, y=max(maxDensPhi_1, maxDensPhi_0)*0.50, 
            label=paste0("'Expected prevalence in '*italic(C)[0]*': '*italic(p[1](bold(x)))*' = ",
                         percent(div_basic$Prevalence_Expected_0, accuracy=0.001),"'"),
            family=chosenFont, size=3, colour=vCol1[1], parse=T) +    
   # Annotations: KS-test of discrimination
-  annotate(geom="text", x=phi*4.2, y=max(maxDensPhi_1, maxDensPhi_0)*0.4, 
+  annotate(geom="text", x=phi*4.5, y=max(maxDensPhi_1, maxDensPhi_0)*0.4, 
            label=paste0("'KS-statistic '*italic(K)*' = ",
                         percent(KS_results_basic$KS_statistic, accuracy=0.1),"; discriminiation level: ",
                         KS_results_basic$KS_discrimation, "'"),
            family=chosenFont, size=2.5, colour="black", parse=T) +   
-  annotate(geom="text", x=phi*3.3, y=max(maxDensPhi_1, maxDensPhi_0)*0.37, 
+  annotate(geom="text", x=phi*3.35, y=max(maxDensPhi_1, maxDensPhi_0)*0.37, 
            label=paste0("Two-sample ",KS_results_basic$KS_decision),
            family=chosenFont, size=2.5, colour="black") +   
   # facets & scale options
@@ -581,7 +581,7 @@ binNum <- round(2*datCredit_valid[,.N]^(1/3)*0.5) # using Rice's rule
   scale_x_continuous(breaks=pretty_breaks(), label=percent, limits=c(0,percX)))
 
 # Saving the graph to a specified path
-ggsave(gPlot, file=paste0(genFigPath, "ProbScoreDensity_1Basic.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
+ggsave(gPlot, file=paste0(genFigPath, "ProbScoreDensity_1Basic.png"), width=1100/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
 
 
@@ -595,7 +595,7 @@ percX <- quantile(datCredit_valid$prob_int, 0.999)
 datCredit_valid[, Facet_label := "Intermediate PD-model"]
 
 # - Graphing parameters
-chosenFont <- "Cambria"; dpi <- 220
+chosenFont <- "Cambria"; dpi <- 250
 vCol1<-brewer.pal(8, "Dark2")[c(1,2)]
 vFill<-brewer.pal(8, "Set2")[c(1,2)]
 vLabel <- c(bquote(italic(C)[0]), 
@@ -614,7 +614,7 @@ binNum <- 32 # manually tweaked given extreme bimodality in the distributions
     #geom_density(aes(colour=factor(DefaultStatus1_lead_12_max), fill=factor(DefaultStatus1_lead_12_max)), 
                  #linewidth=0.3, alpha=0.4, position="identity", trim=F) + 
     # Annotations: actual prevalence
-    annotate(geom="text", x=phi*0.5, y=10, 
+    annotate(geom="text", x=phi*1.7, y=12, 
              label=paste0("'Actual prevalence '*italic(q[1])==",sprintf("%.3f", phi*100), "*'%'"),
              family=chosenFont, size=3, colour="black", angle=90, parse=T) +
     # Annotations: expected prevalences
@@ -636,7 +636,7 @@ binNum <- 32 # manually tweaked given extreme bimodality in the distributions
                           percent(KS_results_int$KS_statistic, accuracy=0.1),"; discriminiation level: ",
                           KS_results_int$KS_discrimation, "'"),
              family=chosenFont, size=2.5, colour="black", parse=T) +   
-    annotate(geom="text", x=0.315, y=19, 
+    annotate(geom="text", x=0.29, y=18, 
              label=paste0("Two-sample ",KS_results_int$KS_decision),
              family=chosenFont, size=2.5, colour="black") +      
     # facets & scale options
@@ -647,7 +647,7 @@ binNum <- 32 # manually tweaked given extreme bimodality in the distributions
     scale_x_continuous(breaks=pretty_breaks(), label=percent))
 
 # Saving the graph to a specified path
-ggsave(gPlot, file=paste0(genFigPath, "ProbScoreDensity_2Intermediate.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
+ggsave(gPlot, file=paste0(genFigPath, "ProbScoreDensity_2Intermediate.png"), width=1100/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
 
 
@@ -661,7 +661,7 @@ percX <- quantile(datCredit_valid$prob_int, 0.999)
 datCredit_valid[, Facet_label := "Advanced PD-model"]
 
 # - Graphing parameters
-chosenFont <- "Cambria"; dpi <- 220
+chosenFont <- "Cambria"; dpi <- 250
 vCol1<-brewer.pal(8, "Dark2")[c(1,2)]
 vFill<-brewer.pal(8, "Set2")[c(1,2)]
 vLabel <- c(bquote(italic(C)[0]), 
@@ -680,29 +680,29 @@ binNum <- 36 # manually tweaked given extreme bimodality in the distributions
     #geom_density(aes(colour=factor(DefaultStatus1_lead_12_max), fill=factor(DefaultStatus1_lead_12_max)), 
     #linewidth=0.3, alpha=0.4, position="identity", trim=F) + 
     # Annotations: actual prevalence
-    annotate(geom="text", x=phi*1.5, y=13, 
+    annotate(geom="text", x=phi*1.7, y=14, 
              label=paste0("'Actual prevalence '*italic(q[1])==",sprintf("%.3f", phi*100), "*'%'"),
              family=chosenFont, size=3, colour="black", angle=90, parse=T) +
     # Annotations: expected prevalences
-    annotate(geom="text", x=0.4, y=25, 
+    annotate(geom="text", x=0.5, y=25, 
              label=paste0("'Expected prevalence (overall) '*italic(p[1](bold(x)))*' = ",
                           percent(div_adv$Prevalence_Expected, accuracy=0.001),"'"),
              family=chosenFont, size=3, colour="black", parse=T) +    
-    annotate(geom="text", x=0.39, y=23, 
+    annotate(geom="text", x=0.49, y=23, 
              label=paste0("'Expected prevalence in '*italic(C)[1]*': '*italic(p[1](bold(x)))*' = ",
                           percent(div_adv$Prevalence_Expected_1, accuracy=0.001),"'"),
              family=chosenFont, size=3, colour=vCol1[2], parse=T) +    
-    annotate(geom="text", x=0.385, y=21, 
+    annotate(geom="text", x=0.48, y=21, 
              label=paste0("'Expected prevalence in '*italic(C)[0]*': '*italic(p[1](bold(x)))*' = ",
                           percent(div_adv$Prevalence_Expected_0, accuracy=0.001),"'"),
              family=chosenFont, size=3, colour=vCol1[1], parse=T) +    
     # Annotations: KS-test of discrimination
-    annotate(geom="text", x=0.38, y=17, 
+    annotate(geom="text", x=0.48, y=17, 
              label=paste0("'KS-statistic '*italic(K)*' = ",
                           percent(KS_results_adv$KS_statistic, accuracy=0.1),"; discriminiation level: ",
                           KS_results_adv$KS_discrimation, "'"),
              family=chosenFont, size=2.5, colour="black", parse=T) +   
-    annotate(geom="text", x=0.30, y=16, 
+    annotate(geom="text", x=0.375, y=16, 
              label=paste0("Two-sample ",KS_results_int$KS_decision),
              family=chosenFont, size=2.5, colour="black") +      
     geom_vline(xintercept=phi_basic, linewidth=0.5, colour="black") + 
@@ -713,7 +713,7 @@ binNum <- 36 # manually tweaked given extreme bimodality in the distributions
     scale_x_continuous(breaks=pretty_breaks(), label=percent))
 
 # Saving the graph to a specified path
-ggsave(gPlot, file=paste0(genFigPath, "ProbScoreDensity_3Advanced.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
+ggsave(gPlot, file=paste0(genFigPath, "ProbScoreDensity_3Advanced.png"), width=1100/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
 
 # - Section cleanup
