@@ -549,20 +549,20 @@ binNum <- round(2*datCredit_valid[,.N]^(1/3)*0.5) # using Rice's rule
   #             linewidth=0.3, alpha=0.4) + 
   # Annotations: actual prevalence
   geom_vline(xintercept=phi_basic, linewidth=0.5, colour="black") + 
-  annotate(geom="text", x=phi*0.85, y=max(maxDensPhi_1, maxDensPhi_0)*0.25, 
-           label=paste0("'Actual prevalence '*italic(q[1])==",sprintf("%.3f", phi*100), "*'%'"),
+  annotate(geom="text", x=phi*0.82, y=max(maxDensPhi_1, maxDensPhi_0)*0.25, 
+           label=paste0("'Actual prevalence '*phi[A]==",sprintf("%.3f", phi*100), "*'%'"),
            family=chosenFont, size=3, colour="black", angle=90, parse=T) +
   # Annotations: expected prevalences
   annotate(geom="text", x=phi*4.4, y=max(maxDensPhi_1, maxDensPhi_0)*0.6, 
-           label=paste0("'Expected prevalence (overall) '*italic(p[1](bold(x)))*' = ",
+           label=paste0("'Expected prevalence (overall) '*phi[E]*' = ",
                         percent(div_basic$Prevalence_Expected, accuracy=0.001),"'"),
            family=chosenFont, size=3, colour="black", parse=T) +    
   annotate(geom="text", x=phi*4.2, y=max(maxDensPhi_1, maxDensPhi_0)*0.55, 
-       label=paste0("'Expected prevalence in '*italic(C)[1]*': '*italic(p[1](bold(x)))*' = ",
+       label=paste0("'Expected prevalence in '*italic(C)[1]*': '*phi[E1]*' = ",
                     percent(div_basic$Prevalence_Expected_1, accuracy=0.001),"'"),
        family=chosenFont, size=3, colour=vCol1[2], parse=T) +    
   annotate(geom="text", x=phi*4.2, y=max(maxDensPhi_1, maxDensPhi_0)*0.50, 
-           label=paste0("'Expected prevalence in '*italic(C)[0]*': '*italic(p[1](bold(x)))*' = ",
+           label=paste0("'Expected prevalence in '*italic(C)[0]*': '*phi[E0]*' = ",
                         percent(div_basic$Prevalence_Expected_0, accuracy=0.001),"'"),
            family=chosenFont, size=3, colour=vCol1[1], parse=T) +    
   # Annotations: KS-test of discrimination
@@ -615,19 +615,19 @@ binNum <- 32 # manually tweaked given extreme bimodality in the distributions
                  #linewidth=0.3, alpha=0.4, position="identity", trim=F) + 
     # Annotations: actual prevalence
     annotate(geom="text", x=phi*1.7, y=12, 
-             label=paste0("'Actual prevalence '*italic(q[1])==",sprintf("%.3f", phi*100), "*'%'"),
+             label=paste0("'Actual prevalence '*phi[A]==",sprintf("%.3f", phi*100), "*'%'"),
              family=chosenFont, size=3, colour="black", angle=90, parse=T) +
     # Annotations: expected prevalences
     annotate(geom="text", x=0.4, y=28, 
-             label=paste0("'Expected prevalence (overall) '*italic(p[1](bold(x)))*' = ",
+             label=paste0("'Expected prevalence (overall) '*phi[E]*' = ",
                           percent(div_int$Prevalence_Expected, accuracy=0.001),"'"),
              family=chosenFont, size=3, colour="black", parse=T) +    
-    annotate(geom="text", x=0.39, y=26, 
-             label=paste0("'Expected prevalence in '*italic(C)[1]*': '*italic(p[1](bold(x)))*' = ",
+    annotate(geom="text", x=0.395, y=26, 
+             label=paste0("'Expected prevalence in '*italic(C)[1]*': '*phi[E1]*' = ",
                           percent(div_int$Prevalence_Expected_1, accuracy=0.001),"'"),
              family=chosenFont, size=3, colour=vCol1[2], parse=T) +    
-    annotate(geom="text", x=0.385, y=24, 
-             label=paste0("'Expected prevalence in '*italic(C)[0]*': '*italic(p[1](bold(x)))*' = ",
+    annotate(geom="text", x=0.4, y=24, 
+             label=paste0("'Expected prevalence in '*italic(C)[0]*': '*iphi[E0]*' = ",
                           percent(div_int$Prevalence_Expected_0, accuracy=0.001),"'"),
              family=chosenFont, size=3, colour=vCol1[1], parse=T) +    
     # Annotations: KS-test of discrimination
@@ -681,19 +681,19 @@ binNum <- 36 # manually tweaked given extreme bimodality in the distributions
     #linewidth=0.3, alpha=0.4, position="identity", trim=F) + 
     # Annotations: actual prevalence
     annotate(geom="text", x=phi*1.7, y=14, 
-             label=paste0("'Actual prevalence '*italic(q[1])==",sprintf("%.3f", phi*100), "*'%'"),
+             label=paste0("'Actual prevalence '*phi[A]==",sprintf("%.3f", phi*100), "*'%'"),
              family=chosenFont, size=3, colour="black", angle=90, parse=T) +
     # Annotations: expected prevalences
     annotate(geom="text", x=0.5, y=25, 
-             label=paste0("'Expected prevalence (overall) '*italic(p[1](bold(x)))*' = ",
+             label=paste0("'Expected prevalence (overall) '*phi[E]*' = ",
                           percent(div_adv$Prevalence_Expected, accuracy=0.001),"'"),
              family=chosenFont, size=3, colour="black", parse=T) +    
     annotate(geom="text", x=0.49, y=23, 
-             label=paste0("'Expected prevalence in '*italic(C)[1]*': '*italic(p[1](bold(x)))*' = ",
+             label=paste0("'Expected prevalence in '*italic(C)[1]*': '*phi[E1]*' = ",
                           percent(div_adv$Prevalence_Expected_1, accuracy=0.001),"'"),
              family=chosenFont, size=3, colour=vCol1[2], parse=T) +    
     annotate(geom="text", x=0.48, y=21, 
-             label=paste0("'Expected prevalence in '*italic(C)[0]*': '*italic(p[1](bold(x)))*' = ",
+             label=paste0("'Expected prevalence in '*italic(C)[0]*': '*phi[E0]*' = ",
                           percent(div_adv$Prevalence_Expected_0, accuracy=0.001),"'"),
              family=chosenFont, size=3, colour=vCol1[1], parse=T) +    
     # Annotations: KS-test of discrimination

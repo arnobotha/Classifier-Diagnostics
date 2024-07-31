@@ -89,7 +89,7 @@ adjInflation <- function(g_start, g_stop) {
 }
 
 
-# -  Adjuting for inflation (Robust version that accepts a macroeconomic dataset)
+# -  Adjusting for inflation (Robust version that accepts a macroeconomic dataset)
 # Generating an inflation factor for a given series of yearly inflation growth rates
 # Input:  [datMacro]: The dataset containing the yearly inflation growth rate
 #         [time]: Name of the time/date variable in [datMacro]
@@ -107,6 +107,13 @@ adjInflation_MV <- function(datMacro, time, Inflation_Growth, g_start, g_stop) {
 # if (!exists('datMV')) unpack.ffdf(paste0(genPath,"datMV"), tempPath)
 # (test <- adjInflation(datMacro=datMV, time="Date", g_start=date("2015-02-28"), g_stop=date("2022-12-31"), Inflation_Growth="M_Inflation_Growth"))
 # rm(datMV, test); gc()
+
+
+# - Function to convert NaN-values or infinite values within a vector to the given value 
+Treat_NaN <- function(vec, replaceVal=0) {
+  vec[is.nan(vec) | is.infinite(vec)] <- replaceVal
+  return (vec)
+}
 
 
 
@@ -1149,10 +1156,22 @@ divergences_binary <- function(datGiven, Target, TargetValue=1, Prediction, cutO
   H_qq <- -1*(q1 *log2(q1) + (1-q1)*log2(1-q1))
   # - Binary Cross-Entropy (BCE) of p relative to q
   H_qp <- -1*(q1 *log2(p1) + (1-q1)*log2(1-p1))
+  H_qp <- -1*mean( ifelse(datGiven$Target==TargetValue,1,0) * log2(datGiven$Prediction_score) +
+                  (1-ifelse(datGiven$Target==TargetValue,1,0)) * log2(1-datGiven$Prediction_score), na.rm=T )
   # - Kullback-Leibler (KL) divergence of p relative to q
-  D_qp <- q1 *log2(q1/p1) + (1-q1)*log2((1-q1)/(1-p1))
+  #D_qp <- q1 *log2(q1/p1) + (1-q1)*log2((1-q1)/(1-p1))
+  D_qp <- -1*mean( Treat_NaN( ifelse(datGiven$Target==TargetValue,1,0) * 
+                    log2(ifelse(datGiven$Target==TargetValue,1,0) / datGiven$Prediction_score) ) +
+                     Treat_NaN( (1-ifelse(datGiven$Target==TargetValue,1,0)) * 
+                                 log2( (1-ifelse(datGiven$Target==TargetValue,1,0)) / (1-datGiven$Prediction_score)) 
+                               ), na.rm=T )
   # - Jeffreys' J-divergence (information value) of p relative to q
-  J_qp <- (q1-p1)*log2(q1/p1) + ((1-q1)-(1-p1))*log2((1-q1)/(1-p1))
+  #J_qp <- (q1-p1)*log2(q1/p1) + ((1-q1)-(1-p1))*log2((1-q1)/(1-p1))
+  J_qp <- mean( Treat_NaN ( (ifelse(datGiven$Target==TargetValue,1,0) - datGiven$Prediction_score) * 
+         log2(ifelse(datGiven$Target==TargetValue,1,0) / datGiven$Prediction_score) ) +
+           Treat_NaN ( ((1-ifelse(datGiven$Target==TargetValue,1,0)) - (1-datGiven$Prediction_score)) * 
+                      log2( (1-ifelse(datGiven$Target==TargetValue,1,0)) / (1-datGiven$Prediction_score))
+         ), na.rm=T )
   
   cat("Shannon entropy H(q): \t\t\t\t\t", H_qq, "\nCross-entropy of p relative to q, H_q(p): \t\t", H_qp, 
       "\nKullback-Leibler D-divergence of p to q, D_q(p): \t", D_qp, 
@@ -1172,6 +1191,8 @@ divergences_binary <- function(datGiven, Target, TargetValue=1, Prediction, cutO
   return(resultSet)
 }
 
+div_basic <- divergences_binary(datCredit_valid, Target="DefaultStatus1_lead_12_max", 
+                                Prediction="prob_basic", cutOff=cutoff_basic$cutoff)
 
 
 
