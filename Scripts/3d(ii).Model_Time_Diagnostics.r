@@ -1,5 +1,5 @@
 # ========================== MODEL DEFAULT RISK - TIME DIAGNOSTICS ========================================
-# This script performs time diagnostics on the three logit models. Mainly it tests the realised default rate 
+# This script performs time diagnostics on the three logit models. Mainly, it tests the realised default rate 
 # against the predictions thereof, by using the MAE and the Wilcoxon Signed Rank Test.
 # -----------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
@@ -59,7 +59,7 @@ unpack.ffdf(paste0(genObjPath, "Adv_Formula"), tempPath)
 # --- 2.1 Fitting the models
 # - Basic model
 logitMod_Basic <- glm(inputs_bas, data=datCredit_train, family="binomial")
-# - Basic model
+# - Intermediate model
 logitMod_Int <- glm(inputs_int, data=datCredit_train, family="binomial")
 # - Advanced model
 logitMod_Adv <- glm(inputs_adv, data=datCredit_train, family="binomial")
