@@ -1018,6 +1018,8 @@ Gen_Youd_Ind<-function(Trained_Model, Train_DataSet, Target, a){
   
   require(data.table, DEoptimR)
   
+  Train_DataSet <- copy(Train_DataSet) # reserve copy so that we do not change the object outside of this scope
+  
   # - ensure given target name does not coincide with the intended name used internally in this function
   # If not, then ensure the field doesn't already exist
   if (Target != "Target" & "Target" %in% colnames(Train_DataSet)){
@@ -1075,9 +1077,9 @@ Gen_Youd_Ind<-function(Trained_Model, Train_DataSet, Target, a){
 
 
 
-# ------------------------------- DIVERGENCE MEASURES ---------------------------------
-# Calculates Shannon entropy H(q), Cross-entropy H_q(p_1), Kullback-Leibler (KL) Divergence D_q(p_1),
-# and Jeffrey Divergence J(q,p_1) for a binary classifier
+# ------------------------------- INFORMATION MEASURES ---------------------------------
+# Calculates prevalences (actual + expected), Shannon entropy H(q), Cross-entropy H_q(p_1), 
+# Kullback-Leibler (KL) Divergence D_q(p_1) and Jeffrey Divergence J(q,p_1) for a binary classifier
 
 ### INPUTS:
 # - datGiven: given dataset
@@ -1085,9 +1087,10 @@ Gen_Youd_Ind<-function(Trained_Model, Train_DataSet, Target, a){
 # - TargetValue: Value in target variable that is considered as the main event
 # - Prediction: Field name of prediction variable, i.e., probability score p_1(x) or dichotomised variant thereof
 # - cutOff: Probability cut-off beyond which probability scores are classified into main event [TargetValue]
+# - logBase: base of logarithm (default: 2) when calculating cross-entropy and divergences (KL + Jeffreys)
 ### OUTPUTS: a list of prevalences and divergence measures
 
-divergences_binary <- function(datGiven, Target, TargetValue=1, Prediction, cutOff=0.5) {
+divergences_binary <- function(datGiven, Target, TargetValue=1, Prediction, cutOff=0.5, logBase=2) {
   require(data.table)
   
   # ----- 0. Initialisation and checks
@@ -1133,7 +1136,7 @@ divergences_binary <- function(datGiven, Target, TargetValue=1, Prediction, cutO
   
   # - Are the predictions already probability scores or should we dichotomise?
   if (!isTRUE( all.equal( datGiven$Prediction, c(0,1)) )) {
-    cat("NOTE: Predictions are probability scores that can be dichotomised with the cut-off: ",
+    cat("NOTE: Predictions are probability scores that can be dichotomised with the given cut-off: ",
         cutOff,"\n   However, expected prevalences and divergence measures are still calculated using the mean of these scores.\n")
     datGiven[, Prediction_score := Prediction]
     datGiven[, Prediction := ifelse(Prediction_score > cutOff, TargetValue, NonTargetVal)]
@@ -1142,57 +1145,94 @@ divergences_binary <- function(datGiven, Target, TargetValue=1, Prediction, cutO
   
   
   # ----- 1. Prevalences
-  # - Actual prevalence q_1
+  
+  # - Prevalence q (Actual) in estimating the Prior class probability of Y
   q1 <- sum(datGiven$Target==TargetValue) / datGiven[, .N]
-  # - Expected prevalence p_1(X)
+  
+  # - Expected prevalence p_1(X) in estimating the Posterior class probability of Y given X
   if (probScore_Ind) {
     p1 <- mean(datGiven$Prediction_score, na.rm=T)
     p1_1 <- mean(datGiven[Target==TargetValue, Prediction_score], na.rm=T) # Class 1 prevalence
     p1_0 <- mean(datGiven[Target==NonTargetVal, Prediction_score], na.rm=T) # Class 0 prevalence
   } else p1 <- sum(datGiven$Prediction==TargetValue) / datGiven[, .N]
   
-  # ----- 2. Divergence measures
-  # - Shannon entropy of q
-  H_qq <- -1*(q1 *log2(q1) + (1-q1)*log2(1-q1))
-  # - Binary Cross-Entropy (BCE) of p relative to q
-  H_qp <- -1*(q1 *log2(p1) + (1-q1)*log2(1-p1))
-  H_qp <- -1*mean( ifelse(datGiven$Target==TargetValue,1,0) * log2(datGiven$Prediction_score) +
-                  (1-ifelse(datGiven$Target==TargetValue,1,0)) * log2(1-datGiven$Prediction_score), na.rm=T )
-  # - Kullback-Leibler (KL) divergence of p relative to q
-  #D_qp <- q1 *log2(q1/p1) + (1-q1)*log2((1-q1)/(1-p1))
-  D_qp <- -1*mean( Treat_NaN( ifelse(datGiven$Target==TargetValue,1,0) * 
-                    log2(ifelse(datGiven$Target==TargetValue,1,0) / datGiven$Prediction_score) ) +
-                     Treat_NaN( (1-ifelse(datGiven$Target==TargetValue,1,0)) * 
-                                 log2( (1-ifelse(datGiven$Target==TargetValue,1,0)) / (1-datGiven$Prediction_score)) 
-                               ), na.rm=T )
-  # - Jeffreys' J-divergence (information value) of p relative to q
-  #J_qp <- (q1-p1)*log2(q1/p1) + ((1-q1)-(1-p1))*log2((1-q1)/(1-p1))
-  J_qp <- mean( Treat_NaN ( (ifelse(datGiven$Target==TargetValue,1,0) - datGiven$Prediction_score) * 
-         log2(ifelse(datGiven$Target==TargetValue,1,0) / datGiven$Prediction_score) ) +
-           Treat_NaN ( ((1-ifelse(datGiven$Target==TargetValue,1,0)) - (1-datGiven$Prediction_score)) * 
-                      log2( (1-ifelse(datGiven$Target==TargetValue,1,0)) / (1-datGiven$Prediction_score))
-         ), na.rm=T )
   
-  cat("Shannon entropy H(q): \t\t\t\t\t", H_qq, "\nCross-entropy of p relative to q, H_q(p): \t\t", H_qp, 
-      "\nKullback-Leibler D-divergence of p to q, D_q(p): \t", D_qp, 
-      "\nJeffreys J-divergence between q and p, J(q,p): \t\t", J_qp, "\n\n")
+  # ----- 2. Divergence measures
+  
+  # - Shannon entropy of q
+  H_qq <- -(q1 *log(q1,base=logBase) + (1-q1)*log(1-q1,base=logBase))
+  # Alternative (gives same result)
+  probs <- prop.table(table(q1)); -sum(probs * log(probs,base=logBase)); #print(-sum(probs * log(probs,base=logBase)) == H_qq)
+  
+  # - Binary Cross-Entropy (BCE)  of p relative to q | Discrete probability distributions
+  H_qp_disc <- -1*(q1 *log(p1,base=logBase) + (1-q1)*log(1-p1,base=logBase))
+  
+  # - Binary Cross-Entropy (BCE) of p relative to q | Continuous probability distributions
+  H_qp <- -mean( ifelse(datGiven$Target==TargetValue,1,0) * log(datGiven$Prediction_score,base=logBase) +
+                  (1-ifelse(datGiven$Target==TargetValue,1,0)) * log(1-datGiven$Prediction_score,base=logBase), na.rm=T )
+  
+  # - Kullback-Leibler (KL) divergence of p relative to q | Discrete probability distributions
+  D_qp <- q1*log(q1/p1,base=logBase) + (1-q1)*log((1-q1)/(1-p1),base=logBase)
+  
+  # - Jeffreys' J-divergence (information value) of p relative to q | Discrete probability distributions
+  J_qp <- (q1-p1)*log(q1/p1,base=logBase) + ((1-q1)-(1-p1))*log((1-q1)/(1-p1),base=logBase)
+  
+  cat("Shannon entropy H(q): \t\t\t\t\t\t", H_qq, "\nCross-entropy of p (continouous) relative to q, H_q(p): \t", H_qp, 
+      "\nCross-entropy of p (discrete) relative to q, H_q(p): \t\t", H_qp_disc, 
+      "\nKullback-Leibler D-divergence of p to q, D_q(p): \t\t", D_qp, 
+      "\nJeffreys J-divergence between q and p, J(q,p): \t\t\t", J_qp, "\n\n")
   
   
   # ----- 3. Prepare result set
-  # Stich together prevalences
+  # Stitch together prevalences, based on given prediction (discrete or probabilistic)
   resultSet <- list(Prevalence_Actual=q1, Prevalence_Expected=p1)
-  if (probScore_Ind) {
-    resultSet <- c(resultSet, list(Prevalence_Expected_1=p1_1, Prevalence_Expected_0=p1_0))
-  }
-  # Stitch together the divergences
-  resultSet <- c(resultSet, list(ShannonEntropy=H_qq, CrossEntropy=H_qp,
-                                 KullbackLeibler_divergence=D_qp, Jeffrey_divergence=J_qp))
+  if (probScore_Ind) resultSet <- c(resultSet, list(Prevalence_Expected_1=p1_1, Prevalence_Expected_0=p1_0))
   
+  # Stitch together the divergences
+  resultSet <- c(resultSet, list(ShannonEntropy=H_qq, CrossEntropy=H_qp, CrossEntropy_discrete=H_qp_disc,
+                                 KullbackLeibler_divergence=D_qp, Jeffrey_divergence=J_qp))
   return(resultSet)
 }
 
-div_basic <- divergences_binary(datCredit_valid, Target="DefaultStatus1_lead_12_max", 
-                                Prediction="prob_basic", cutOff=cutoff_basic$cutoff)
+# --- Unit test
+#library(entropy) # for validating Shannon entropy
+#library(Metrics) # for validating Cross-Entropy ("logloss")
+#library(LaplacesDemon) # for validating Kullback-Leibler and Jeffrey divergences
+#require(ISLR); 
+# - Load data
+#dat <- data.table(ISLR::Default)
+# - Prepare data
+#dat[, `:=`(default=ifelse(default=="No",0,1), student=as.factor(student), Ind=1:.N)]
+# - Implement basic resampling scheme, stratified by default
+#set.seed(1, kind="Mersenne-Twister")
+#datTrain <- dat %>% group_by(default) %>% slice_sample(prop=0.7) %>% as.data.table()
+#datValid <- subset(dat, !(Ind %in% datTrain$Ind)) %>% as.data.table()
+# - Train model
+#logit_model <- glm(default ~ student + balance + income, data=datTrain, family="binomial")
+# - Score with model
+#datValid[, prob_vals := predict(logit_model, newdata = datValid, type="response")]
+#cutoff_basic <- Gen_Youd_Ind(logit_model, datValid, "default", a=10) # find cut-off using Generalised Youden Index
+# - Dichotomise probability score into discrete prediction with found cut-off
+#datValid[, Prediction := ifelse(prob_vals > cutoff_basic$cutoff, 1, 0)]
+# -- Validating divergence/information measures against those from other R-packages
+#divergences_binary(datValid, Target="default", Prediction="prob_vals", cutOff=cutoff_basic$cutoff, logBase=exp(1))
+# Shannon Entropy
+#entropy(prop.table(table(datValid$default)), unit="log")
+# Binary Cross-Entropy (BCE) of p relative to q | Discrete & continuous probability distributions
+#q1 <- sum(datValid$default==1) / datvalid[,.N]
+#logLoss(c(q1,1-q1), c(mean(datValid$prob_vals), mean(1-datValid$prob_vals))) # Discrete
+#logLoss(c(q1,1-q1), c(mean(datValid$Prediction), mean(1-datValid$Prediction))) # Discrete (dichotomised probability score, just out of interest)
+#logLoss(datValid$default, datValid$prob_vals) # continuous
+# Kullback-Leibler (KL) divergence of p relative to q | Discrete probability distributions
+#(D_qp <- KLD(c(q1,1-q1), c(mean(datValid$prob_vals), mean(1-datValid$prob_vals) ), base=exp(1))$sum.KLD.px.py )
+# Jeffreys' J-divergence (information value) of p relative to q | Discrete probability distributions
+# NOTE: first calculate Kullback-Leibler (KL) divergence of q relative to p 
+#D_pq <- KLD(c(mean(datValid$prob_vals), mean(1-datValid$prob_vals) ), c(q1,1-q1), base=exp(1))$sum.KLD.px.py
+#D_pq + D_qp # Jeffrey's J-divergence
+### RESULTS: All information & divergence measures successfully validated
+# - Clean-up
+#rm(cutoff_basic, dat, datTrain, datValid, logit_model, q1, D_qp, D_pq)
+
 
 
 

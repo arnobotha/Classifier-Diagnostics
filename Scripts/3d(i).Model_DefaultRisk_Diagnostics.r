@@ -721,13 +721,24 @@ rm(KS_results_basic, KS_results_int, KS_results_adv); gc()
 
 
 
-### AB: Embed divergence function as a standalone graph
-divergences_binary(datCredit_valid, Target="DefaultStatus1_lead_12_max", Prediction="prob_basic", cutOff=cutoff_basic$cutoff)
+### AB: RB to Embed divergence function as a standalone graph
+# Re-use existing objects as far as possible, given that the last clean-up call already caters for their disposal from memory
+### SCRATCH: The following are just some initial analyses to inspire a possible (graphic) diagnostic later. RB to continue and refine this
+# Idea 1: Perhaps useful to focus on %-differences in cross-entropy when drawing inference
+# NOTE: One of our directives (Dir 5) anyway calls for calculating the BCE. And here we have these, so might as well embed into CR-template. Already done
+div_int$CrossEntropy/div_basic$CrossEntropy -1 # 17 decrease / "improvement" of intermediate over basic?
+div_adv$CrossEntropy/div_basic$CrossEntropy -1 # 29% decrease / "improvement" of advance over basic?
+# Maybe a dedicated graph to cross-entropy values and %-differencces? Can embed the "base" Shannon Entropy as an annotation. Might work well with Directive 5
+# KL-divergence values are very small and I wonder whether they'll be practically useful. Maybe just %-differences?
+div_int$KullbackLeibler_divergence/div_basic$KullbackLeibler_divergence -1 # 48% decrease / "improvement" of intermediate over basic?
+div_adv$KullbackLeibler_divergence/div_basic$KullbackLeibler_divergence -1 # 94% decrease / "improvement" of intermediate over basic?
+### RESULTS: Seems worthwhile to focus only on %-differences, given the large magnitudes .. ?
 
 
 
 # --- Final Clean up
 rm(logitMod_Basic, logitMod_Int, logitMod_Adv, datCredit_train, datCredit_valid, 
    cutoff_basic, cutoff_int, cutoff_adv, div_basic, div_int, div_adv,
+   KS_results_basic, KS_results_int, KS_results_adv,
    roc_obj_basic, roc_obj_int, roc_obj_adv,
    vCol1, vCol2, vCol3, vLineType, vLabel, datPlot, gPlot); gc()
