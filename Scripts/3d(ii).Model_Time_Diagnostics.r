@@ -200,7 +200,83 @@ facet_names_full <- c("DefRate"="Tester")
 # - Pack away graph
 ggsave(Models_TimeDiag, file=paste0(genFigPath, "ModelsTimeDiagnostics.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
 
-# --- 2.4 AUC over time
+# --- 2.4 Risk Prudence Analysis
+RiskPrud_Set <- datCredit_smp[,list(Actuals=mean(DefaultStatus1_lead_12_max,na.rm=T), ExpBas=mean(prob_bas,na.rm=T), ExpInt=mean(prob_int,na.rm=T), ExpAdv=mean(prob_adv,na.rm=T) ), by=list(Date)]
+
+# - Proportion of Under predictions
+cat("Proportion of dates where the default rate was under predicted by the Basic model = ", round(RiskPrud_Set[Actuals>ExpBas,.N]/RiskPrud_Set[,.N]*100,2), "%", sep="", "\n") # 26.67%
+cat("Proportion of dates where the default rate was under predicted by the Intermediate model = ", round(RiskPrud_Set[Actuals>ExpInt,.N]/RiskPrud_Set[,.N]*100,2), "%", sep="", "\n") # 45%
+cat("Proportion of dates where the default rate was under predicted by the Advanced model = ", round(RiskPrud_Set[Actuals>ExpAdv,.N]/RiskPrud_Set[,.N]*100,2), "%", sep="", "\n") # 44.44%
+
+# - 95% VaR
+
+# - Basic Model
+# - Calculate the under differences for the under predicted cases
+UnderPreds_B<- as.matrix(RiskPrud_Set[Actuals>ExpBas, list(difference=(Actuals-ExpBas)*100)])
+# - Obtain the 95th percentile
+(Bas_VaR<-quantile(UnderPreds_B, 0.95))
+### RESULTS: 95% Empirical VaR = 3.72%
+
+# - Intermediate Model
+# - Calculate the under differences for the under predicted cases
+UnderPreds_I<- as.matrix(RiskPrud_Set[Actuals>ExpInt, list(difference=(Actuals-ExpInt)*100)])
+# - Obtain the 95th percentile
+(Int_VaR<-quantile(UnderPreds_I, 0.95))
+### RESULTS: 95% Empirical VaR = 0.55%
+
+# - Advanced Model
+# - Calculate the under differences for the under predicted cases
+UnderPreds_A<- as.matrix(RiskPrud_Set[Actuals>ExpAdv, list(difference=(Actuals-ExpAdv)*100)])
+# - Obtain the 95th percentile
+(Adv_VaR<-quantile(UnderPreds_A, 0.95))
+### RESULTS: 95% Empirical VaR = 0.72%
+mean(UnderPreds_A[which(UnderPreds_A>=Adv_VaR)], na.rm=T)
+mean(UnderPreds_I[which(UnderPreds_I>=Int_VaR)], na.rm=T)
+
+Dat_Plot<-as.data.table(rbind(cbind(UnderPreds_B, Rate="A_Bas"), cbind(UnderPreds_I, Rate="B_Int"), cbind(UnderPreds_A, Rate="C_Adv")))
+Dat_Plot[,difference:=as.numeric(difference)]
+
+# - Plot differences in histogram format
+
+# - Annotations
+start_y<-1.5
+space<-0.1
+y_vals<-c(start_y,start_y-space,start_y-2*space)
+
+# - Graphing parameters
+col.v<-brewer.pal(9, "Set1")[c(2,1,4)]
+
+label.v <- c("A_Bas"=bquote(italic(A)[t]-italic(B)[t]*"  "),
+             "B_Int"=bquote(italic(A)[t]-italic(C)[t]*"  "),
+             "C_Adv"=bquote(italic(A)[t]-italic(D)[t]*"  "))
+linetype.v <- c("solid","dashed","solid")
+
+dat_anno1 <- data.table(Label = c(paste0("'95% VaR of positive '*italic(A[t]-B[t])*'"),
+                                  paste0("'95% VaR of positive '*italic(A[t]-C[t])*'"),
+                                  paste0("'95% VaR of positive '*italic(A[t]-D[t])*'")),
+                        VaR = c(Bas_VaR,Int_VaR,Adv_Var),
+                        x = rep(2,3),
+                        y = y_vals)
+
+# - Last adjustments before plotting
+dat_anno1[, Label := paste0(Label, " = ", sprintf("%.3f",VaR), "%'")]
+
+(VaR_plot <- ggplot(Dat_Plot, aes(x=difference, fill=Rate, color=Rate)) + theme_minimal() +
+       geom_histogram(alpha=0.8, position="identity", aes(y = ..density..), color="black") +
+       geom_density(alpha=0.6, linetype="dashed", size = 0.8, show.legend = FALSE) +
+       labs(x="Under prediction (%)", y = "Density") +
+    theme(legend.key = element_blank(),text=element_text(family=chosenFont),legend.position = "bottom",
+          axis.text.x=element_text(angle=0), 
+          strip.background=element_rect(fill="snow2", colour="snow2"),
+          strip.text=element_text(size=9, colour="gray50"), strip.text.y.right=element_text(angle=90), legend.margin = margin(t=-5)) +
+          geom_text(data=dat_anno1, aes(x=x, y=y, label = Label), family=chosenFont, size=4, parse=T, inherit.aes=FALSE) +
+          scale_fill_manual(name=bquote("Difference: "),  values=col.v, labels=label.v)+
+          scale_colour_manual(name=bquote("Event rate: "),  values=col.v, labels=label.v))
+# - Pack away graph
+ggsave(VaR_plot, file=paste0(genFigPath, "VaR_Plot.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
+
+
+# --- 2.5 AUC over time
 # - Call AUC_overTime Function for each of the three PD-models
 BasAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
 IntAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_int")
