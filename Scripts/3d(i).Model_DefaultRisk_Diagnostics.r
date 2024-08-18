@@ -477,7 +477,6 @@ DefRte_Plotter<-function(a){
 (a_3<-DefRte_Plotter(3))
 (a_4<-DefRte_Plotter(4))
 (a_6<-DefRte_Plotter(6))
-#(a_5<-DefRte_Plotter(5))
 
 # - Bind graphs together
 (gCombined<-grid.arrange(a_1, a_3 ,a_4 ,a_6 ,ncol=2))
@@ -721,24 +720,60 @@ rm(KS_results_basic, KS_results_int, KS_results_adv); gc()
 
 
 
-### AB: RB to Embed divergence function as a standalone graph
-# Re-use existing objects as far as possible, given that the last clean-up call already caters for their disposal from memory
-### SCRATCH: The following are just some initial analyses to inspire a possible (graphic) diagnostic later. RB to continue and refine this
-# Idea 1: Perhaps useful to focus on %-differences in cross-entropy when drawing inference
-# NOTE: One of our directives (Dir 5) anyway calls for calculating the BCE. And here we have these, so might as well embed into CR-template. Already done
-div_int$CrossEntropy/div_basic$CrossEntropy -1 # 17 decrease / "improvement" of intermediate over basic?
-div_adv$CrossEntropy/div_basic$CrossEntropy -1 # 29% decrease / "improvement" of advance over basic?
-# Maybe a dedicated graph to cross-entropy values and %-differencces? Can embed the "base" Shannon Entropy as an annotation. Might work well with Directive 5
-# KL-divergence values are very small and I wonder whether they'll be practically useful. Maybe just %-differences?
-div_int$KullbackLeibler_divergence/div_basic$KullbackLeibler_divergence -1 # 48% decrease / "improvement" of intermediate over basic?
-div_adv$KullbackLeibler_divergence/div_basic$KullbackLeibler_divergence -1 # 94% decrease / "improvement" of intermediate over basic?
-### RESULTS: Seems worthwhile to focus only on %-differences, given the large magnitudes .. ?
+# --- Divergence/Information measures
 
+# - Shannon Entropy
+div_basic$ShannonEntropy
+div_int$ShannonEntropy
+div_adv$ShannonEntropy
+### RESULTS: Shannon entropy is the same for all 3 classifiers (0.2040216), given that the classifiers are trained on the same data.
 
+# Focusing on %-differences in cross-entropy when drawing inference
+(CE_Improv_Int<-div_int$CrossEntropy/div_basic$CrossEntropy -1) # 17% decrease / "improvement" of intermediate over baseline/basic
+(CE_Improv_Adv<-div_adv$CrossEntropy/div_basic$CrossEntropy -1) # 29% decrease / "improvement" of advance over baseline/basic
+
+# Focusing on %-differences in KL-devergence when drawing inference
+(KL_Improv_Int<-div_int$KullbackLeibler_divergence/div_basic$KullbackLeibler_divergence -1) # 48% decrease / "improvement" of intermediate over basic?
+(KL_Improv_Adv<-div_adv$KullbackLeibler_divergence/div_basic$KullbackLeibler_divergence -1) # 94% decrease / "improvement" of intermediate over basic?
+
+# - Create graphing dataset to visualize information measures
+datPlotz<-data.table(Info_M=rep(c(" ", "  "),each=2),Model=rep(c("b_Intermediate", "c_Advanced"),times=2),Value=-1*c(CE_Improv_Int,CE_Improv_Adv,KL_Improv_Int,KL_Improv_Adv))
+# - More adjustments before plotting
+datPlotz[, Label := paste0(sprintf("%.2f",Value*100),"%")]
+
+# - Set aesthetic parameters
+dpi <- 200
+vCol1 <- brewer.pal(9, "Purples")[c(5,7)]
+vCol3 <- rep("white", 2*2)
+vLabel <- c("b_Intermediate"=bquote("Intermediate"),
+            "c_Advanced"=bquote("Advanced"))
+
+# - Create the plot
+(Info_M<-ggplot(datPlotz, aes(group=Model, y=Value, x=Info_M)) + 
+    theme_minimal() + theme(legend.position = "bottom", text=element_text(family=chosenFont), axis.title.x = element_text(margin = margin(t = 5))) + labs(x="Information measure", y="Improvement relative to the baseline / basic model (%)", family=chosenFont) +
+    geom_col(aes(colour=Model, fill=Model), position="dodge") +
+    # - Annotation
+    annotate(geom="text", hjust=0, x=0.55, y=0.825, family=chosenFont, size=4, parse=T,
+             label=paste0("'Shannon entropy '*italic(H(q))=='", sprintf("%#.3f", div_basic$ShannonEntropy),"'")) +
+    annotate(geom="text", hjust=0, x=0.55, y=0.75, family=chosenFont, size=4, parse=T,
+             label=paste0("'Basic model: Cross-entropy '*italic(H[q](p))=='", sprintf("%#.3f", div_basic$CrossEntropy),"'")) +
+    annotate(geom="text", hjust=0, x=0.55, y=0.7, family=chosenFont, size=4, parse=T,
+             label=paste0("'Intermediate model: Cross-entropy '*italic(H[q](p))=='", sprintf("%#.3f", div_int$CrossEntropy),"'")) +
+    annotate(geom="text", hjust=0, x=0.55, y=0.65, family=chosenFont, size=4, parse=T,
+             label=paste0("'Advanced model: Cross-entropy '*italic(H[q](p))=='", sprintf("%#.3f", div_adv$CrossEntropy),"'")) +
+    # - General graph specifications
+    geom_label(aes(label=Label,fill=Model),colour="white", position=position_dodge(0.90), size=2.75,label.padding = unit(0.15, "lines"),show.legend = F) +
+    scale_colour_manual(name="Model:", values=vCol1, labels=vLabel) +
+    scale_fill_manual(name="Model:", values=vCol1, labels=vLabel) +
+    scale_x_discrete(labels=c(" "=bquote("Cross-entropy "*italic(H[q](p))),"  "=bquote("KL-divergence "*italic(D[q](p)))))+
+    scale_y_continuous(breaks=pretty_breaks(),limits=c(0,1), label=percent))
+
+# Saving the graph to specified path
+ggsave(Info_M, file=paste0(genFigPath, "Information_Measures.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
 
 # --- Final Clean up
 rm(logitMod_Basic, logitMod_Int, logitMod_Adv, datCredit_train, datCredit_valid, 
    cutoff_basic, cutoff_int, cutoff_adv, div_basic, div_int, div_adv,
    KS_results_basic, KS_results_int, KS_results_adv,
    roc_obj_basic, roc_obj_int, roc_obj_adv,
-   vCol1, vCol2, vCol3, vLineType, vLabel, datPlot, gPlot); gc()
+   vCol1, vCol2, vCol3, vLineType, vLabel, datPlot, gPlot, dat_anno1, Info_M, datPlotz); gc()
