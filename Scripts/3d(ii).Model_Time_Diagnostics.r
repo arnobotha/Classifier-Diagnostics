@@ -126,7 +126,14 @@ Actual <- datCredit_smp[,list(DefRate=mean(DefaultStatus1_lead_12_max,na.rm=T), 
 ExpRte_Bas <- datCredit_smp[,list(DefRate=mean(prob_bas,na.rm=T), Dataset="B"),by=list(Date)]
 ExpRte_Int <- datCredit_smp[,list(DefRate=mean(prob_int,na.rm=T), Dataset="C"),by=list(Date)]
 ExpRte_Adv <- datCredit_smp[,list(DefRate=mean(prob_adv,na.rm=T), Dataset="D"),by=list(Date)]
-  
+
+# - Standard deviations of these rates
+# - Actual
+(sd(Actual$DefRate,na.rm = TRUE)) # 0.01104
+(sd(ExpRte_Bas$DefRate,na.rm = TRUE)) # 0.00232
+(sd(ExpRte_Int$DefRate,na.rm = TRUE)) # 0.01066
+(sd(ExpRte_Adv$DefRate,na.rm = TRUE)) # 0.01041
+
 # - Bind rates
 PlotSet <- rbind(Actual,ExpRte_Bas,ExpRte_Int,ExpRte_Adv)
 
@@ -200,7 +207,103 @@ facet_names_full <- c("DefRate"="Tester")
 # - Pack away graph
 ggsave(Models_TimeDiag, file=paste0(genFigPath, "ModelsTimeDiagnostics.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
 
-# --- 2.4 AUC over time
+# --- 2.4 Risk Prudence Analysis
+RiskPrud_Set <- datCredit_smp[,list(Actuals=mean(DefaultStatus1_lead_12_max,na.rm=T), ExpBas=mean(prob_bas,na.rm=T), ExpInt=mean(prob_int,na.rm=T), ExpAdv=mean(prob_adv,na.rm=T) ), by=list(Date)]
+
+# - Proportion of Under predictions
+cat("Proportion of dates where the default rate was under predicted by the Basic model = ", round(RiskPrud_Set[Actuals>ExpBas,.N]/RiskPrud_Set[,.N]*100,2), "%", sep="", "\n") # 26.67%
+cat("Proportion of dates where the default rate was under predicted by the Intermediate model = ", round(RiskPrud_Set[Actuals>ExpInt,.N]/RiskPrud_Set[,.N]*100,2), "%", sep="", "\n") # 45%
+cat("Proportion of dates where the default rate was under predicted by the Advanced model = ", round(RiskPrud_Set[Actuals>ExpAdv,.N]/RiskPrud_Set[,.N]*100,2), "%", sep="", "\n") # 44.44%
+
+# - Cost function, by setting a cost to the degree of under prediction and over prediction respectively
+UnderCost<-2
+OverCost<-1
+# - Basic
+(sum(RiskPrud_Set[Actuals>ExpBas,Actuals-ExpBas])*UnderCost+sum(RiskPrud_Set[Actuals<ExpBas,ExpBas-Actuals])*OverCost) # 2.57
+# - Intermediate
+(sum(RiskPrud_Set[Actuals>ExpInt,Actuals-ExpInt])*UnderCost+sum(RiskPrud_Set[Actuals<ExpInt,ExpInt-Actuals])*OverCost) # 0.58
+# - Advance
+(sum(RiskPrud_Set[Actuals>ExpAdv,Actuals-ExpAdv])*UnderCost+sum(RiskPrud_Set[Actuals<ExpAdv,ExpAdv-Actuals])*OverCost) # 0.67
+
+# - Proportion of error due to overprediction
+# - Basic
+(sum(RiskPrud_Set[Actuals>ExpBas,Actuals-ExpBas]))/sum(RiskPrud_Set[,abs(Actuals-ExpBas)])*100 # 47.18%
+# - Intermediate
+(sum(RiskPrud_Set[Actuals>ExpInt,Actuals-ExpInt]))/sum(RiskPrud_Set[,abs(Actuals-ExpInt)])*100 # 51.32%
+# - Advance
+(sum(RiskPrud_Set[Actuals>ExpAdv,Actuals-ExpAdv]))/sum(RiskPrud_Set[,abs(Actuals-ExpAdv)])*100 # 49.77%
+
+# - 95% VaR for under predictions
+# - Basic Model
+# - Calculate the extent of the under predicted cases
+UnderPreds_B<- as.matrix(RiskPrud_Set[Actuals>ExpBas, list(difference=(Actuals-ExpBas))])
+# - Obtain the 95th percentile
+(Bas_VaR<-quantile(UnderPreds_B, 0.95))*100
+### RESULTS: 95% Empirical VaR = 3.72%
+
+# - Intermediate Model
+# - Calculate the under differences for the under predicted cases
+UnderPreds_I<- as.matrix(RiskPrud_Set[Actuals>ExpInt, list(difference=(Actuals-ExpInt))])
+# - Obtain the 95th percentile
+(Int_VaR<-quantile(UnderPreds_I, 0.95))*100
+### RESULTS: 95% Empirical VaR = 0.55%
+
+# - Advanced Model
+# - Calculate the under differences for the under predicted cases
+UnderPreds_A<- as.matrix(RiskPrud_Set[Actuals>ExpAdv, list(difference=(Actuals-ExpAdv))])
+# - Obtain the 95th percentile
+(Adv_VaR<-quantile(UnderPreds_A, 0.95))*100
+### RESULTS: 95% Empirical VaR = 0.72%
+
+# - Create data to feed into ggplot
+Dat_Plot<-as.data.table(rbind(cbind(UnderPreds_B, Rate="A_Bas"), cbind(UnderPreds_I, Rate="B_Int"), cbind(UnderPreds_A, Rate="C_Adv")))
+Dat_Plot[,difference:=as.numeric(difference)]
+
+# - Plot differences in histogram format
+# - Annotations
+start_y<-150
+space<-10
+y_vals<-c(start_y,start_y-space,start_y-2*space)
+
+# - Graphing parameters
+col.v<-brewer.pal(9, "Set1")[c(2,1,4)]
+
+label.v <- c("A_Bas"=bquote(italic(A)[t]-italic(B)[t]*"  "),
+             "B_Int"=bquote(italic(A)[t]-italic(C)[t]*"  "),
+             "C_Adv"=bquote(italic(A)[t]-italic(D)[t]*"  "))
+linetype.v <- c("solid","dashed","solid")
+
+dat_anno1 <- data.table(Label = c(paste0("'95% VaR of positive '*italic(A[t]-B[t])*' cases"),
+                                  paste0("'95% VaR of positive '*italic(A[t]-C[t])*' cases"),
+                                  paste0("'95% VaR of positive '*italic(A[t]-D[t])*' cases")),
+                        VaR = c(Bas_VaR,Int_VaR,Adv_VaR),
+                        x = rep(0.02,3),
+                        y = y_vals)
+
+# - Last adjustments before plotting
+dat_anno1[, Label := paste0(Label, " = ", sprintf("%.3f",VaR*100), "%'")]
+
+(VaR_plot <- ggplot(Dat_Plot, aes(x=difference, fill=Rate, color=Rate)) + theme_minimal() +
+       geom_histogram(alpha=0.8, position="identity", aes(y = after_stat(!!str2lang("density"))), color="black") +
+       geom_vline(xintercept=Bas_VaR, color=col.v[1], linetype="dashed", alpha=0.8) +
+       geom_vline(xintercept=Int_VaR, color=col.v[2], linetype="dashed", alpha=0.8) +
+       geom_vline(xintercept=Adv_VaR, color=col.v[3], linetype="dashed", alpha=0.8) +
+       geom_density(alpha=0.6, linetype="dashed", linewidth = 0.8, show.legend = FALSE) +
+       labs(x="Under prediction (%)", y = "Density") +
+    theme(legend.key = element_blank(),text=element_text(family=chosenFont),legend.position = "bottom",
+          axis.text.x=element_text(angle=0), 
+          strip.background=element_rect(fill="snow2", colour="snow2"),
+          strip.text=element_text(size=9, colour="gray50"), strip.text.y.right=element_text(angle=90), legend.margin = margin(t=-5)) +
+          geom_text(data=dat_anno1, aes(x=x, y=y, label = Label), family=chosenFont, size=4, parse=T, inherit.aes=FALSE) +
+          scale_fill_manual(name=bquote("Difference: "),  values=col.v, labels=label.v)+
+          scale_colour_manual(name=bquote("Difference: "),  values=col.v, labels=label.v) +
+          scale_x_continuous(breaks=pretty_breaks(), label=percent) +
+          scale_y_continuous(breaks=pretty_breaks()))
+# - Pack away graph
+ggsave(VaR_plot, file=paste0(genFigPath, "VaR_Plot.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
+
+
+# --- 2.5 AUC over time
 # - Call AUC_overTime Function for each of the three PD-models
 BasAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
 IntAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_int")
@@ -236,8 +339,6 @@ dat_anno1[3, MeanAUC := round(mean(AdvAUC$AUC_Val, na.rm = T),4)]
 dat_anno1[, Label := paste0(Label, " = ", sprintf("%.2f",MeanAUC*100), "%'")]
 
 # - Graphing parameters
-vCol<-brewer.pal(9, "Set1")[c(2,1,4)]
-
 vCol <- brewer.pal(8, "Dark2")[c(2,1,3)]
 vLabel <- c("A"="Basic",
              "B"="Intermediate",
@@ -271,4 +372,5 @@ ggsave(g3, file=paste0(genFigPath, "AUC-time.png"), width=1400/dpi, height=1000/
 
 # - Final Clean up
 rm(g3,BasAUC, IntAUC, AdvAUC, label.v, logitMod_Adv, logitMod_Basic, logitMod_Int, IntWSR, Bas_WSR, AdvWSR, Models_TimeDiag,
-   PlottingSet, PlotSet, ExpRte_Bas, ExpRte_Int, ExpRte_Adv, dat_anno1, Actual); gc()
+   PlottingSet, PlotSet, ExpRte_Bas, ExpRte_Int, ExpRte_Adv, dat_anno1, Actual, Dat_Plot,RiskPrud_Set, VaR_plot,UnderPreds_A,
+   UnderPreds_B,UnderPreds_I); gc()
