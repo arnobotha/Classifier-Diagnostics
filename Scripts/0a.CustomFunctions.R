@@ -435,8 +435,9 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
                             limitVars=10, dpi=180){
   
   # - Unit testing conditions:
-  # logit_model <- glm(default ~ student + balance + income, data=datTrain1, family="binomial")
-  # method <- "stdCoef_ZScores"; sig_level<-0.05; impPlot<-T; pd_plot<-T; chosenFont="Cambria"; colPalette="BrBG"; colPaletteDir=1
+  # unpack.ffdf(paste0(genPath,"creditdata_train"), tempPath); unpack.ffdf(paste0(genObjPath, "Adv_Formula"), tempPath)
+  # logit_model <- glm(inputs_adv, data=datCredit_train, family="binomial")
+  # method <- "stdCoef_Menard"; sig_level<-0.05; impPlot<-T; pd_plot<-T; chosenFont="Cambria"; colPalette="BrBG"; colPaletteDir=1
   # plotName=paste0(genFigPath, "VariableImportance_", method,".png"); limitVars=10
   
   # - Safety check
@@ -448,7 +449,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   # Getting the names of the original training dataset
   datTrain1_names <- names(datTrain1)
   
-  # - Filtering for significant variables
+  # - Initialising vectors and datasets
   coefficients_summary <- data.table(names=names(summary(logit_model)$coefficients[,4][-1]), sig=summary(logit_model)$coefficients[,4][-1],
                                      coefficient=summary(logit_model)$coefficients[,1][-1], se=summary(logit_model)$coefficients[,2][-1]) %>% arrange(names) # Names of variables in the model
   coefficients_sig_model_level <- as.list(rep(0,coefficients_summary[,.N])) # Corresponding level name of the categorical variable; NULL in the case of a numeric or integer variable
@@ -456,6 +457,8 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   coefficients_sig_data_index <- rep(0,coefficients_summary[,.N]) # Index showing if the variable in the model is significant or not
   coefficients_sig_data <- rep(0,coefficients_summary[,.N]) # Names of the significant variable's associated column name in the training dataset
   sig_level <- ifelse(is.na(sig_level),1,sig_level) # The significance level against which each variable must be tested
+ 
+  # --- 1. Filtering for significant variables
   k <- 1 # Counter
   for (i in 1:length(coefficients_data$names)){ # Main loop - looping through all the relevant variables in the training dataset
     if(class(datTrain1[,get(coefficients_data$names[i])]) %in% c("numeric", "integer")){ # Do the following if variable i is numeric
@@ -484,6 +487,9 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   # - Initiating the dataset to be returned (results dataset)
   results <- list(data = data.table(Variable = coefficients_sig_model,Value = 0,Rank = 0))
   
+  # - Initialise advanced counting variable (for keeping track of all variables in the loop, including categorical/dummy variables)
+  k <- 1
+  
   # --- 2. Calculating variable importance based on specified method
   
   if (method=='stdCoef_ZScores'){
@@ -494,10 +500,11 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     # Scaling the variables
     datTrain2 <- copy(datTrain1)
     for (i in 1:length(unique(coefficients_sig_data))){
-      # Checking if the variable is numeric so that the underlying training data can be scaled
+      # Conditionally scaling the variable if it is numeric
       if (class(datTrain2[, get(unique(coefficients_sig_data)[i])]) %in% c("numeric","integer")){ ### Can have a "binary" as well as "factor" type variables - check how these types of variables are handled - check in an additional script to confirm; factorise numeric variables (in model call)P and fit model - check funcitonality
         datTrain2[, (unique(coefficients_sig_data)[i]) := (get(unique(coefficients_sig_data)[i])-mean(get(unique(coefficients_sig_data)[i]),na.rm=T))/sd(get(unique(coefficients_sig_data)[i]), na.rm=T)]
-      } # if
+        k <- k+1 # Updating advanced counting variable
+      }
     }
     # Re-training the model on the scaled data
     suppressWarnings( logit_model <- glm(logit_model$formula, data=datTrain2, family="binomial") )
@@ -525,35 +532,28 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     
     # Computing the standard deviations for each x (this requires a loop to ensure that categorical variables are correctly accounted for)
     ### AB: how to compute exactly for categorical? Google suggests standard error of bin proportion, Harrell suggests using "binconf" function from Hmisc-package to calculate Wilson's confidence interval
-    # see (https://stats.stackexchange.com/questions/51248/how-can-i-find-the-standard-deviation-in-categorical-distribution#:~:text=There%20is%20no%20standard%20deviation,a%20binomial%20or%20multinomial%20proportion.)
+    ### see (https://stats.stackexchange.com/questions/51248/how-can-i-find-the-standard-deviation-in-categorical-distribution#:~:text=There%20is%20no%20standard%20deviation,a%20binomial%20or%20multinomial%20proportion.)
     sd_x <- rep(0, length(coefficients_sig_model))
     for (i in 1:length(coefficients_sig_model)){
       x <- datTrain1[,get(coefficients_sig_data[i])]
-      if (class(x) %in% c("numeric", "integer")){
+      if (class(x) %in% c("numeric", "integer")){ # Compute standard deviation for numeric variables
         sd_x[i] <- sd(x, na.rm=T)
-      } else {
+      } else { # Compute standard deviation for categorical variables
         levels_n <- length(unique(datTrain1[,get(coefficients_sig_data[i])]))
-        if (levels_n==2){
-          x <- as.numeric(x == coefficients_sig_model_level[[i]])
-        } else {
-          x <- as.numeric(x == coefficients_sig_model_level[[i]])
-        }
-        sd_x[i] <- sd(x, na.rm=T)
+        x <- as.numeric(x == coefficients_sig_model_level[[i]])
       } # else
+      sd_x[i] <- sd(x, na.rm=T)
     } # for
     
     # Computing the standard deviation for each y
     y_prob <- na.omit(predict(logit_model, newdata = datTrain1, type="response")); y_logit <- log(y_prob/(1-y_prob)) # Standard deviation of predictions
     sd_y <- sd(y_logit) 
-    # Computing the coefficient of determination
-    r2 <- coefDeter_glm(logit_model)
+    # Computing (McFadden's) Coefficient of determination
+    r2 <- coefDeter_glm(logit_model)[[1]]; r2 <- as.numeric(substr(r2,1,nchar(r2)-1)) # Converting the character output to numeric
     # Computing the variable importance
     results$data$Value <- coefficients_summary$coefficient[coefficients_sig_data_index==1] * r2 * (sd_x/sd_y)
     
-    # Calculating importance measure and preparing result set
-    results$data <- copy(coefficients_summary)[names %in% coefficients_sig_model]
-    results$data[,Value:=abs(coefficient/se)] # Compute the importance measure
-    results$data[,`:=`(coefficient=NULL,se=NULL, sig=NULL)]; colnames(results$data) <- c("Variable", "Value")
+    # Stamping the results dataset with the chosen method for variable importance
     results$Method <- "Standardised Coefficients: Menard"
   
   } else if (method=="partDep") { # - Variable importance as determined by feature importance rank measure (FIRM) (explainable AI technique)
@@ -626,7 +626,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
 }
 # - Unit test
 # install.packages("ISLR"); require(ISLR)
-# datTrain_simp <- data.table(ISLR::Default); datTrain[, `:=`(default=as.factor(default), student=as.factor(student))]
+# datTrain_simp <- data.table(ISLR::Default); datTrain_simp[, `:=`(default=as.factor(default), student=as.factor(student))]
 # logit_model <- glm(default ~ student + balance + income, data=datTrain_simp, family="binomial")
 # a<-varImport_logit(logit_model = logit_model, method="stdCoef_ZScores", impPlot=T)
 # b<-varImport_logit(logit_model = logit_model, method="stdCoef_Goodman", impPlot=T)
