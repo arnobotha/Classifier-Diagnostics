@@ -210,29 +210,6 @@ ggsave(Models_TimeDiag, file=paste0(genFigPath, "ModelsTimeDiagnostics.png"), wi
 # --- 2.4 Risk Prudence Analysis
 RiskPrud_Set <- datCredit_smp[,list(Actuals=mean(DefaultStatus1_lead_12_max,na.rm=T), ExpBas=mean(prob_bas,na.rm=T), ExpInt=mean(prob_int,na.rm=T), ExpAdv=mean(prob_adv,na.rm=T) ), by=list(Date)]
 
-# - Proportion of Under predictions
-cat("Proportion of dates where the default rate was under predicted by the Basic model = ", round(RiskPrud_Set[Actuals>ExpBas,.N]/RiskPrud_Set[,.N]*100,2), "%", sep="", "\n") # 26.67%
-cat("Proportion of dates where the default rate was under predicted by the Intermediate model = ", round(RiskPrud_Set[Actuals>ExpInt,.N]/RiskPrud_Set[,.N]*100,2), "%", sep="", "\n") # 45%
-cat("Proportion of dates where the default rate was under predicted by the Advanced model = ", round(RiskPrud_Set[Actuals>ExpAdv,.N]/RiskPrud_Set[,.N]*100,2), "%", sep="", "\n") # 44.44%
-
-# - Cost function, by setting a cost to the degree of under prediction and over prediction respectively
-UnderCost<-2
-OverCost<-1
-# - Basic
-(sum(RiskPrud_Set[Actuals>ExpBas,Actuals-ExpBas])*UnderCost+sum(RiskPrud_Set[Actuals<ExpBas,ExpBas-Actuals])*OverCost) # 2.57
-# - Intermediate
-(sum(RiskPrud_Set[Actuals>ExpInt,Actuals-ExpInt])*UnderCost+sum(RiskPrud_Set[Actuals<ExpInt,ExpInt-Actuals])*OverCost) # 0.58
-# - Advance
-(sum(RiskPrud_Set[Actuals>ExpAdv,Actuals-ExpAdv])*UnderCost+sum(RiskPrud_Set[Actuals<ExpAdv,ExpAdv-Actuals])*OverCost) # 0.67
-
-# - Proportion of error due to overprediction
-# - Basic
-(sum(RiskPrud_Set[Actuals>ExpBas,Actuals-ExpBas]))/sum(RiskPrud_Set[,abs(Actuals-ExpBas)])*100 # 47.18%
-# - Intermediate
-(sum(RiskPrud_Set[Actuals>ExpInt,Actuals-ExpInt]))/sum(RiskPrud_Set[,abs(Actuals-ExpInt)])*100 # 51.32%
-# - Advance
-(sum(RiskPrud_Set[Actuals>ExpAdv,Actuals-ExpAdv]))/sum(RiskPrud_Set[,abs(Actuals-ExpAdv)])*100 # 49.77%
-
 # - 95% VaR for under predictions
 # - Basic Model
 # - Calculate the extent of the under predicted cases
@@ -284,24 +261,29 @@ dat_anno1 <- data.table(Label = c(paste0("'95% VaR of positive '*italic(A[t]-B[t
 dat_anno1[, Label := paste0(Label, " = ", sprintf("%.3f",VaR*100), "%'")]
 
 (VaR_plot <- ggplot(Dat_Plot, aes(x=difference, fill=Rate, color=Rate)) + theme_minimal() +
-       geom_histogram(alpha=0.8, position="identity", aes(y = after_stat(!!str2lang("density"))), color="black") +
-       geom_vline(xintercept=Bas_VaR, color=col.v[1], linetype="dashed", alpha=0.8) +
-       geom_vline(xintercept=Int_VaR, color=col.v[2], linetype="dashed", alpha=0.8) +
-       geom_vline(xintercept=Adv_VaR, color=col.v[3], linetype="dashed", alpha=0.8) +
-       geom_density(alpha=0.6, linetype="dashed", linewidth = 0.8, show.legend = FALSE) +
-       labs(x="Under prediction (%)", y = "Density") +
+    geom_histogram(alpha=0.8, position="identity", aes(y = after_stat(!!str2lang("density"))), color="black") +
+    geom_vline(xintercept=Bas_VaR, color=col.v[1], linetype="dashed", alpha=0.8) +
+    geom_vline(xintercept=Int_VaR, color=col.v[2], linetype="dashed", alpha=0.8) +
+    geom_vline(xintercept=Adv_VaR, color=col.v[3], linetype="dashed", alpha=0.8) +
+    geom_density(alpha=0.6, linetype="dashed", linewidth = 0.8, show.legend = FALSE) +
+    labs(x="Under prediction (%)", y = "Density") +
     theme(legend.key = element_blank(),text=element_text(family=chosenFont),legend.position = "bottom",
           axis.text.x=element_text(angle=0), 
           strip.background=element_rect(fill="snow2", colour="snow2"),
           strip.text=element_text(size=9, colour="gray50"), strip.text.y.right=element_text(angle=90), legend.margin = margin(t=-5)) +
-          geom_text(data=dat_anno1, aes(x=x, y=y, label = Label), family=chosenFont, size=4, parse=T, inherit.aes=FALSE) +
-          scale_fill_manual(name=bquote("Difference: "),  values=col.v, labels=label.v)+
-          scale_colour_manual(name=bquote("Difference: "),  values=col.v, labels=label.v) +
-          scale_x_continuous(breaks=pretty_breaks(), label=percent) +
-          scale_y_continuous(breaks=pretty_breaks()))
+    annotate(geom="text", x=Bas_VaR-0.0008, y=240, label=paste0("95% VaR"),
+             family=chosenFont, size=2.5, colour=col.v[1], angle=90, alpha=0.9) +
+    annotate(geom="text", x=Int_VaR-0.0008, y=240, label=paste0("95% VaR"),
+             family=chosenFont, size=2.5, colour=col.v[2], angle=90, alpha=0.9) +
+    annotate(geom="text", x=Adv_VaR-0.0008, y=240, label=paste0("95% VaR"),
+             family=chosenFont, size=2.5, colour=col.v[3], angle=90, alpha=0.9) +
+    geom_text(data=dat_anno1, aes(x=x, y=y, label = Label), family=chosenFont, size=4, parse=T, inherit.aes=FALSE) +
+    scale_fill_manual(name=bquote("Difference: "),  values=col.v, labels=label.v)+
+    scale_colour_manual(name=bquote("Difference: "),  values=col.v, labels=label.v) +
+    scale_x_continuous(breaks=pretty_breaks(), label=percent) +
+    scale_y_continuous(breaks=pretty_breaks()))
 # - Pack away graph
-ggsave(VaR_plot, file=paste0(genFigPath, "VaR_Plot.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
-
+ggsave(VaR_plot, file=paste0(genFigPath, "VaR_Plot.png"), width=1200/dpi, height=1000/dpi, dpi=600, bg="white")
 
 # --- 2.5 AUC over time
 # - Call AUC_overTime Function for each of the three PD-models
