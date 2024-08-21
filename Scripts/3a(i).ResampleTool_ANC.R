@@ -103,8 +103,8 @@ datStrata_aggr[, StrataSize_Margin := qnorm(1-(1-confLevel)/2) * datStrata_aggr$
 
 # - Graphing parameters
 chosenFont <- "Cambria"; dpi <- 170
-col.v <- brewer.pal(8, "Dark2")[c(1,2)]
-fill.v <- brewer.pal(8, "Set2")[c(1,2)]
+vCol <- brewer.pal(8, "Dark2")[c(1,2)]
+vFill <- brewer.pal(8, "Set2")[c(1,2)]
 
 # - Create graph to evidence minimum strata sizes
 (g0 <- ggplot(datStrata, aes(x=Time, y=Freq, group=Target)) + theme_minimal() + 
@@ -123,8 +123,8 @@ fill.v <- brewer.pal(8, "Set2")[c(1,2)]
                           sprintf("%.0f", datStrata_aggr$StratumSize_Min))) +     
     # facets & scale options
     facet_grid(Facet_label ~ .) + 
-    scale_colour_manual(name="Default outcome (12-months)", values=col.v) + 
-    scale_fill_manual(name="Default outcome (12-months)", values=fill.v) + 
+    scale_colour_manual(name="Default outcome (12-months)", values=vCol) + 
+    scale_fill_manual(name="Default outcome (12-months)", values=vFill) + 
     scale_y_continuous(breaks=pretty_breaks(), label=comma) + 
     scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y") )
 
@@ -180,8 +180,8 @@ port.aggr2 <- port.aggr %>% pivot_wider(id_cols = c(Time), names_from = c(Sample
 
 # - Graphing parameters
 chosenFont <- "Cambria"; dpi <- 170
-col.v <- brewer.pal(9, "Set1")[c(1,5,2,4)]; size.v <- c(0.5,0.3,0.3,0.3)
-label.v <- c("a_Full"=expression(italic(A)[t]*": Full set "*italic(D)),
+vCol <- brewer.pal(9, "Set1")[c(1,5,2,4)]; size.v <- c(0.5,0.3,0.3,0.3)
+vLabel <- c("a_Full"=expression(italic(A)[t]*": Full set "*italic(D)),
              "b_Train"=bquote(italic(B)[t]*": Training set "*italic(D)[italic(T)]~"("*.(round(train_prop*smp_size/1000))*"k)"),
              "c_Valid"=bquote(italic(C)[t]*": Validation set "*italic(D)[italic(V)]~"("*.(round((1-train_prop)*smp_size/1000))*"k)"))
 
@@ -210,9 +210,9 @@ label.v <- c("a_Full"=expression(italic(A)[t]*": Full set "*italic(D)),
              family=chosenFont, size=3, parse=T) +     
     # facets & scale options
     facet_grid(Facet_label ~ .) + 
-    scale_colour_manual(name=bquote("Sample "*italic(bar(D))), values=col.v, labels=label.v) + 
-    scale_linewidth_manual(name=bquote("Sample "*italic(bar(D))), values=size.v, labels=label.v) + 
-    scale_shape_discrete(name=bquote("Sample "*italic(bar(D))), labels=label.v) + scale_linetype_discrete(name=bquote("Sample "*italic(bar(D))), labels=label.v) + 
+    scale_colour_manual(name=bquote("Sample "*italic(bar(D))), values=vCol, labels=vLabel) + 
+    scale_linewidth_manual(name=bquote("Sample "*italic(bar(D))), values=size.v, labels=vLabel) + 
+    scale_shape_discrete(name=bquote("Sample "*italic(bar(D))), labels=vLabel) + scale_linetype_discrete(name=bquote("Sample "*italic(bar(D))), labels=vLabel) + 
     scale_y_continuous(breaks=pretty_breaks(), label=percent) + 
     scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y"))
 
