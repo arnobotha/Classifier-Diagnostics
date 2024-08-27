@@ -466,12 +466,12 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
       coefficients_sig_data[k] <- as.character(coefficients_data[i,])
       coefficients_sig_model_level[[k]] <- NA 
       k<-k+1
-    } else { # Do the following if variable i is numeric
+    } else { # Do the following if variable i is categorical
       levels_n <- length(unique(datTrain1[,get(coefficients_data$names[i])]))-1
       coefficients_sig_data_index[k:(k+levels_n-1)] <- rep(ifelse(any(coefficients_summary$sig[k:(k+levels_n-2)]<=sig_level),T,F),levels_n) # Checking if any levels of this variable is significant
       coefficients_sig_data[k:(k+levels_n-1)] <- as.character(coefficients_data[i,])
       for(j in 1:levels_n){
-        coefficients_sig_model_level[[k+j-1]] <- unique(datTrain1[,get(coefficients_data$names[i])])[order(unique(datTrain1[,get(coefficients_data$names[i])]))][-1][j]
+        coefficients_sig_model_level[[k+j-1]] <- substr(coefficients_summary$names[[k+j-1]], nchar(coefficients_data$names[i]) + 1, nchar(coefficients_summary$names[[k+j-1]]))
       }
       k<-k+levels_n
     }
@@ -494,20 +494,33 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   
   if (method=='stdCoef_ZScores'){
     # -- Standardizing the input space using Z-scores, followed by refitting the logit model
-    # B = \beta - mean(X) / sd(x)
+    # B = \beta - mean(X) / sd(x) | For categorical variables: sd(x) = (mean(x)*(1-mean(x)))^0.5
     # NOTE: The resulting coefficients are therefore "standardized", as per Menard2011 (http://www.jstor.org/stable/41290135)
+    
+    # Defining a new model formula that will be able to consume categorical variables with multiple levels
+    model_form_new <- paste0(as.character(terms(logit_model)[[2]]), " ~ ")
     
     # Scaling the variables
     datTrain2 <- copy(datTrain1)
-    for (i in 1:length(unique(coefficients_sig_data))){
+    for (i in 1:length(coefficients_sig_data)){
+      # Get ith variable
+      x <- datTrain1[,get(coefficients_sig_data[i])]
       # Conditionally scaling the variable if it is numeric
-      if (class(datTrain2[, get(unique(coefficients_sig_data)[i])]) %in% c("numeric","integer")){ ### Can have a "binary" as well as "factor" type variables - check how these types of variables are handled - check in an additional script to confirm; factorise numeric variables (in model call)P and fit model - check funcitonality
-        datTrain2[, (unique(coefficients_sig_data)[i]) := (get(unique(coefficients_sig_data)[i])-mean(get(unique(coefficients_sig_data)[i]),na.rm=T))/sd(get(unique(coefficients_sig_data)[i]), na.rm=T)]
-        k <- k+1 # Updating advanced counting variable
+      if (class(datTrain2[, get(coefficients_sig_data[i])]) %in% c("numeric","integer")){ # Numerical variable
+        datTrain2[, coefficients_sig_data[i] := (x-mean(x,na.rm=T))/sd(x, na.rm=T)]
+        model_form_new <- paste0(model_form_new, coefficients_sig_data[i], " + ")
+      } else { # Categorical variable
+        x <- as.numeric(x == coefficients_sig_model_level[[i]])
+        sd_x <- sqrt(mean(x) * (1-mean(x))) # Standard deviation of a Bernoulli random variable | This results in a slightly different result compared to the sd() function (if only a few decimal places)
+        datTrain2[, paste0(coefficients_sig_data[i], coefficients_sig_model_level[[i]]) := (x-mean(x,na.rm=T))/sd_x]
+        model_form_new <- paste0(model_form_new, coefficients_sig_data[i], coefficients_sig_model_level[[i]], " + ")
       }
     }
+    # Adjusting the model formula
+    model_form_new <- as.formula(substr(model_form_new, 1, nchar(model_form_new)-3))
+
     # Re-training the model on the scaled data
-    suppressWarnings( logit_model <- glm(logit_model$formula, data=datTrain2, family="binomial") )
+    suppressWarnings( logit_model <- glm(model_form_new, data=datTrain2, family="binomial") )
     
     # Calculating importance measure and preparing result set
     results$data[,Value := data.table(names=names(logit_model$coefficients[which(names(logit_model$coefficients) %in% coefficients_sig_model)]),
@@ -539,10 +552,9 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
       if (class(x) %in% c("numeric", "integer")){ # Compute standard deviation for numeric variables
         sd_x[i] <- sd(x, na.rm=T)
       } else { # Compute standard deviation for categorical variables
-        levels_n <- length(unique(datTrain1[,get(coefficients_sig_data[i])]))
         x <- as.numeric(x == coefficients_sig_model_level[[i]])
+        sd_x[i] <- sqrt(mean(x) * (1-mean(x))) # Standard deviation of a Bernoulli random variable | This results in a slightly different result compared to the sd() function (if only a few decimal places)
       } # else
-      sd_x[i] <- sd(x, na.rm=T)
     } # for
     
     # Computing the standard deviation for each y

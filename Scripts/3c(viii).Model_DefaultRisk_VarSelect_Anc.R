@@ -46,11 +46,13 @@ datCredit_valid <- datCredit_valid %>% subset(DefaultStatus1==0)
 unpack.ffdf(paste0(genObjPath, "Basic_Com_Formula"), tempPath)
 # Intermediate variables
 unpack.ffdf(paste0(genObjPath, "Int_Formula"), tempPath)
+# Advanced variables
+unpack.ffdf(paste0(genObjPath, "Adv_Formula"), tempPath)
 
 
 
 
-# ------ 2. Pure automatic variable selection
+# ------ 2. Fitting the base/full model
 # --- 2.1 Specify all variables used in thematic variable selection
 # - Basic model
 bas_vars <- labels(terms(inputs_bas))
@@ -74,52 +76,117 @@ port_vars <-  c("g0_Delinq_Any_Aggr_Prop", "g0_Delinq_Any_Aggr_Prop_Lag_12", "g0
                 "InterestRate_Margin_Aggr_Med", "InterestRate_Margin_Aggr_Med_1", "InterestRate_Margin_Aggr_Med_9")
 
 # - Combine themes
-inputs_all <- paste0("DefaultStatus1_lead_12_max","~", paste0(c(bas_vars, int_vars, del_vars, beh_vars, port_vars), collapse="+"))
+inputs_adv_full <- as.formula(paste0("DefaultStatus1_lead_12_max","~", paste0(c(bas_vars, int_vars, del_vars, beh_vars, port_vars), collapse="+")))
 
 
-# --- 2.2 Fit full model and run best subset selection
+# --- 2.2 Fit full model
 # - Fit full model
-logitMod_full <- glm(inputs_all, data=datCredit_train, family="binomial")
-summary(logitMod_full)
+logitMod_adv_full <- glm(inputs_adv_full, data=datCredit_train, family="binomial")
 
-# - Best subset selection
+# - High-level evaluation of model
+summary(logitMod_adv_full)
+
+
+
+
+# ------ 3. "Thematic" and "best subset" model
+# --- 3.1 "Thematic" model
+# - Fit model from predefined input space
+logitMod_adv <- glm(inputs_adv, data=datCredit_train, family="binomial")
+
+
+# --- 3.2 "Best subset" model
+# - Running best subset selection on the full/base model
 logitMod_adv_best <- MASS::stepAIC(logitMod_full, direction="both")
 # Start AIC = 187399.8
 # End AIC = 187386.7
 
 # - Save input space to drive
-inputs_adv_best <- formula(logitMod_full_best)
+inputs_adv_best <- formula(logitMod_adv_best)
 pack.ffdf(paste0(genObjPath, "Adv_Best_Formula"), inputs_adv_best); gc()
 
 
-# --- 2.3 Compare "thematic" advanced model with "best subset: advanced model
-# - Advanced (thematic) model input space
-unpack.ffdf(paste0(genObjPath, "Adv_Formula"), tempPath)
-logitMod_adv <- glm(inputs_adv, data=datCredit_train, family="binomial")
 
-# - Comparing variables
+
+# ------ 4. Comparison
+# --- 4.1 Fitting "thematic" and "best subset" models if not in memory
+# - "Thematic model"
+if (!exists('logitMod_adv')) {
+  unpack.ffdf(paste0(genObjPath, "Adv_Formula"), tempPath)
+  logitMod_adv <- glm(inputs_adv, data=datCredit_train, family="binomial")
+}
+
+# - "Best subset model"
+if (!exists('logitMod_adv_best')) {
+  unpack.ffdf(paste0(genObjPath, "Adv_Best_Formula"), tempPath)
+  logitMod_adv_best <- glm(inputs_adv_best, data=datCredit_train, family="binomial")
+} 
+
+
+# --- 4.2 Comparison
+# - Composition of input space
+paste0("Advanced (full) model variable:   ", labels(terms(inputs_adv_full)))
+paste0("========================================================================================================================")
 paste0("Advanced (thematic) model variable:   ", labels(terms(inputs_adv)))
-paste0("=================================================================================================================================================")
+paste0("========================================================================================================================")
 paste0("Advanced (best subset) model variable:   ", labels(terms(inputs_adv_best)))
 
+
 # - Total number of variables
-paste0("Total variables in Advanced (thematic) model:   ", length(labels(terms(inputs_adv))))
-paste0("Total variables in Advanced (best subset) model:   ", length(labels(terms(inputs_adv_best))))
-### RESULTS: Number of variables in Advanced thematic model = 22 variables
-###          Number of variables in Advanced best subset model = 33 variables
+# Get total number of variables in each model through an ANOVA analysis
+sum_logitMod_adv_full <- summary(logitMod_adv_full) # Full model
+sum_logitMod_adv_them <- summary(logitMod_adv) # Thematic model
+sum_logitMod_adv_best <- summary(logitMod_adv_best) # Best subset model
+
+# Displaying the total number of variables in each model
+paste0("Total variables in Advanced (full) model:   ", nrow(sum_logitMod_adv_full$coefficients))
+paste0("Total variables in Advanced (thematic) model:   ", nrow(sum_logitMod_adv_them$coefficients))
+paste0("Total variables in Advanced (best subset) model:   ", nrow(sum_logitMod_adv_best$coefficients))
+### RESULTS: Number of variables in Advanced full model = 48 variables
+###          Number of variables in Advanced thematic model = 25 variables
+###          Number of variables in Advanced best subset model = 39 variables
 
 # - Model fit
-summary(logitMod_adv)$aic; coefDeter_glm(logitMod_adv)
-summary(logitMod_adv_best)$aic; coefDeter_glm(logitMod_adv_best)
-### RESULTS: Advanced thematic model: AIC = 187883; Pseudo R-squared = 32.71%
-### RESULTS: Advanced best subset model: AIC = 187386.7; Pseudo R-squared = 32.89%
-### NOTE:    Not all variables in best subset model are significant
+# Basic model fit statistics
+paste0("AIC of Advanced (full) model: ", sum_logitMod_adv_full$aic); paste0("Pseudo R-Squared of Advanced (full) model: ", coef_Deter_adv_full <- coefDeter_glm(logitMod_adv_full)[[1]])
+paste0("AIC of Advanced (thematic) model: ", sum_logitMod_adv_them$aic); paste0("Pseudo R-Squared of Advanced (thematic) model: ", coef_Deter_adv_them <- coefDeter_glm(logitMod_adv)[[1]])
+paste0("AIC of Advanced (best subset) model: ", sum_logitMod_adv_best$aic); paste0("Pseudo R-Squared of Advanced (best subset) model: ", coef_Deter_adv_best <- coefDeter_glm(logitMod_adv_best)[[1]])
+### RESULTS: Advanced full model: AIC = 187399.77; Pseudo R-squared = 32.90%
+###         Advanced thematic model: AIC = 187882.97; Pseudo R-squared = 32.71%
+###         Advanced best subset model: AIC = 187386.7; Pseudo R-squared = 32.89%
+### NOTE:   Not all variables in best subset model are significant
+
+# Change in AIC with full model as reference
+paste0("Difference in AIC between thematic and full (reference) model: ",  round(sum_logitMod_adv_them$aic/sum_logitMod_adv_full$aic,4)*100, "%")
+paste0("Difference in AIC between best subset and full (reference) model: ",  round(sum_logitMod_adv_best$aic/sum_logitMod_adv_full$aic,4)*100, "%")
+### RESULTS: Thematic model has an AIC that is 0.26% higher than the full model.
+###          Best subset model has an AIC that is 0.01% lower than the full model.
+###
+
+# Change in Pseudo R-squared with full model as reference
+paste0("Difference in Pseudo R-squared between thematic and full (reference) model: ",
+       round(as.numeric(substr(coef_Deter_adv_them,1,nchar(coef_Deter_adv_them[[1]])-1))/as.numeric(substr(coef_Deter_adv_full,1,nchar(coef_Deter_adv_full[[1]])-1)),4)*100, "%")
+paste0("Difference in Pseudo R-squared between best subset and full (reference) model: ",
+       round(as.numeric(substr(coef_Deter_adv_best,1,nchar(coef_Deter_adv_best[[1]])-1))/as.numeric(substr(coef_Deter_adv_full,1,nchar(coef_Deter_adv_full[[1]])-1)),4)*100, "%")### RESULTS: 
+### RESULTS: Thematic model has an Pseudo R-squared that is 0.58% lower than the full model.
+###          Best subset model has an Pseudo R-squared that is 0.03% lower than the full model.
+
 
 # - Variable importance
-varImport_logit(logitMod_adv, method="stdCoef_Goodman", sig_level=0.1, impPlot=T, plotVersionName="Advanced")
-varImport_logit(logitMod_adv_best, method="stdCoef_Goodman", sig_level=0.1, impPlot=T, plotVersionName="Advanced")
-### RESULTS: Advanced thematic model: Top three variables: [PrevDefaultsTRUE], [g0_Delinq], and [slc_acct_roll_ever_24_imputed_mean]
-### RESULTS: Advanced best subset model: Top three variables: [PrevDefaultsTRUE], [g0_Delinq], and [slc_acct_roll_ever_24_imputed_mean]
+# High-level variable importance using Goodman's method
+(varImport_logit_adv_full <- varImport_logit(logitMod_adv_full, method="stdCoef_Goodman", sig_level=0.1, impPlot=T, plotVersionName="Advanced"))
+(varImport_logit_adv_them <- varImport_logit(logitMod_adv, method="stdCoef_Goodman", sig_level=0.1, impPlot=T, plotVersionName="Advanced"))
+(varImport_logit_adv_best <- varImport_logit(logitMod_adv_best, method="stdCoef_Goodman", sig_level=0.1, impPlot=T, plotVersionName="Advanced"))
+### RESULTS: Advanced full model: Top three variables: [PrevDefaultsTRUE], [g0_Delinq], and [slc_acct_roll_ever_24_imputed_mean]
+###          Advanced thematic model: Top three variables: [PrevDefaultsTRUE], [g0_Delinq], and [slc_acct_roll_ever_24_imputed_mean]
+###          Advanced best subset model: Top three variables: [PrevDefaultsTRUE], [g0_Delinq], and [slc_acct_roll_ever_24_imputed_mean]
+
+# Comparing variable importance of variables in thematic model to best subset model
+paste0("The average rank of variables that are in best subset model and not in the thematic model: ",  round(mean(varImport_logit_adv_best$data[!(varImport_logit_adv_best$data$Variable %in% varImport_logit_adv_them$data$Variable), Rank], na.rm=T),2))
+paste0("Therefore, there are ", round(aveRank_logit_adv_best_them/nrow(varImport_logit_adv_best$data),4)*100,"% more important variables (on average) that are in both the best subset and thematic models.")
+### RESULTS: The average rank of variables in the best subset model, that are not in the thematic model, is 22.77.
+###          Therefore, there are 73.45% more important variable that are in both the best subset and thematic models.
+
 
 # - Predictive performance
 datCredit_valid[, prob_adv:=predict(logitMod_adv, newdata = datCredit_valid, type="response")]
@@ -128,6 +195,7 @@ paste0("AUC of Advanced (thematic) model:   ", auc(datCredit_valid$DefaultStatus
 paste0("AUC of Advanced (best subset) model:   ", auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_adv_best))
 ### RESULTS: Advanced thematic model: AUC = 90.02%
 ###          Advanced best subset model: AUC = 90.12%
+
 
 # - VIF analysis
 paste0("Number of variables with VIF > 10:   ", sum(car::vif(logitMod_adv)[,1]>10))
