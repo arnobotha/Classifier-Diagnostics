@@ -1,6 +1,6 @@
 # =================================== STUDY OF INFORMATION MEASURES ==========================================
 # Manual calculation, illustration, and comparison of various information measures, which includes:
-#     Entropy, cross-entropy, Kullback-Leibler's D-divergence, and Jeffrey's J-divergence
+#     Shannon Entropy, cross-entropy, Kullback-Leibler's D-divergence, and Jeffrey's J-divergence
 # ------------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
 # SCRIPT AUTHOR(S): Dr Arno Botha
@@ -8,6 +8,7 @@
 # -- Script dependencies:
 #   - 0.Setup.R | Only for plotting purposes
 # ============================================================================================================
+
 
 
 # ------- 0. Setup
@@ -23,6 +24,7 @@ library(data.table)
 library(Metrics) # for validating Cross-Entropy ("logloss")
 library(entropy) # for validating Shannon entropy
 library(LaplacesDemon) # for validating Kullback-Leibler and Jeffrey divergences
+
 
 
 
@@ -60,7 +62,77 @@ divChecks <- function(H_qq, H_qp, D_qp, D_pq, J_qp) {
 
 
 
-# ------ 1. Illustrating information measures
+# ------ 2. Shannon Entropy over probability spectrum
+
+# --- Illustrating Shannon entropy of a Bernoulli random variable (0 & 1), with probability spectrum thereof as p
+
+# - Design probability spectrum
+p <- seq(0,1,0.01)
+H <- -1*(p*log2(p) + (1-p)*log2(1-p)) # Shannon Entropy H
+dat <- data.frame(p=p, H=H)
+
+# - Graphing parameters
+chosenFont <- "Cambria"; dpi <- 220
+
+# - Create plot
+(g <- ggplot(dat, aes(x=p, y=H)) + theme_minimal() + 
+    labs(x=bquote("Probability of Bernoulli random variable "*italic(q)), 
+         y=bquote("Shannon Entropy "*italic(H) )) + 
+    theme(text=element_text(family=chosenFont),legend.position = "bottom") + 
+    geom_point(aes(colour=H)) + 
+    scale_colour_distiller(type="seq", palette="YlOrRd", direction=1, name=bquote("Surprisal level "*italic(H))) + 
+    scale_x_continuous(labels=percent)
+)
+
+# - Save graph
+ggsave(g, file=paste0(genFigPath, "ShannonEntropy.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
+
+
+
+# --- Illustrating Shannon entropy for a known probability of a Bernoulli random variable
+q1 <- 0.7
+(H <- -1*(q1*log2(q1) + (1-q1)*log2(1-q1))) # Shannon Entropy H(q)
+
+
+# --- Illustrating Shannon entropy for a sample of generated probabilities for a Bernoulli random variable
+q <- as.factor(rbinom(n=100000, size=1, prob=0.7)) # size starts at 0, therefore minus 1
+q_outcomes <- unique(q)
+describe(q); qplot(q) + theme_minimal()
+
+q1 <- sum(q==q_outcomes[1]) / length(q)
+(H <- -1*(q1 *log2(q1) + (1-q1)*log2(1-q1))) # Shannon Entropy H(q)
+
+
+
+# --- Illustrating Shannon entropy for a sample of generated probabilities for a Binomial random variable
+outcomes <- 3
+q <- as.factor(rbinom(n=100000, size=outcomes-1, prob=0.7)) # size starts at 0, therefore minus 1
+q_outcomes <- unique(q)
+describe(q); qplot(q) + theme_minimal()
+
+for (y in 1:(outcomes)) {
+  q_y <- sum(q==q_outcomes[y]) / length(q)
+  if (y==1) { H <- q_y*log2(q_y) } else { H <- H + q_y*log2(q_y) }
+}
+(H <- -H)
+
+
+# --- Illustrating Shannon entropy for multiple rolls of a fair 6-sided dice
+outcomes <- 6
+q <- as.factor(sample(x=1:outcomes, size=100000, prob=rep(1/outcomes, times=outcomes), replace=T))
+q_outcomes <- unique(q)
+describe(q); qplot(q) + theme_minimal()
+
+for (y in 1:(outcomes)) {
+  q_y <- sum(q==q_outcomes[y]) / length(q)
+  if (y==1) { H <- q_y*log2(q_y) } else { H <- H + q_y*log2(q_y) }
+}
+(H <- -H)
+
+
+
+
+# ------ 3. Illustrating various information measures
 
 # -- Initialize simulation parameters
 n <- 100000
@@ -139,7 +211,6 @@ J_qp <- (q1-p1)*log(q1/p1, base=chosenBase) + ((1-q1)-(1-p1))*log2((1-q1)/(1-p1)
     #            ), na.rm=T )
 
 
-
 # - Sanity checks
 reportBack(H_qq, H_qp, D_qp, J_qp) # basic information measures
 divChecks(H_qq, H_qp, D_qp, D_pq, J_qp) # While correct, the (continuous) BCE-estimator breaks certain relationships
@@ -149,7 +220,7 @@ divChecks(H_qq, H_qp=H_qp_disc, D_qp, D_pq, J_qp)
 
 
 
-# ------ 2. Comparing information measures across 2 candidate classifiers
+# ------ 4. Comparing information measures across 2 candidate classifiers
 
 # --- Simulate more distributions towards creating comparative graph
 # simulate another 'posterior': a fair coin
