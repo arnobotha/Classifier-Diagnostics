@@ -720,8 +720,7 @@ rm(KS_results_basic, KS_results_int, KS_results_adv); gc()
 
 
 
-# --- Divergence/Information measures
-
+# --- 3.7 Divergence/Information measures
 # - Shannon Entropy
 div_basic$ShannonEntropy
 div_int$ShannonEntropy
@@ -745,21 +744,21 @@ datPlotz[, Label := paste0(sprintf("%.2f",Value*100),"%")]
 dpi <- 200
 vCol1 <- brewer.pal(9, "Purples")[c(5,7)]
 vCol3 <- rep("white", 2*2)
-vLabel <- c("b_Intermediate"=bquote("Intermediate"),
-            "c_Advanced"=bquote("Advanced"))
+vLabel <- c("b_Intermediate"=bquote("Intermediate vs Basic"),
+            "c_Advanced"=bquote("Advanced vs Basic"))
 
 # - Create the plot
 (Info_M<-ggplot(datPlotz, aes(group=Model, y=Value, x=Info_M)) + 
-    theme_minimal() + theme(legend.position = "bottom", text=element_text(family=chosenFont), axis.title.x = element_text(margin = margin(t = 5))) + labs(x="Information measure", y="Improvement relative to the baseline / basic model (%)", family=chosenFont) +
+    theme_minimal() + theme(legend.position = "bottom", text=element_text(family=chosenFont), axis.title.x = element_text(margin = margin(t = 5))) + labs(x="Information measure", y="Relative improvement (%)", family=chosenFont) +
     geom_col(aes(colour=Model, fill=Model), position="dodge") +
     # - Annotation
     annotate(geom="text", hjust=0, x=0.55, y=0.825, family=chosenFont, size=4, parse=T,
              label=paste0("'Shannon entropy '*italic(H(q))=='", sprintf("%#.3f", div_basic$ShannonEntropy),"'")) +
     annotate(geom="text", hjust=0, x=0.55, y=0.75, family=chosenFont, size=4, parse=T,
              label=paste0("'Basic model: Cross-entropy '*italic(H[q](p))=='", sprintf("%#.3f", div_basic$CrossEntropy),"'")) +
-    annotate(geom="text", hjust=0, x=0.55, y=0.7, family=chosenFont, size=4, parse=T,
+    annotate(geom="text", hjust=0, x=0.55, y=0.695, family=chosenFont, size=4, parse=T,
              label=paste0("'Intermediate model: Cross-entropy '*italic(H[q](p))=='", sprintf("%#.3f", div_int$CrossEntropy),"'")) +
-    annotate(geom="text", hjust=0, x=0.55, y=0.65, family=chosenFont, size=4, parse=T,
+    annotate(geom="text", hjust=0, x=0.55, y=0.64, family=chosenFont, size=4, parse=T,
              label=paste0("'Advanced model: Cross-entropy '*italic(H[q](p))=='", sprintf("%#.3f", div_adv$CrossEntropy),"'")) +
     # - General graph specifications
     geom_label(aes(label=Label,fill=Model),colour="white", position=position_dodge(0.90), size=2.75,label.padding = unit(0.15, "lines"),show.legend = F) +

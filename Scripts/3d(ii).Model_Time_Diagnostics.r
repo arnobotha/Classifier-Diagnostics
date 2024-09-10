@@ -1,14 +1,15 @@
 # ========================== MODEL DEFAULT RISK - TIME DIAGNOSTICS ========================================
-# This script performs time diagnostics on the three logit models. Mainly, it tests the realised default rate 
-# against the predictions thereof, by using the MAE and the Wilcoxon Signed Rank Test.
+# Benchmarking the predictions of competing classifiers over time by calculating various time diagnostic
 # -----------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Roland Breedt
+# SCRIPT AUTHOR(S): Roland Breedt, Dr Arno Botha
 
 # DESCRIPTION:
 # This script uses the previously selected variables in fitting different logit models according to their
 # level of complexity. These models are then analysed over time to ensure the models are able to perform well
-# against various macroeconomic scenarios.
+# against various macroeconomic scenarios. 
+# Time diagnostics include: 1) actual-expected pairs of event rates with MAEs in measuring the divergence; 
+#     2) as AUC-values over time; 3) Risk prudence degree (VaR-plot)
 # -----------------------------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
@@ -27,12 +28,10 @@
 #   - Some graphs showcasing model performance over time
 # ===========================================================================================================
 
+
+
 # ------ 1. Preliminaries
 ptm <- proc.time() # for runtime calculations (ignore)
-
-# - Graphing Parameters
-chosenFont <- "Cambria"
-dpi <- 180
 
 # - Confirm prepared datasets are loaded into memory
 if (!exists('datCredit_train')) unpack.ffdf(paste0(genPath,"creditdata_train"), tempPath)
@@ -53,105 +52,114 @@ unpack.ffdf(paste0(genObjPath, "Int_Formula"), tempPath)
 unpack.ffdf(paste0(genObjPath, "Adv_Formula"), tempPath)
 
 
-
-
-# ------ 2. Model comparison
-# --- 2.1 Fitting the models
-# - Basic model
+# - 2.1 Fitting the models
+# Basic model
 logitMod_Basic <- glm(inputs_bas, data=datCredit_train, family="binomial")
-# - Intermediate model
+# Intermediate model
 logitMod_Int <- glm(inputs_int, data=datCredit_train, family="binomial")
-# - Advanced model
+# Advanced model
 logitMod_Adv <- glm(inputs_adv, data=datCredit_train, family="binomial")
 
 
-# --- 2.2 Simplistic plot, using only the advanced model
-# --- Create a plot displaying default rate
+
+
+
+
+# ------ 2. Time diagnostics
+
+
+# --- 2.1 Time graph of actual vs expected 12-month default rates | Advanced PD-model
+
 # - Add probability scores to the sub sampled set
 datCredit_smp[, prob_adv := predict(logitMod_Adv, newdata = datCredit_smp, type="response")]
 datCredit_smp[, prob_bas := predict(logitMod_Basic, newdata = datCredit_smp, type="response")]
 datCredit_smp[, prob_int := predict(logitMod_Int, newdata = datCredit_smp, type="response")]  
 
 # - Create plotting dataset
-ActRte_Dset <- datCredit_smp[,list(DefRate=mean(DefaultStatus1_lead_12_max,na.rm=T), Rate="Act"),by=list(Date)]
-ExpRte_Adv <- datCredit_smp[,list(DefRate=mean(prob_adv,na.rm=T), Rate="Exp"),by=list(Date)]
-PlotSet <- rbind(ActRte_Dset,ExpRte_Adv)
+datActRte <- datCredit_smp[,list(DefRate=mean(DefaultStatus1_lead_12_max,na.rm=T), Rate="Act"),by=list(Date)]
+datExpRte <- datCredit_smp[,list(DefRate=mean(prob_adv,na.rm=T), Rate="Exp"),by=list(Date)]
+datPlot <- rbind(datActRte,datExpRte)
   
 # - Creating annotation datasets for easier annotations
-dat_anno1 <- data.table(MAE = NULL, Label = paste0("'MAE between '*italic(A[t])*' and '*italic(B[t])*'"),
+datAnnotate <- data.table(MAE = NULL, Label = paste0("'MAE between '*italic(A[t])*' and '*italic(B[t])*'"),
                           x = as.Date("2016-01-31"),
                           y = 0.055)
   
 # - MAE Calculation between actual and expected rate
-dat_anno1[1, MAE := mean(abs(PlotSet[Rate=="Act", DefRate] - PlotSet[Rate=="Exp", DefRate]), na.rm = T)]
+datAnnotate[1, MAE := mean(abs(datPlot[Rate=="Act", DefRate] - datPlot[Rate=="Exp", DefRate]), na.rm = T)]
   
 # - Making the label more readable
-dat_anno1[, Label := paste0(Label, " = ", sprintf("%.4f",MAE*100), "%'")]
+datAnnotate[, Label := paste0(Label, " = ", sprintf("%.4f",MAE*100), "%'")]
   
-# - More graphing parameters
-col.v<-brewer.pal(9, "Set1")[c(2,1)]
-shape.v <- c(18,20) 
-linetype.v <- c("dashed","solid")
-label.v <- c("Act"=bquote(italic(A)[t]*": Actual event rate"),
+# - Aesthetic engineering and graphing parameters
+chosenFont <- "Cambria"; dpi <- 180
+vCol<-brewer.pal(9, "Set1")[c(2,1)]
+vShape <- c(18,20) 
+vLineType <- c("dashed","solid")
+vLabel <- c("Act"=bquote(italic(A)[t]*": Actual event rate"),
                "Exp"=bquote(italic(B)[t]*": Expected event rate"))
   
-# - Actual Plot (Only for advanced model)
-  (gg_TimeDiag <- ggplot(PlotSet, aes(x=Date, y=DefRate)) + 
+# - Create graph
+(gg_ActExp <- ggplot(datPlot, aes(x=Date, y=DefRate)) + 
     theme_minimal() +
     labs(x="Calendar date (months)", y=bquote(" Conditional 12-month default rate (%)"), family=chosenFont) + 
     theme(text=element_text(family=chosenFont),legend.position = "bottom",legend.margin=margin(-10, 0, 0, 0),
           axis.text.x=element_text(angle=90), 
           strip.background=element_rect(fill="snow2", colour="snow2"),
           strip.text=element_text(size=15, colour="gray50"), strip.text.y.right=element_text(angle=90)) +
-# Main line graph with overlaid points
+    # Main line graph with overlaid points
     geom_line(aes(colour=Rate, linetype=Rate), linewidth=0.6) +
     geom_point(aes(colour=Rate, shape=Rate),size=1.7) + 
     # Facet and Scale options
-    geom_text(data=dat_anno1, aes(x=x, y=y, label = Label), family=chosenFont, size=4.5, parse=T) +
-    scale_colour_manual(name=bquote(" "), values=col.v, labels=label.v) + 
-    scale_shape_manual(name=bquote(" "), values=shape.v, labels=label.v) + 
-    scale_linetype_manual(name=bquote(" "), values=linetype.v, labels=label.v) + 
+    geom_text(data=datAnnotate, aes(x=x, y=y, label = Label), family=chosenFont, size=4.5, parse=T) +
+    scale_colour_manual(name=bquote(" "), values=vCol, labels=vLabel) + 
+    scale_shape_manual(name=bquote(" "), values=vShape, labels=vLabel) + 
+    scale_linetype_manual(name=bquote(" "), values=vLineType, labels=vLabel) + 
     scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y") +
     scale_y_continuous(breaks=pretty_breaks(), label=percent))
-# - Pack away graph
-ggsave(gg_TimeDiag, file=paste0(genFigPath, "Adv_Model_TimeDiagnostics.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
-  
+
+# - Save graph
+ggsave(gg_ActExp, file=paste0(genFigPath, "DefaultRate_ActExp_Adv.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
+
 # - Clean up
-rm(ActRte_Dset, ExpRte_Adv, gg_TimeDiag, PlotSet)
+rm(datActRte, datExpRte, gg_ActExp, datPlot)
 
-# --- 2.3 Plot for all 3 models
+
+
+
+# --- 2.2 Time graph of actual vs expected 12-month default rates | All PD-models
+
 # - Create plotting dataset by obtaining the actual and expected event rates over time
-# - Aggregation is done by taking the mean of the probability scores at each date
-Actual <- datCredit_smp[,list(DefRate=mean(DefaultStatus1_lead_12_max,na.rm=T), Dataset="A"),by=list(Date)]
-ExpRte_Bas <- datCredit_smp[,list(DefRate=mean(prob_bas,na.rm=T), Dataset="B"),by=list(Date)]
-ExpRte_Int <- datCredit_smp[,list(DefRate=mean(prob_int,na.rm=T), Dataset="C"),by=list(Date)]
-ExpRte_Adv <- datCredit_smp[,list(DefRate=mean(prob_adv,na.rm=T), Dataset="D"),by=list(Date)]
+# Aggregation is performed by taking the mean of the probability scores at each date
+datActRte <- datCredit_smp[,list(DefRate=mean(DefaultStatus1_lead_12_max,na.rm=T), Dataset="A"),by=list(Date)]
+datExpRte_Bas <- datCredit_smp[,list(DefRate=mean(prob_bas,na.rm=T), Dataset="B"),by=list(Date)]
+datExpRte_Int <- datCredit_smp[,list(DefRate=mean(prob_int,na.rm=T), Dataset="C"),by=list(Date)]
+datExpRte_Adv <- datCredit_smp[,list(DefRate=mean(prob_adv,na.rm=T), Dataset="D"),by=list(Date)]
+# Bind rates into a single data object for graphing purposes
+datPlot <- rbind(datActRte,datExpRte_Bas,datExpRte_Int,datExpRte_Adv)
 
-# - Standard deviations of these rates
-# - Actual
-(sd(Actual$DefRate,na.rm = TRUE)) # 0.01104
-(sd(ExpRte_Bas$DefRate,na.rm = TRUE)) # 0.00232
-(sd(ExpRte_Int$DefRate,na.rm = TRUE)) # 0.01066
-(sd(ExpRte_Adv$DefRate,na.rm = TRUE)) # 0.01041
+# - Standard deviations of event rates over time
+(sd(datActRte$DefRate,na.rm = TRUE)) # 0.01104
+(sd(datExpRte_Bas$DefRate,na.rm = TRUE)) # 0.00232
+(sd(datExpRte_Int$DefRate,na.rm = TRUE)) # 0.01066
+(sd(datExpRte_Adv$DefRate,na.rm = TRUE)) # 0.01041
 
-# - Bind rates
-PlotSet <- rbind(Actual,ExpRte_Bas,ExpRte_Int,ExpRte_Adv)
-
-# --- Wilcoxon Signed Rank Test
-(Bas_WSR<-Wilcoxon_SR_Test(Actual[,DefRate], ExpRte_Bas[,DefRate], Alpha = 0.05)) #basic
+# - Wilcoxon Signed Rank Test
+(Bas_WSR <- Wilcoxon_SR_Test(datActRte[,DefRate], datExpRte_Bas[,DefRate], Alpha = 0.05)) #basic
 ### RESULTS: p-value ~ 0; i.e., WSR-Test: rejected
-(IntWSR<-Wilcoxon_SR_Test(Actual[,DefRate], ExpRte_Int[,DefRate], Alpha = 0.05)) #intermediate
+(IntWSR <- Wilcoxon_SR_Test(datActRte[,DefRate], datExpRte_Int[,DefRate], Alpha = 0.05)) #intermediate
 ### RESULTS: p-value = 0.6136; i.e., WSR-Test: not rejected
-(AdvWSR<-Wilcoxon_SR_Test(Actual[,DefRate], ExpRte_Adv[,DefRate], Alpha = 0.05)) #advanced
+(AdvWSR <- Wilcoxon_SR_Test(datActRte[,DefRate], datExpRte_Adv[,DefRate], Alpha = 0.05)) #advanced
 ### RESULTS: p-value = 0.3392; i.e., WSR-Test: not rejected
 
-# - Location of annotations
-start_y<-0.06
-space<-0.00375
-y_vals<-c(start_y,start_y-space,start_y-space*2)
+# - Aesthetic engineering: annotations
+# Location of annotations
+start_y <- 0.06
+space <- 0.00375
+y_vals <- c(start_y, start_y-space, start_y-space*2)
   
-# - Creating an annotation dataset for easier annotations
-dat_anno1 <- data.table(MAE = NULL,
+# - Aesthetic engineering: annotation table
+datAnnotate <- data.table(MAE = NULL,
                           Dataset = c("A-B","A-C","A-D"),
                           Label = c(paste0("'MAE  '*italic(bar(r)(A[t],B[t]))*'"),
                                     paste0("'MAE  '*italic(bar(r)(A[t],C[t]))*'"),
@@ -160,29 +168,24 @@ dat_anno1 <- data.table(MAE = NULL,
                           x = rep(as.Date("2010-05-31"),3), # Text x coordinates
                           y = y_vals)
 
-# - MAE Calculations
-dat_anno1[1, MAE := mean(abs(PlotSet[Dataset=="A", DefRate] - PlotSet[Dataset=="B", DefRate]), na.rm = T)]
-dat_anno1[2, MAE := mean(abs(PlotSet[Dataset=="A", DefRate] - PlotSet[Dataset=="C", DefRate]), na.rm = T)]
-dat_anno1[3, MAE := mean(abs(PlotSet[Dataset=="A", DefRate] - PlotSet[Dataset=="D", DefRate]), na.rm = T)]
+# - MAE Calculations and labelling
+datAnnotate[1, MAE := mean(abs(datPlot[Dataset=="A", DefRate] - datPlot[Dataset=="B", DefRate]), na.rm = T)]
+datAnnotate[2, MAE := mean(abs(datPlot[Dataset=="A", DefRate] - datPlot[Dataset=="C", DefRate]), na.rm = T)]
+datAnnotate[3, MAE := mean(abs(datPlot[Dataset=="A", DefRate] - datPlot[Dataset=="D", DefRate]), na.rm = T)]
+datAnnotate[, Label := paste0(Label, " = ", sprintf("%.4f",MAE*100), "%;", ifelse(outcome=="WSR-Test: rejected", paste0("  WSR-Test: '*italic(H[0])*' rejected'"), paste0("  WSR-Test: '*italic(H[0])*' not rejected'")) )]
   
-# - Last adjustments before plotting
-dat_anno1[, Label := paste0(Label, " = ", sprintf("%.4f",MAE*100), "%;", ifelse(outcome=="WSR-Test: rejected", paste0("  WSR-Test: '*italic(H[0])*' rejected'"), paste0("  WSR-Test: '*italic(H[0])*' not rejected'")) )]
-  
-# - Graphing parameters
-col.v<-brewer.pal(9, "Set1")[c(2,1,4,3)]
-  
-label.v <- c("A"=bquote(italic(A)[t]*": Actual"),
+# - Aesthetic engineering & graphing parameters
+chosenFont <- "Cambria"; dpi <- 180
+vCol <- brewer.pal(9, "Set1")[c(2,1,4,3)]
+vLabel <- c("A"=bquote(italic(A)[t]*": Actual"),
              "B"=bquote(italic(B)[t]*": Basic"),
              "C"=bquote(italic(C)[t]*": Intermediate"),
              "D"=bquote(italic(D)[t]*": Advanced"))
-shape.v <- c(18,20,16,17); 
-linetype.v <- c("dashed","solid","solid","solid")
+vShape <- c(18,20,16,17); 
+vLineType <- c("dashed","solid","solid","solid")
   
-# - Facet names
-facet_names_full <- c("DefRate"="Tester")
-  
-# - Aesthetics engineering
-(Models_TimeDiag <- ggplot(PlotSet, aes(x=Date, y=DefRate)) + 
+# - Create graph
+(gg_ActExp <- ggplot(datPlot, aes(x=Date, y=DefRate)) + 
     theme_minimal() +
     labs(x="Calendar date (months)", y=bquote(" Conditional 12-month default rate (%)"), family=chosenFont) + 
     theme(text=element_text(family=chosenFont),legend.position = "bottom",legend.margin=margin(-10, 0, 0, 0),
@@ -193,10 +196,10 @@ facet_names_full <- c("DefRate"="Tester")
     geom_line(aes(colour=Dataset, linetype=Dataset), linewidth=0.6) +
     geom_point(aes(colour=Dataset, shape=Dataset),size=1.7) + 
     # facets & scale options
-    geom_text(data=dat_anno1, aes(x=x, y=y, label = Label), family=chosenFont, size=3.5, parse=T, hjust=0) +
-    scale_colour_manual(name=bquote("Event rate: "),  values=col.v, labels=label.v) + 
-    scale_shape_manual(name=bquote("Event rate: "),  values=shape.v, labels=label.v) + 
-    scale_linetype_manual(name=bquote("Event rate: "),  values=linetype.v, labels=label.v) + 
+    geom_text(data=datAnnotate, aes(x=x, y=y, label = Label), family=chosenFont, size=3.5, parse=T, hjust=0) +
+    scale_colour_manual(name=bquote("Event rate: "),  values=vCol, labels=vLabel) + 
+    scale_shape_manual(name=bquote("Event rate: "),  values=vShape, labels=vLabel) + 
+    scale_linetype_manual(name=bquote("Event rate: "),  values=vLineType, labels=vLabel) + 
     scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y") +
     scale_y_continuous(breaks=pretty_breaks(), label=percent))
 ### RESULTS:
@@ -204,53 +207,116 @@ facet_names_full <- c("DefRate"="Tester")
 # MAE between Actuals and Intermediate Expected = 0.2146%
 # MAE between Actuals and Advanced Expected = 0.2486%
 
-# - Pack away graph
-ggsave(Models_TimeDiag, file=paste0(genFigPath, "ModelsTimeDiagnostics.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
+# - Save graph
+ggsave(gg_ActExp, file=paste0(genFigPath, "DefaultRate_ActExp_AllModels.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
 
-# --- 2.4 Risk Prudence Analysis
-RiskPrud_Set <- datCredit_smp[,list(Actuals=mean(DefaultStatus1_lead_12_max,na.rm=T), ExpBas=mean(prob_bas,na.rm=T), ExpInt=mean(prob_int,na.rm=T), ExpAdv=mean(prob_adv,na.rm=T) ), by=list(Date)]
+# - Clean up
+rm(datActRte, datExpRte_Bas, datExpRte_Int, datExpRte_Adv, gg_ActExp, datPlot, datAnnotate,
+   AdvWSR, IntWSR, Bas_WSR)
 
-# - Proportion of Under predictions
-cat("Proportion of dates where the default rate was under predicted by the Basic model = ", round(RiskPrud_Set[Actuals>ExpBas,.N]/RiskPrud_Set[,.N]*100,2), "%", sep="", "\n") # 26.67%
-cat("Proportion of dates where the default rate was under predicted by the Intermediate model = ", round(RiskPrud_Set[Actuals>ExpInt,.N]/RiskPrud_Set[,.N]*100,2), "%", sep="", "\n") # 45%
-cat("Proportion of dates where the default rate was under predicted by the Advanced model = ", round(RiskPrud_Set[Actuals>ExpAdv,.N]/RiskPrud_Set[,.N]*100,2), "%", sep="", "\n") # 44.44%
 
-# - Cost function, by setting a cost to the degree of under prediction and over prediction respectively
-UnderCost<-2
-OverCost<-1
-# - Basic
-(sum(RiskPrud_Set[Actuals>ExpBas,Actuals-ExpBas])*UnderCost+sum(RiskPrud_Set[Actuals<ExpBas,ExpBas-Actuals])*OverCost) # 2.57
-# - Intermediate
-(sum(RiskPrud_Set[Actuals>ExpInt,Actuals-ExpInt])*UnderCost+sum(RiskPrud_Set[Actuals<ExpInt,ExpInt-Actuals])*OverCost) # 0.58
-# - Advance
-(sum(RiskPrud_Set[Actuals>ExpAdv,Actuals-ExpAdv])*UnderCost+sum(RiskPrud_Set[Actuals<ExpAdv,ExpAdv-Actuals])*OverCost) # 0.67
 
-# - Proportion of error due to overprediction
-# - Basic
-(sum(RiskPrud_Set[Actuals>ExpBas,Actuals-ExpBas]))/sum(RiskPrud_Set[,abs(Actuals-ExpBas)])*100 # 47.18%
-# - Intermediate
-(sum(RiskPrud_Set[Actuals>ExpInt,Actuals-ExpInt]))/sum(RiskPrud_Set[,abs(Actuals-ExpInt)])*100 # 51.32%
-# - Advance
-(sum(RiskPrud_Set[Actuals>ExpAdv,Actuals-ExpAdv]))/sum(RiskPrud_Set[,abs(Actuals-ExpAdv)])*100 # 49.77%
+
+# --- 2.4 AUC over time | All PD-models
+
+# - Call custom AUC_overTime() function for each of the three PD-models
+BasAUC <- AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
+IntAUC <- AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_int")
+AdvAUC <- AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_adv")
+
+# - Differentiation for plotting
+BasAUC[,Dataset := "A"]
+IntAUC[,Dataset := "B"]
+AdvAUC[,Dataset := "C"]
+
+# - Create final dataset for ggplot
+datPlot <- rbind(BasAUC,IntAUC,AdvAUC)
+
+# - Aesthetic engineering: annotations
+# Location of annotations
+start_y <- 0.625
+space <- 0.025
+y_vals <- c(start_y,start_y-space,start_y-space*2)
+
+# - Creating an annotation dataset for easier annotations
+datAnnotate <- data.table(MeanAUC = NULL, Dataset = c("A-B","A-C","A-D"),
+                          x = rep(as.Date("2013-05-31"),3), # Text x coordinates
+                          y = y_vals )
+
+# - TTC-mean & confidence interval calculations
+confLevel <- 0.95
+vEventRates_Mean <- c(mean(BasAUC$AUC_Val, na.rm = T), mean(IntAUC$AUC_Val, na.rm = T), mean(AdvAUC$AUC_Val, na.rm = T))
+vEventRates_stErr <- c(sd(BasAUC$AUC_Val, na.rm=T) / sqrt(BasAUC[, .N]),
+                       sd(IntAUC$AUC_Val, na.rm=T) / sqrt(IntAUC[, .N]),
+                       sd(AdvAUC$AUC_Val, na.rm=T) / sqrt(AdvAUC[, .N]) )
+vMargin <- qnorm(1-(1-confLevel)/2) * vEventRates_stErr
+vLabel <- c(paste0("'TTC-mean over '*italic(A[X](t))*' for '*italic(A[t])*' : ", sprintf("%.2f",vEventRates_Mean[1]*100),
+                   "% ± ", sprintf("%1.3f", vMargin[1]*100),"%'"),
+          paste0("'TTC-mean over '*italic(A[X](t))*' for '*italic(B[t])*' : ", sprintf("%.2f",vEventRates_Mean[2]*100),
+                 "% ± ", sprintf("%1.3f", vMargin[2]*100),"%'"),
+          paste0("'TTC-mean over '*italic(A[X](t))*' for '*italic(C[t])*' : ", sprintf("%.2f",vEventRates_Mean[3]*100),
+                 "% ± ", sprintf("%1.3f", vMargin[3]*100),"%'") )
+datAnnotate[, Label := vLabel]
+
+# - Graphing parameters
+chosenFont <- "Cambria"; dpi <- 180
+vCol <- brewer.pal(8, "Dark2")[c(2,1,3)]
+vLabel <- c("A"=bquote(italic(A[t])~": Basic"), "B"=bquote(italic(B[t])~": Intermediate"), 
+            "C"=bquote(italic(C[t])~": Advanced"))
+vShape <- c(17,20,4) 
+
+# - Create graph
+(g3 <- ggplot(datPlot, aes(x=Date, y=AUC_Val)) + theme_minimal() + 
+    labs(y=bquote("Prediction Accuracy: AUC (%) "*italic(A[X])), x=bquote("Reporting time "*italic(t)* " (months)")) + 
+    theme(text=element_text(family=chosenFont),legend.position = "bottom",legend.margin=margin(-10, 0, 0, 0),
+          axis.text.x=element_text(angle=90), 
+          strip.background=element_rect(fill="snow2", colour="snow2"),
+          strip.text=element_text(size=11, colour="gray50"), strip.text.y.right=element_text(angle=90)) + 
+    # Main graph
+    geom_ribbon(aes(fill=Dataset, ymin=AUC_LowerCI, ymax=AUC_UpperCI), alpha=0.2,show.legend = FALSE) + 
+    geom_line(aes(colour=Dataset, linetype=Dataset), linewidth=0.3) +    
+    geom_point(aes(colour=Dataset, shape=Dataset), size=1.8) + 
+    geom_hline(yintercept = 0.7, linewidth=0.75) +
+    geom_text(data=datAnnotate, aes(x=x, y=y, label = Label), family=chosenFont, size=3.5, hjust=0, parse=TRUE) +
+    # Facets & scale options
+    scale_colour_manual(name="Model", values=vCol, labels=vLabel) + 
+    scale_fill_manual(name="Model", values=vCol, labels=vLabel) +
+    scale_shape_manual(name=bquote("Model"), values=vShape, labels=vLabel) + 
+    scale_linetype_discrete(name=bquote("Model"), labels=vLabel) + 
+    scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y") +
+    scale_y_continuous(breaks=pretty_breaks(), label=percent)
+)
+
+# - Save graph
+ggsave(g3, file=paste0(genFigPath, "AUC-time.png"), width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
+
+# - Cleanup
+rm(datAnnotate, g3, datPlot, BasAUC, IntAUC, AdvAUC)
+
+
+
+
+# --- 2.5 Risk Prudence Degree
+datRiskPrud <- datCredit_smp[,list(Actuals=mean(DefaultStatus1_lead_12_max,na.rm=T), ExpBas=mean(prob_bas,na.rm=T), ExpInt=mean(prob_int,na.rm=T), ExpAdv=mean(prob_adv,na.rm=T) ), by=list(Date)]
 
 # - 95% VaR for under predictions
 # - Basic Model
 # - Calculate the extent of the under predicted cases
-UnderPreds_B<- as.matrix(RiskPrud_Set[Actuals>ExpBas, list(difference=(Actuals-ExpBas))])
+UnderPreds_B<- as.matrix(datRiskPrud[Actuals>ExpBas, list(difference=(Actuals-ExpBas))])
 # - Obtain the 95th percentile
 (Bas_VaR<-quantile(UnderPreds_B, 0.95))*100
 ### RESULTS: 95% Empirical VaR = 3.72%
 
 # - Intermediate Model
 # - Calculate the under differences for the under predicted cases
-UnderPreds_I<- as.matrix(RiskPrud_Set[Actuals>ExpInt, list(difference=(Actuals-ExpInt))])
+UnderPreds_I<- as.matrix(datRiskPrud[Actuals>ExpInt, list(difference=(Actuals-ExpInt))])
 # - Obtain the 95th percentile
 (Int_VaR<-quantile(UnderPreds_I, 0.95))*100
 ### RESULTS: 95% Empirical VaR = 0.55%
 
 # - Advanced Model
 # - Calculate the under differences for the under predicted cases
-UnderPreds_A<- as.matrix(RiskPrud_Set[Actuals>ExpAdv, list(difference=(Actuals-ExpAdv))])
+UnderPreds_A<- as.matrix(datRiskPrud[Actuals>ExpAdv, list(difference=(Actuals-ExpAdv))])
 # - Obtain the 95th percentile
 (Adv_VaR<-quantile(UnderPreds_A, 0.95))*100
 ### RESULTS: 95% Empirical VaR = 0.72%
@@ -265,15 +331,15 @@ start_y<-150
 space<-10
 y_vals<-c(start_y,start_y-space,start_y-2*space)
 
-# - Graphing parameters
-col.v<-brewer.pal(9, "Set1")[c(2,1,4)]
+# - Aesthetic engineering & graphing parameters
+vCol<-brewer.pal(9, "Set1")[c(2,1,4)]
 
-label.v <- c("A_Bas"=bquote(italic(A)[t]-italic(B)[t]*"  "),
+vLabel <- c("A_Bas"=bquote(italic(A)[t]-italic(B)[t]*"  "),
              "B_Int"=bquote(italic(A)[t]-italic(C)[t]*"  "),
              "C_Adv"=bquote(italic(A)[t]-italic(D)[t]*"  "))
-linetype.v <- c("solid","dashed","solid")
+vLineType <- c("solid","dashed","solid")
 
-dat_anno1 <- data.table(Label = c(paste0("'95% VaR of positive '*italic(A[t]-B[t])*' cases"),
+datAnnotate <- data.table(Label = c(paste0("'95% VaR of positive '*italic(A[t]-B[t])*' cases"),
                                   paste0("'95% VaR of positive '*italic(A[t]-C[t])*' cases"),
                                   paste0("'95% VaR of positive '*italic(A[t]-D[t])*' cases")),
                         VaR = c(Bas_VaR,Int_VaR,Adv_VaR),
@@ -281,96 +347,39 @@ dat_anno1 <- data.table(Label = c(paste0("'95% VaR of positive '*italic(A[t]-B[t
                         y = y_vals)
 
 # - Last adjustments before plotting
-dat_anno1[, Label := paste0(Label, " = ", sprintf("%.3f",VaR*100), "%'")]
+datAnnotate[, Label := paste0(Label, " = ", sprintf("%.3f",VaR*100), "%'")]
 
-(VaR_plot <- ggplot(Dat_Plot, aes(x=difference, fill=Rate, color=Rate)) + theme_minimal() +
-       geom_histogram(alpha=0.8, position="identity", aes(y = after_stat(!!str2lang("density"))), color="black") +
-       geom_vline(xintercept=Bas_VaR, color=col.v[1], linetype="dashed", alpha=0.8) +
-       geom_vline(xintercept=Int_VaR, color=col.v[2], linetype="dashed", alpha=0.8) +
-       geom_vline(xintercept=Adv_VaR, color=col.v[3], linetype="dashed", alpha=0.8) +
-       geom_density(alpha=0.6, linetype="dashed", linewidth = 0.8, show.legend = FALSE) +
-       labs(x="Under prediction (%)", y = "Density") +
+# - Create graph
+(ggVaR <- ggplot(Dat_Plot, aes(x=difference, fill=Rate, color=Rate)) + theme_minimal() +
+    geom_histogram(alpha=0.8, position="identity", aes(y = after_stat(!!str2lang("density"))), color="black") +
+    geom_vline(xintercept=Bas_VaR, color=vCol[1], linetype="dashed", alpha=0.8) +
+    geom_vline(xintercept=Int_VaR, color=vCol[2], linetype="dashed", alpha=0.8) +
+    geom_vline(xintercept=Adv_VaR, color=vCol[3], linetype="dashed", alpha=0.8) +
+    geom_density(alpha=0.6, linetype="dashed", linewidth = 0.8, show.legend = FALSE) +
+    labs(x="Under prediction (%)", y = "Density") +
     theme(legend.key = element_blank(),text=element_text(family=chosenFont),legend.position = "bottom",
           axis.text.x=element_text(angle=0), 
           strip.background=element_rect(fill="snow2", colour="snow2"),
           strip.text=element_text(size=9, colour="gray50"), strip.text.y.right=element_text(angle=90), legend.margin = margin(t=-5)) +
-          geom_text(data=dat_anno1, aes(x=x, y=y, label = Label), family=chosenFont, size=4, parse=T, inherit.aes=FALSE) +
-          scale_fill_manual(name=bquote("Difference: "),  values=col.v, labels=label.v)+
-          scale_colour_manual(name=bquote("Difference: "),  values=col.v, labels=label.v) +
-          scale_x_continuous(breaks=pretty_breaks(), label=percent) +
-          scale_y_continuous(breaks=pretty_breaks()))
-# - Pack away graph
-ggsave(VaR_plot, file=paste0(genFigPath, "VaR_Plot.png"), width=1200/dpi, height=1000/dpi, dpi=400, bg="white")
+    annotate(geom="text", x=Bas_VaR-0.0008, y=240, label=paste0("95% VaR"),
+             family=chosenFont, size=2.5, colour=vCol[1], angle=90, alpha=0.9) +
+    annotate(geom="text", x=Int_VaR-0.0008, y=240, label=paste0("95% VaR"),
+             family=chosenFont, size=2.5, colour=vCol[2], angle=90, alpha=0.9) +
+    annotate(geom="text", x=Adv_VaR-0.0008, y=240, label=paste0("95% VaR"),
+             family=chosenFont, size=2.5, colour=vCol[3], angle=90, alpha=0.9) +
+    geom_text(data=datAnnotate, aes(x=x, y=y, label = Label), family=chosenFont, size=4, parse=T, inherit.aes=FALSE) +
+    scale_fill_manual(name=bquote("Difference: "),  values=vCol, labels=vLabel)+
+    scale_colour_manual(name=bquote("Difference: "),  values=vCol, labels=vLabel) +
+    scale_x_continuous(breaks=pretty_breaks(), label=percent) +
+    scale_y_continuous(breaks=pretty_breaks()))
+
+# - Save graph
+ggsave(ggVaR, file=paste0(genFigPath, "ggVaR.png"), width=1200/dpi, height=1000/dpi, dpi=600, bg="white")
 
 
-# --- 2.5 AUC over time
-# - Call AUC_overTime Function for each of the three PD-models
-BasAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_bas")
-IntAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_int")
-AdvAUC<-AUC_overTime(datCredit_smp,"Date","DefaultStatus1_lead_12_max","prob_adv")
 
-# - Differentiation for plotting
-BasAUC[,Dataset:="A"]
-IntAUC[,Dataset:="B"]
-AdvAUC[,Dataset:="C"]
-
-# - Create final dataset for ggplot
-PlottingSet<-rbind(BasAUC,IntAUC,AdvAUC)
-
-# - Location of annotations
-start_y<-0.625
-space<-0.025
-y_vals<-c(start_y,start_y-space,start_y-space*2)
-
-# - Creating an annotation dataset for easier annotations
-dat_anno1 <- data.table(MeanAUC = NULL,
-                        Dataset = c("A-B","A-C","A-D"),
-                        Label = c(paste0("'Mean '*italic(A[X])*' for the basic PD-model"),
-                                  paste0("'Mean '*italic(A[X])*' for the intermediate PD-model"),
-                                  paste0("'Mean '*italic(A[X])*' for the advanced PD-model")),
-                        x = rep(as.Date("2013-05-31"),3), # Text x coordinates
-                        y = y_vals)
-# - MAE Calculations
-dat_anno1[1, MeanAUC := round(mean(BasAUC$AUC_Val, na.rm = T),4)]
-dat_anno1[2, MeanAUC := round(mean(IntAUC$AUC_Val, na.rm = T),4)]
-dat_anno1[3, MeanAUC := round(mean(AdvAUC$AUC_Val, na.rm = T),4)]
-
-# - Last adjustments before plotting
-dat_anno1[, Label := paste0(Label, " = ", sprintf("%.2f",MeanAUC*100), "%'")]
-
-# - Graphing parameters
-vCol <- brewer.pal(8, "Dark2")[c(2,1,3)]
-vLabel <- c("A"="Basic",
-             "B"="Intermediate",
-             "C"="Advanced")
-vShape <- c(17,20,4) 
-
-# - Graph results
-(g3 <- ggplot(PlottingSet, aes(x=Date, y=AUC_Val)) + theme_minimal() + 
-    labs(y=bquote("Prediction Accuracy: AUC (%) "*italic(A[X])), x="Calendar date (months)") + 
-    theme(text=element_text(family=chosenFont),legend.position = "bottom",legend.margin=margin(-10, 0, 0, 0),
-          axis.text.x=element_text(angle=90), 
-          strip.background=element_rect(fill="snow2", colour="snow2"),
-          strip.text=element_text(size=11, colour="gray50"), strip.text.y.right=element_text(angle=90)) + 
-    # Main graph
-    geom_ribbon(aes(fill=Dataset, ymin=AUC_LowerCI, ymax=AUC_UpperCI), alpha=0.2,show.legend = FALSE) + 
-    geom_line(aes(colour=Dataset, linetype=Dataset), linewidth=0.3) +    
-    geom_point(aes(colour=Dataset, shape=Dataset), size=1.8) + 
-    geom_hline(yintercept = 0.7, linewidth=0.75) +
-    geom_text(data=dat_anno1, aes(x=x, y=y, label = Label), family=chosenFont, size=3.5, hjust=0, parse=TRUE) +
-    # Facets & scale options
-    scale_colour_manual(name="Model", values=vCol, labels=vLabel) + 
-    scale_fill_manual(name="Model", values=vCol, labels=vLabel) +
-    scale_shape_manual(name=bquote("Model"), values=vShape, labels=vLabel) + 
-    scale_linetype_discrete(name=bquote("Model"), labels=vLabel) + 
-    scale_x_date(date_breaks=paste0(6, " month"), date_labels = "%b %Y") +
-    scale_y_continuous(breaks=pretty_breaks(), label=percent, limits=c(0.5,1))
-)
-
-# - Pack away graph
-ggsave(g3, file=paste0(genFigPath, "AUC-time.png"), width=1400/dpi, height=1000/dpi, dpi="retina", bg="white")
 
 # - Final Clean up
-rm(g3,BasAUC, IntAUC, AdvAUC, label.v, logitMod_Adv, logitMod_Basic, logitMod_Int, IntWSR, Bas_WSR, AdvWSR, Models_TimeDiag,
-   PlottingSet, PlotSet, ExpRte_Bas, ExpRte_Int, ExpRte_Adv, dat_anno1, Actual, Dat_Plot,RiskPrud_Set, VaR_plot,UnderPreds_A,
+rm(g3,BasAUC, IntAUC, AdvAUC, vLabel, logitMod_Adv, logitMod_Basic, logitMod_Int, IntWSR, Bas_WSR, AdvWSR, gg_ActExp,
+   datPlot, datPlot, datExpRte_Bas, datExpRte_Int, datExpRte_Adv, datAnnotate, datActRte, Dat_Plot,datRiskPrud, ggVaR,UnderPreds_A,
    UnderPreds_B,UnderPreds_I); gc()
