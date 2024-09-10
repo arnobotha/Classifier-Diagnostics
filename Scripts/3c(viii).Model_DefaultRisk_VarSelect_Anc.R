@@ -189,12 +189,15 @@ paste0("Therefore, there are ", round(aveRank_logit_adv_best_them/nrow(varImport
 
 
 # - Predictive performance
+datCredit_valid[, prob_adv_full:=predict(logitMod_adv_full, newdata = datCredit_valid, type="response")]
 datCredit_valid[, prob_adv:=predict(logitMod_adv, newdata = datCredit_valid, type="response")]
 datCredit_valid[, prob_adv_best:=predict(logitMod_adv_best, newdata = datCredit_valid, type="response")]
+paste0("AUC of Advanced (full) model:   ", auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_adv_full))
 paste0("AUC of Advanced (thematic) model:   ", auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_adv))
 paste0("AUC of Advanced (best subset) model:   ", auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_adv_best))
-### RESULTS: Advanced thematic model: AUC = 90.02%
-###          Advanced best subset model: AUC = 90.12%
+### RESULTS: Advanced full model: AUC = 90.109448%
+###          Advanced thematic model: AUC = 90.022675%
+###          Advanced best subset model: AUC = 90.108667%
 
 
 # - VIF analysis

@@ -490,7 +490,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   # - Initialise advanced counting variable (for keeping track of all variables in the loop, including categorical/dummy variables)
   k <- 1
   
-  # --- 2. Calculating variable importance based on specified method
+  # --- 3. Calculating variable importance based on specified method
   
   if (method=='stdCoef_ZScores'){
     # -- Standardizing the input space using Z-scores, followed by refitting the logit model
@@ -511,7 +511,8 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
         model_form_new <- paste0(model_form_new, coefficients_sig_data[i], " + ")
       } else { # Categorical variable
         x <- as.numeric(x == coefficients_sig_model_level[[i]])
-        sd_x <- sqrt(mean(x) * (1-mean(x))) # Standard deviation of a Bernoulli random variable | This results in a slightly different result compared to the sd() function (if only a few decimal places)
+        # sd_x <- sqrt(mean(x) * (1-mean(x))) # Standard deviation of a Bernoulli random variable | This results in a slightly different result compared to the sd() function (if only a few decimal places)
+        sd_x <- sd(x, na.rm=T)
         datTrain2[, paste0(coefficients_sig_data[i], coefficients_sig_model_level[[i]]) := (x-mean(x,na.rm=T))/sd_x]
         model_form_new <- paste0(model_form_new, coefficients_sig_data[i], coefficients_sig_model_level[[i]], " + ")
       }
@@ -548,12 +549,14 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     ### see (https://stats.stackexchange.com/questions/51248/how-can-i-find-the-standard-deviation-in-categorical-distribution#:~:text=There%20is%20no%20standard%20deviation,a%20binomial%20or%20multinomial%20proportion.)
     sd_x <- rep(0, length(coefficients_sig_model))
     for (i in 1:length(coefficients_sig_model)){
+      # Get ith variable
       x <- datTrain1[,get(coefficients_sig_data[i])]
       if (class(x) %in% c("numeric", "integer")){ # Compute standard deviation for numeric variables
         sd_x[i] <- sd(x, na.rm=T)
       } else { # Compute standard deviation for categorical variables
-        x <- as.numeric(x == coefficients_sig_model_level[[i]])
-        sd_x[i] <- sqrt(mean(x) * (1-mean(x))) # Standard deviation of a Bernoulli random variable | This results in a slightly different result compared to the sd() function (if only a few decimal places)
+        x <- as.numeric(datTrain1[,get(coefficients_sig_data[i])] == coefficients_sig_model_level[[i]])
+        # sd_x[i] <- sqrt(mean(x) * (1-mean(x))) # Standard deviation of a Bernoulli random variable | This results in a slightly different result compared to the sd() function (if only a few decimal places)
+        sd_x[i] <- sd(x, na.rm=T)
       } # else
     } # for
     
@@ -568,26 +571,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     # Stamping the results dataset with the chosen method for variable importance
     results$Method <- "Standardised Coefficients: Menard"
   
-  } else if (method=="partDep") { # - Variable importance as determined by feature importance rank measure (FIRM) (explainable AI technique)
-    
-    # Calculating importance measure and preparing result set
-    results$data <- vip::vi_firm(logit_model, feature_names=coefficients_sig_data, method="firm", train=datTrain1)
-    
-    # Calculating (and) the partial dependence
-    if (pd_plot==T){
-      for (i in seq_along(coefficients_sig_model)){
-        datPlot_pd <- data.table(attr(results$data, which = "effects")[[i]])
-        names(datPlot_pd) <- c("x","y")
-        (results$plots[[paste0("pd_",coefficients_sig_model[i])]] <- ggplot(datPlot_pd) + geom_point(aes(x=x,y=y)) + theme_minimal() +
-            labs(x=coefficients_sig_data[i],y="yhat") + theme(plot.title = element_text(hjust=0.5)))
-      } # for
-    } # if
-    
-    # Adding a column to indicate the rank order of the variables' importance and getting the data in the desired format
-    results$data <- data.table(results$data) %>% rename(Value = Importance)
-    results$Method <- "Partial Dependence (FIRM)"
-
-  } else {stop(paste0('"', method,'" is not supported. Please use either "stcCoef_ZScores", "stdCoef_Goodman", "stdCoef_Menard", or "pd" as method.'))}# if else (method)
+  } else {stop(paste0('"', method,'" is not supported. Please use either "stcCoef_ZScores", "stdCoef_Goodman", or "stdCoef_Menard" as method.'))}# if else (method)
   
   # - Ranking the variables according to their associated importance measure values
   results$data[,Value_Abs:=abs(Value)]
@@ -604,24 +588,21 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
   
   # --- 3. Creating a general plot of the variable importance (if desired)
   if (impPlot==T){
-    # Generic variable importance plot
-    (results$plots[["Ranking"]] <- ggplot(results$data, aes(x=reorder(Variable, Value_Abs))) + geom_col(aes(y=Value_Abs, fill=Value_Abs)) +
-       coord_flip() + theme_minimal() + theme(text=element_text(family=chosenFont)) +
-       labs(x="Variable name", y=results$Method))
-    
-    # - create graphing object based on the top [limitVars]-number of variables
+    # - Create graphing object based on the top [limitVars]-number of variables
     datGraph <- results$data[1:min(.N, limitVars), ]
     
-    # - cull away lengthy names that will otherwise ruin the graph
+    # - Cull away lengthy names that will otherwise ruin the graph
     datGraph[, Variable_Short := ifelse(str_length(Variable) >= 18, paste0(substr(Variable, 1, 18),".."), Variable)]
     
     # Generic variable importance plot
-    results$plots[["Ranking"]] <- ggplot(datGraph, aes(x=reorder(Variable_Short, Value_Abs))) + theme_minimal() + theme(text=element_text(family=chosenFont)) + 
+    results$plots[["Ranking"]] <- ggplot(datGraph, aes(x=reorder(Variable, Value_Abs))) + theme_minimal() + theme(text=element_text(family=chosenFont)) +  # Re-order by [Variable] because [Variable_Short] yields incorrect orderings
        geom_col(aes(y=Value_Abs, fill=Value_Abs)) + geom_label(aes(y=sumVarImport*0.05, label=paste(percent(Contribution, accuracy=0.1)), fill=Value_Abs), family=chosenFont) + 
-       annotate(geom="text", x=datGraph[.N, Variable_Short], y=sumVarImport*0.3, label=paste0("Variable Importance (sum): ", comma(sumVarImport, accuracy=0.1)), family=chosenFont, size=3) + 
+       annotate(geom="text", x=datGraph[.N, Variable], y=datGraph$Value_Abs[1]*0.75, label=paste0("Variable Importance (sum): ", comma(sumVarImport, accuracy=0.1)), family=chosenFont, size=3) + 
        coord_flip() + scale_fill_distiller(palette=colPalette, name="Absolute value", direction=colPaletteDir) +
        scale_colour_distiller(palette=colPalette, name="Absolute value", direction=colPaletteDir) + 
+       scale_x_discrete(labels =datGraph$Variable_Short[order(datGraph$Value_Abs)]) + # Use [Variable_Short] for the x-axis labeling; Ensure ordering matches the absolute variable importance values
        labs(x="Variable name", y=results$Method)
+   
       
     # Show plot to current display device
     print(results$plots[["Ranking"]])
@@ -630,7 +611,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     # - Save graph
     ggsave(results$plots[["Ranking"]] , file=plotName, width=1200/dpi, height=1000/dpi, dpi=dpi, bg="white")
     
-  }
+  } # if
 
   # - Return results
   return(results)
