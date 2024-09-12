@@ -2,7 +2,7 @@
 # Applying exclusions, data fusion between credit and macroeconomic datasets, followed by
 # engineering some basic features that must precede any (non-clustered) subsampling
 # ---------------------------------------------------------------------------------------
-# PROJECT TITLE: Loss Modelling (LGD) for FNB Mortgages
+# PROJECT TITLE: Classifier Diagnostics
 # SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller, Roland Breedt
 
 # DESCRIPTION:

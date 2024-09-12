@@ -529,7 +529,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     results$Method <- "Standardised coefficients using Z-scores"
     
   } else if (method=="stdCoef_Goodman") { 
-    # -- Variable importance based on Goodman's standardised coefficients
+    # -- Variable importance based on Goodman-standardised coefficients
     # See Menard2011; https://www.jstor.org/stable/41290135)
     # B = \beta / sd(\beta)
 
@@ -540,9 +540,10 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     results$Method <- "Standardised coefficients: Goodman"
 
   } else if (method=="stdCoef_Menard"){ 
-    # -- Variable importance based on Menard's standardised coefficients from Menard2011; https://www.jstor.org/stable/41290135)
+    # -- Variable importance based on Menard-standardised coefficients from Menard2011; https://www.jstor.org/stable/41290135)
     # B = \beta . s_x . R / s_{logit( \hat{Y} )}, where s_x is the standard deviation of X, R is the Pearson correlation between observed values Y and 
     # predicted class probabilities \hat{Y}, and s_\hat{Y} is the standard deviation of logit(\hat{Y})
+    # NOTE: R can also be interpreted as a pseudo R^2, and duly estimated using McFadden R^2
     
     # Computing the standard deviations for each x (this requires a loop to ensure that categorical variables are correctly accounted for)
     ### AB: how to compute exactly for categorical? Google suggests standard error of bin proportion, Harrell suggests using "binconf" function from Hmisc-package to calculate Wilson's confidence interval
@@ -561,7 +562,8 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     } # for
     
     # Computing the standard deviation for each y
-    y_prob <- na.omit(predict(logit_model, newdata = datTrain1, type="response")); y_logit <- log(y_prob/(1-y_prob)) # Standard deviation of predictions
+    y_prob <- na.omit(predict(logit_model, newdata = datTrain1, type="response"))
+    y_logit <- log(y_prob/(1-y_prob)) # Standard deviation of predictions of logit(Y)
     sd_y <- sd(y_logit) 
     # Computing (McFadden's) Coefficient of determination
     r2 <- coefDeter_glm(logit_model)[[1]]; r2 <- as.numeric(substr(r2,1,nchar(r2)-1)) # Converting the character output to numeric
