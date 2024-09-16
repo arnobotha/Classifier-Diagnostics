@@ -432,13 +432,13 @@ transform_yj <- function(x, bound_lower=-2, bound_upper=2, lambda_inc=0.5, verbo
 # Output: A data table containing the variable importance information
 varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.05, impPlot=F, pd_plot=F, chosenFont="Cambria", 
                             colPalette="BrBG", colPaletteDir=1, plotVersionName="", plotName=paste0(genFigPath, "VariableImportance_", method,"_", plotVersionName,".png"), 
-                            limitVars=10, dpi=180){
+                            limitVars=10, dpi=180, Menard_Method="Pearson"){
   
   # - Unit testing conditions:
   # unpack.ffdf(paste0(genPath,"creditdata_train"), tempPath); unpack.ffdf(paste0(genObjPath, "Adv_Formula"), tempPath)
   # logit_model <- glm(inputs_adv, data=datCredit_train, family="binomial")
   # method <- "stdCoef_Menard"; sig_level<-0.05; impPlot<-T; pd_plot<-T; chosenFont="Cambria"; colPalette="BrBG"; colPaletteDir=1
-  # plotName=paste0(genFigPath, "VariableImportance_", method,".png"); limitVars=10
+  # plotName=paste0(genFigPath, "VariableImportance_", method,".png"); limitVars=10; Menard_Method = "Pearson"
   
   # - Safety check
   if (!any(class(logit_model) %in% c("glm", "lm"))) stop("Specified model object is not of class 'glm' or 'lm'. Exiting .. ")
@@ -562,9 +562,17 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
     
     # Computing the standard deviation for each y
     y_prob <- na.omit(predict(logit_model, newdata = datTrain1, type="response")); y_logit <- log(y_prob/(1-y_prob)) # Standard deviation of predictions
-    sd_y <- sd(y_logit) 
-    # Computing (McFadden's) Coefficient of determination
-    r2 <- coefDeter_glm(logit_model)[[1]]; r2 <- as.numeric(substr(r2,1,nchar(r2)-1)) # Converting the character output to numeric
+    sd_y <- sd(y_logit)
+    # Conditionally computing the correlation used in the estimation - Either Pearson's correlation or the R-squared
+    if (Menard_Method=="Pearson"){
+      # Get actual targets
+      y_act <- subset(na.omit(datTrain1[, mget(all.vars(logit_model$terms))]), select=all.vars(logit_model$terms)[[1]])[[1]]
+      # Compute Pearson correlation
+      r2 <- cor(y_prob, y_act, method="pearson")
+    } else if (Menard_Method=="R-Squared"){
+      r2 <- coefDeter_glm(logit_model)[[1]]; r2 <- as.numeric(substr(r2,1,nchar(r2)-1)) # Converting the character output to numeric  
+    }
+
     # Computing the variable importance
     results$data$Value <- coefficients_summary$coefficient[coefficients_sig_data_index==1] * r2 * (sd_x/sd_y)
     
