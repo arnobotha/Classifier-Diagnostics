@@ -2,7 +2,7 @@
 # Perform various data checks, conduct data cleaning, apply exclusions, treat missingness
 # ---------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller
+# SCRIPT AUTHOR(S): Dr Arno Botha
 # ---------------------------------------------------------------------------------------
 # DESCRIPTION:
 # This script prepares raw imported credit data into a much more meaningful form to 
@@ -74,7 +74,7 @@ suppressWarnings(dat.raw[, `:=`(SUB_STAT_CDE = NULL,
 
 # - engineer fundamental loan parameter fields
 dat.raw[, LoanAge := interval(Date_Origination, DATE)]
-dat.raw[, LoanAge := LoanAge %/% months(1)]
+dat.raw[, LoanAge := LoanAge %/% months(1)] # this interim  quantity will later be adjusted within an Advanced Data Treatment
 dat.raw[, Max_Counter := max(Counter, na.rm=T), by=list(ACCT_NO)]
 gc() # Memory optimization
 

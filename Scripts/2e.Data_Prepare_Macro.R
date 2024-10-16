@@ -101,7 +101,7 @@ macro_data_q[, Key := paste0(Period,"-",Scenario)]
 macro_data <- merge(macro_data_m, macro_data_q, by=c("Key"), all.x=T)
 
 # - simple coalesces and interleaving transformations for one-sided missingness
-# uses custom interpolation function "interleave()" defined in 0.Setup
+# uses custom fusion function "interleave()" defined in 0.Setup
 macro_data[, Date_T := interleave(Date_T.x, Date_T.y, na.value = as.POSIXct(NA), pref='X') ]
 macro_data[, Period := interleave(Period.x, Period.y, na.value = as.double(NA), pref='X') ]
 macro_data[, Type := interleave(Type.x, Type.y, na.value = as.character(NA), pref='X') ]
@@ -152,7 +152,7 @@ macro_data[, `:=`(rbqn_rb1419w = NULL, HPI_Level_EOP = NULL, HPI_Level_SA = NULL
 
 
 # --------- 3. Missing Value Treatments & Scaling
-# Subsetting only relevant periods (and fields), apply missing value treatments, and scale domains
+# Subset only relevant periods (and fields), apply missing value treatments, and scale domains
 
 # --- a. Subsetting
 
@@ -198,7 +198,7 @@ cat( check3 %?% 'SAFE: Interpolation successful with no residual missingness whe
 # --------- 4. Subsetting
 # Subset macroeconomic fields and carry out light data preparation
 # We only want the following macroeconomic variables (MVs), as found to be significant by Botha et al. (2020) during 
-# the "C-FLI" project
+# the "C-FLI" project using an in-depth clustering process
 # - Real income growth rate
 # - Real GDP growth rate
 # - Repo rate (not scaled as we want to use it for a new variable)
