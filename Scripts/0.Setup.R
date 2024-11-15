@@ -74,9 +74,9 @@ k <- 6 # Probation period
 
 if (Sys.getenv("USERNAME") == "u15247199") { # Dr Arno Botha | Tuks-machine
   # - Common path for saving large R-objects as back-up and/or as reusable checkpoints
-  genPath <- "C:/DataDump/RetailMortgages-FNB/"
+  genPath <- "C:/DataDump/RetailMortgages-FNB/Classifier-Diagnostics_Data/"
   # - Common path from which raw big datasets are imported
-  genRawPath <- "C:/DataDump/RetailMortgages-FNB/Classifier-Diagnostics_Data/"
+  genRawPath <- "C:/DataDump/RetailMortgages-FNB/"
   # - Common path for sourcing R-scripts in main codebase
   path_cust <- "C:/Users/u15247199/Google Drive/My Drive/WorkLife/Analytix/R&D Codebases/Classifier-Diagnostics/Scripts/"
   # - Common path for storing important (but small!) R-objects as back-up
