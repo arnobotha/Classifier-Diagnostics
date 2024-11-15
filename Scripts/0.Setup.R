@@ -86,15 +86,15 @@ if (Sys.getenv("USERNAME") == "u15247199") { # Dr Arno Botha | Tuks-machine
   # --- Custom path where R-scripts are saved
 } else if (Sys.getenv("USERNAME") == "Arno Botha") { # Dr Arno Botha | Kralkatorrik-machine
   # - Common path for saving large R-objects as back-up and/or as reusable checkpoints
-  genPath <- "E:/DataDump/FNB SLC/Classifier-Diagnostics_Data/"
+  genPath <- "E:/DataDump/RetailMortgages-FNB/Classifier-Diagnostics_Data/"
   # - Common path from which raw big datasets are imported
-  genRawPath <- "E:/DataDump/FNB SLC/"
+  genRawPath <- "E:/DataDump/RetailMortgages-FNB/"
   # - Common path for sourcing R-scripts in main codebase
-  path_cust <- "E:/WorkLife/Analytix/Research/Classifier-Diagnostics/Scripts/"
+  path_cust <- "E:/Backupz/Google Drive/WorkLife/Analytix/R&D Codebases/Classifier-Diagnostics/Scripts/"
   # - Common path for storing important (but small!) R-objects as back-up
-  genObjPath <- "E:/WorkLife/Analytix/Research/Classifier-Diagnostics/Objects/"
+  genObjPath <- "E:/Backupz/Google Drive/WorkLife/Analytix/R&D Codebases/Classifier-Diagnostics/Objects/"
   # - Common path for saving important analytics and figures
-  genFigPath <- "E:/WorkLife/Analytix/Research/Classifier-Diagnostics/Figures/"
+  genFigPath <- "E:/Backupz/Google Drive/WorkLife/Analytix/R&D Codebases/Classifier-Diagnostics/Figures/"
 } else if (Sys.getenv("USERNAME") == "R5532132") { # Marcel Muller | Botha-machine
   # - Common path for saving large R-objects as back-up and/or as reusable checkpoints
   genPath <- "C:/Data/Classifier-Diagnostics_Data/"
