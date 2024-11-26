@@ -21,6 +21,8 @@
 #
 # -- Inputs:
 #   - datCredit_smp | Subsampled credit data from script 3b
+#   - datCredit_train | Prepared credit data from script 3b
+#   - datCredit_valid | Prepared credit data from script 3b
 #
 # -- Outputs:
 #   - Various results and recommendations from experiments.
