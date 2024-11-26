@@ -678,7 +678,7 @@ logitMod_FULL_Best <- MASS::stepAIC(logitMod_FULL, direction="both")
 # - Deviance and AIC
 summary(logitMod_FULL_Best) # Null deviance = 279124; Residual deviance = 277062; AIC = 277074
 # - Variable importance
-varImport_logit(logitMod_FULL_Best, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) #
+varImport_logit(logitMod_FULL_Best, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)
 ## RESULTS: Top 3 variables: [DefaultStatus1_Aggr_Prop], [DefaultStatus1_Aggr_Prop_Lag_1], and [DefaultStatus1_Aggr_Prop_Lag_9]
 # - ROC analysis
 datCredit_valid[, prob_DR_best := predict(logitMod_FULL_Best, newdata = datCredit_valid, type="response")]
@@ -693,7 +693,8 @@ logitMod_red <- glm(form_DR_red, data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_red) # Null deviance = 279124; Residual deviance = 277097; AIC = 277105
 # - Variable importance
-varImport_logit(logitMod_red, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) # Top 3 variables: [DefaultStatus1_Aggr_Prop], [DefaultStatus1_Aggr_Prop_Lag_9], and [DefaultStatus1_Aggr_Prop_Lag_1]
+varImport_logit(logitMod_red, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) 
+### RESULTS: Top 3 variables: [DefaultStatus1_Aggr_Prop], [DefaultStatus1_Aggr_Prop_Lag_9], and [DefaultStatus1_Aggr_Prop_Lag_1]
 # - ROC analysis
 datCredit_valid[, prob_red := predict(logitMod_red, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_red) # 56.4%
