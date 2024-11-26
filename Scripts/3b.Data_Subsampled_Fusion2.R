@@ -210,7 +210,7 @@ varList_Num <- c('slc_past_due_amt','slc_acct_pre_lim_perc','slc_acct_prepaid_pe
                  'Age_Adj', 'PerfSpell_Num','Term','InterestRate_Nom','InterestRate_Margin','Principal','Instalment','Receipt_Inf','Arrears',
                  'Balance','TimeInPerfSpell','PerfSpell_Age', 'PerfSpell_Counter',
                  'TimeInDefSpell', 'DefSpell_Age', 'DefSpell_Counter',
-                 'Event_Time', 'g0_Delinq_Num', 'g0_Delinq_SD', 'NewLoans_Aggr_Prop')
+                 'Event_Time', 'g0_Delinq_Num', 'NewLoans_Aggr_Prop')
 var_Info_Num <- describe(subset(datCredit_smp, select = varList_Num))
 
 

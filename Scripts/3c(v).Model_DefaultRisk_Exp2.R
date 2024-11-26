@@ -1,8 +1,8 @@
 # ========================= MODEL DEFAULT RISK EXPERIMENT =================================
-# Compare logit models with different lags of aggregated variables.
+# Investigate the utility of different lags of certain variables using comparative studies
 # -----------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Marcel Muller, Roland Breedt
+# SCRIPT AUTHOR(S): Marcel Muller, Roland Breedt, Dr Arno Botha
 
 # DESCRIPTION:
 # This script uses the previously prepared credit dataset to fit a few logit models.
@@ -20,8 +20,7 @@
 #   - 0a.CustomFunctions.R
 #
 # -- Inputs:
-#   - datCredit_train | Prepared credit data from script 3b
-#   - datCredit_valid | Prepared credit data from script 3b
+#   - datCredit_smp | Subsampled credit data from script 3b
 #
 # -- Outputs:
 #   - Various results and recommendations from experiments.
@@ -31,11 +30,14 @@
 
 
 # ------ 1. Preliminaries
+# Load and resample the subsampled dataset, followed by some preliminary feature engineering
 
 ptm <- proc.time() # for runtime calculations (ignore)
 
 # --- Confirm prepared datasets are loaded into memory
 if (!exists('datCredit_smp')) unpack.ffdf(paste0(genPath,"creditdata_smp"), tempPath)
+
+
 
 # --- Feature engineering: Aggregated delinquency proportions
 # - Creating an aggregated dataset with which to fuse to the full dataset
@@ -45,6 +47,7 @@ colnames(dat_g0_Delinq_Aggr) <- c("Date", "g0_Delinq_0_Aggr_Prop", "g0_Delinq_1_
 # [SANITY CHECK] Check for illogical variables
 cat( (!any(is.na(dat_g0_Delinq_Aggr[,-1]))) %?% "SAFE: No missingness, aggregated variables created successfully.\n" %:%
        "WARNING: Excessive missingness detected in the aggregated variables.\n")
+
 
 
 # --- Feature engineering: Lagging aggregate delinquency variables
@@ -81,6 +84,8 @@ cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fu
        "WARNING: Missingness in certain aggregated delinquency fields detected, fusion compromised.\n")
 # - Clean up
 rm(ColNames, lags, dat_g0_Check1, dat_g0_Delinq_Aggr, list_merge_variables, results_missingness); gc()
+
+
 
 # --- Feature engineering: Lagging aggregate interest rate margin variable
 # - Distributional analysis
@@ -135,7 +140,9 @@ cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fu
 # - Clean up
 rm(dat_IRM_Aggr, dat_IRM_Aggr_Check1, list_merge_variables, results_missingness, output, lags, ColNames)
 
-# --- Feature engineering: Lagging aggregate new loans variable
+
+
+# --- Feature engineering: Lagging aggregate new advances (as a proportion of the existing book balance) variable
 # - Creating an aggregated dataset
 dat_NewLoans_Aggr <- datCredit_smp[, list(NewLoans_Aggr_Prop_Bal = sum(ifelse(Age_Adj==1,Balance,0), na.rm=T)/sum(Balance, na.rm=T)), by=list(Date)]
 # - Applying various lags
@@ -168,6 +175,8 @@ cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fu
 # - Clean up
 rm(dat_NewLoans_Aggr, datNewLoans_Aggr_Check1, list_merge_variables, results_missingness, output, lags, ColNames)
 
+
+
 # --- Applying a resampling scheme
 # - Parameters
 stratifiers <- c("DefaultStatus1_lead_12_max", "Date") # Must at least include target variable used in graphing event rate
@@ -184,6 +193,10 @@ set.seed(1)
 datCredit_train <- datCredit_smp %>% group_by(across(all_of(stratifiers))) %>% slice_sample(prop=train_prop) %>% as.data.table()
 datCredit_valid <- subset(datCredit_smp, !(Ind %in% datCredit_train$Ind)) %>% as.data.table(); datCredit_train[,Ind:=NULL]; datCredit_valid[,Ind:=NULL]
 
+# - Filter only for non-defaulted cases since the lead default indicators are already fused
+datCredit_train<-datCredit_train[DefaultStatus1==0,]
+datCredit_valid<-datCredit_valid[DefaultStatus1==0,]
+
 # --- Clean up
 rm(datCredit_smp)
 
@@ -191,11 +204,9 @@ rm(datCredit_smp)
 
 
 # ------ 2. Delinquency aggregation techniques
-# ---- 2.1 "Any delinquency" aggregated variable
-# --- All column names of training dataset
-datCredit_train<-datCredit_train[DefaultStatus1==0,]
-datCredit_valid<-datCredit_valid[DefaultStatus1==0,]
 
+# ---- 2.1 "Any delinquency" aggregated variable
+# - Select relevant columns
 ColNames <- colnames(datCredit_train); ColNames <- ColNames[which(grepl("g0_Delinq_",ColNames))]
 
 # --- Full model
@@ -213,6 +224,7 @@ varImport_logit(logitMod_g0_Any1, method="stdCoef_Goodman", sig_level=0.1, impPl
 datCredit_valid[, prob_g0_Any1 := predict(logitMod_g0_Any1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_Any1)
 ### RESULTS: AUC = 57.97%
+
 
 # --- Best subset selection
 # - Conducting the best subset procedure
@@ -249,16 +261,18 @@ varImport_logit(logitMod_g0_Any2, method="stdCoef_Goodman", sig_level=0.1, impPl
 datCredit_valid[, prob_g0_Any2 := predict(logitMod_g0_Any2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_Any2)
 ### RESULTS:    57.99%
-### CONCLUSION: The model with the top 3 variables from the best subset selection performs as well as the best subset selection.
+### CONCLUSION: The model with the top 3 variables from the best subset selection performs as well as the reduced model
 ###             Use the top three variables in this theme.
+
 
 # --- Clean up
 rm(logitMod_g0_Any1, logitMod_g0_Any2, logitMod_g0_Any_best, form_g0_Any1, form_g0_Any2, inputs_g0_Any1, inputs_g0_Any2, ColNames)
 datCredit_valid[, `:=` (prob_g0_Any1=NULL, prob_g0_best=NULL, prob_g0_Any2=NULL)]
 
 
+
 # ---- 2.2 Factorised aggregated delinquency variables
-# --- All column names of training dataset
+# - Select relevant columns
 ColNames <- colnames(datCredit_train)
 
 # --- Full model
@@ -276,6 +290,7 @@ varImport_logit(logitMod_g0_Fac1, method="stdCoef_Goodman", sig_level=0.1, impPl
 datCredit_valid[, prob_g0_Fac1 := predict(logitMod_g0_Fac1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_Fac1)
 ### RESULTS: 57.96%
+
 
 # --- Best subset selection
 # - Conducting the best subset procedure
@@ -302,8 +317,10 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_Fac_best
 
 
 
-# ------ 3. Interest rate margin variable
+# ------ 3. Interest rate margin variable: varying techniques of imputation, aggregation, and
+
 # ---- 3.1 Mean vs median imputation
+
 # --- Mean imputation
 # - Fit the model
 logitMod_IRM_imputation_mean <- glm(DefaultStatus1_lead_12_max ~ InterestRate_Margin_imputed_mean, data=datCredit_train, family="binomial")
@@ -314,6 +331,7 @@ summary(logitMod_IRM_imputation_mean)
 datCredit_valid[, prob_IRM_imputation_mean:= predict(logitMod_IRM_imputation_mean, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM_imputation_mean)
 ## RESULTS: 57.22%
+
 
 # --- Median imputation
 # - Fit the model
@@ -328,15 +346,19 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM_imputat
 ### RESULTS:    The AUC value of the two models is exactly the same.
 ### CONCLUSION: Use either technique of imputation.
 
+
 # --- Clean up
 rm(logitMod_IRM_imputation_mean, logitMod_IRM_imputation_med)
 datCredit_valid[, `:=` (prob_IRM_imputation_mean=NULL, prob_IRM_imputation_med=NULL)]
 
 
+
 # ---- 3.2 Mean vs median aggregation
-# ---- Mean aggregated variable
-# --- All column names of training dataset
+
+# ---- Mean-aggregated variable
+# - Select relevant columns
 ColNames <- colnames(datCredit_train); ColNames <- ColNames[which(grepl("InterestRate_Margin_mean_Aggr_mean",ColNames))]
+
 
 # --- Full model
 inputs_IRM1 <- ColNames
@@ -347,11 +369,13 @@ logitMod_IRM1 <- glm(form_IRM1, data=datCredit_train, family="binomial")
 summary(logitMod_IRM1)
 ### RESULTS: Null deviance = 279124; Residual deviance = 276774; AIC = 276794
 # - Variable importance
-(varImport_logitMod_IRM1 <- varImport_logit(logitMod_IRM1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)) # Top 3 variables: [InterestRate_Margin_mean_Aggr_mean], [InterestRate_Margin_mean_Aggr_mean_12], and [InterestRate_Margin_mean_Aggr_mean_9]
+(varImport_logitMod_IRM1 <- varImport_logit(logitMod_IRM1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T)) 
+### RESULTS: Top 3 variables: [InterestRate_Margin_mean_Aggr_mean], [InterestRate_Margin_mean_Aggr_mean_12], and [InterestRate_Margin_mean_Aggr_mean_9]
 # - ROC analysis
 datCredit_valid[, prob_IRM1:= predict(logitMod_IRM1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM1)
 ### RESULTS: 56.95%
+
 
 # --- Best subset selection
 # - Conducting the best subset procedure
@@ -368,17 +392,22 @@ summary(logitMod_IRM_best)
 datCredit_valid[, prob_IRM_best := predict(logitMod_IRM_best, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM_best)
 ### RESULTS: 56.94%
-### RESULTS:    The final set of variables are [InterestRate_Margin_imputed_Aggr_mean_12], [InterestRate_Margin_imputed_Aggr_mean], [InterestRate_Margin_imputed_Aggr_mean_9], [InterestRate_Margin_imputed_Aggr_mean_5], [InterestRate_Margin_imputed_Aggr_mean_1], and [InterestRate_Margin_imputed_Aggr_mean_2]
+### RESULTS:    The final set of variables are [InterestRate_Margin_imputed_Aggr_mean_12], [InterestRate_Margin_imputed_Aggr_mean], 
+#                 [InterestRate_Margin_imputed_Aggr_mean_9], [InterestRate_Margin_imputed_Aggr_mean_5], 
+#                 [InterestRate_Margin_imputed_Aggr_mean_1], and [InterestRate_Margin_imputed_Aggr_mean_2]
 ###             All coefficient estimates and the associated standard errors are very large.
+
 
 # --- Clean up
 rm(ColNames, logitMod_IRM1, logitMod_IRM_best, inputs_IRM1, form_IRM1, varImport_logitMod_IRM1, varImport_logitMod_IRM_best)
 datCredit_valid[, `:=` (prob_IRM1=NULL, prob_IRM_best=NULL)]
 
 
+
 # ---- 3.3 Lags for chosen aggregated variable (chosen as the median)
-# --- All column names of training dataset
+# - Select relevant columns
 ColNames <- colnames(datCredit_train); ColNames <- ColNames[which(grepl("InterestRate_Margin_mean_Aggr_med",ColNames))]
+
 
 # --- Full model
 inputs_IRM2 <- ColNames
@@ -396,6 +425,7 @@ datCredit_valid[, prob_IRM2:= predict(logitMod_IRM2, newdata = datCredit_valid, 
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM2)
 ### RESULTS: 57.34%
 
+
 # --- Best subset selection3
 # - Conducting the best subset procedure
 logitMod_IRM_best <- MASS::stepAIC(logitMod_IRM2, direction="both")
@@ -411,10 +441,12 @@ summary(logitMod_IRM_best)
 datCredit_valid[, prob_IRM_best := predict(logitMod_IRM_best, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM_best)
 ### RESULTS:    57.34%
-### RESULTS:    The final set of variables are [InterestRate_Margin_mean_Aggr_med], [InterestRate_Margin_mean_Aggr_med_1], [InterestRate_Margin_mean_Aggr_med_9], [InterestRate_Margin_mean_Aggr_med_12], [InterestRate_Margin_mean_Aggr_med_6],
-###                                            [InterestRate_Margin_mean_Aggr_med_2], and [InterestRate_Margin_mean_Aggr_med_5]
+### RESULTS:    The final set of variables are [InterestRate_Margin_mean_Aggr_med], [InterestRate_Margin_mean_Aggr_med_1], 
+###           [InterestRate_Margin_mean_Aggr_med_9], [InterestRate_Margin_mean_Aggr_med_12], [InterestRate_Margin_mean_Aggr_med_6],
+###           [InterestRate_Margin_mean_Aggr_med_2], and [InterestRate_Margin_mean_Aggr_med_5]
 ###             All coefficient estimates and the associated standard errors are very large.
 ### Conclusion: Median aggregation results in a superior model (AUC of 56.94% vs 57.34%).
+
 
 # --- Reduced model
 inputs_IRM3 <- c("InterestRate_Margin_mean_Aggr_med", "InterestRate_Margin_mean_Aggr_med_1", "InterestRate_Margin_mean_Aggr_med_9")
@@ -434,6 +466,7 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_IRM3)
 ### COMPARISON: AUC drops slightly from the best subset model (57.34% vs 57.22%), but is still larger than the mean aggregation model (56.94%).
 ### CONCLUSION: Use the top-three variables: [InterestRate_Margin_mean_Aggr_med_9], [InterestRate_Margin_mean_Aggr_med], and [InterestRate_Margin_mean_Aggr_med_1]
 
+
 # --- Clean up
 rm(ColNames, logitMod_IRM2,logitMod_IRM3, logitMod_IRM_best, inputs_IRM2, inputs_IRM3, form_IRM2, form_IRM3,
    varImport_logitMod_IRM2, varImport_logitMod_IRM_best, varImport_logitMod_IRM3)
@@ -442,11 +475,14 @@ datCredit_valid[, `:=` (prob_IRM2=NULL, prob_IRM_best=NULL, prob_IRM3=NULL)]
 
 
 
-# ------ 4. Aggregated new loans variable
+# ------ 4. Aggregated new loans variable over different lags
+
 # ---- 1. Number weighted aggregation variable
-# --- All column names of training dataset
+# - Select relevant columns
 ColNames <- colnames(datCredit_train); ColNames <- ColNames[which(grepl("NewLoans_Aggr_Prop",ColNames))]
 ColNames <- ColNames[-which(grepl("NewLoans_Aggr_Prop_Bal",ColNames))]
+
+
 # --- Full model
 inputs_NL1 <- ColNames
 form_NL1 <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(inputs_NL1, collapse="+")))
@@ -463,21 +499,24 @@ datCredit_valid[, prob_NL1:= predict(logitMod_NL1, newdata = datCredit_valid, ty
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_NL1)
 ### RESULTS: 54.08%
 
+
 # --- Best subset selection
 # - Conducting the best subset procedure
 logitMod_NL_best <- MASS::stepAIC(logitMod_NL1, direction="both")
 # Start AIC = 278387
 # End AIC = 278385
 # - Deviance and AIC
-### RESULTS:    The final set of variables are [NewLoans_Aggr_Prop_1], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop], [NewLoans_Aggr_Prop_4], [NewLoans_Aggr_Prop_5]
+### RESULTS: The final set of variables are [NewLoans_Aggr_Prop_1], [NewLoans_Aggr_Prop_3], [NewLoans_Aggr_Prop], 
+#             [NewLoans_Aggr_Prop_4], [NewLoans_Aggr_Prop_5]
 
 # --- Clean up
 rm(ColNames, logitMod_NL1, logitMod_NL_best, form_NL1, inputs_NL1)
 datCredit_valid[, `:=` (prob_NL1=NULL)]
 
 
-# ---- 2. Balance weighted aggregation variables
-# --- All column names of training dataset
+
+# ---- 2. Balance-weighted aggregation variables
+# - Select relevant columns
 ColNames <- colnames(datCredit_train); ColNames <- ColNames[which(grepl("NewLoans_Aggr",ColNames))]
 ColNames <- ColNames[which(grepl("NewLoans_Aggr_Prop_Bal",ColNames))]
 
@@ -497,6 +536,7 @@ datCredit_valid[, prob_NL2:= predict(logitMod_NL2, newdata = datCredit_valid, ty
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_NL2)
 ### RESULTS: 55.5%
 
+
 # --- Best subset selection
 # - Conducting the best subset procedure
 logitMod_NL_best <- MASS::stepAIC(logitMod_NL2, direction="both")
@@ -512,7 +552,9 @@ varImport_logit(logitMod_NL_best, method="stdCoef_Goodman", sig_level=0.1, impPl
 datCredit_valid[, prob_NL_best := predict(logitMod_NL_best, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_NL_best)
 ### RESULTS:    55.5%
-### CONCLUSION: The final set of variables are [NewLoans_Aggr_Prop_Bal_12], [NewLoans_Aggr_Prop_Bal], [NewLoans_Aggr_Prop_Bal_9], [NewLoans_Aggr_Prop_Bal_6], [NewLoans_Aggr_Prop_Bal_2], [NewLoans_Aggr_Prop_Bal_1], and [NewLoans_Aggr_Prop_Bal_4]
+### CONCLUSION: The final set of variables are [NewLoans_Aggr_Prop_Bal_12], [NewLoans_Aggr_Prop_Bal], [NewLoans_Aggr_Prop_Bal_9],
+#               [NewLoans_Aggr_Prop_Bal_6], [NewLoans_Aggr_Prop_Bal_2], [NewLoans_Aggr_Prop_Bal_1], and [NewLoans_Aggr_Prop_Bal_4]
+
 
 # --- Reduced model using most important 3 variables (based on the number weighted aggregated variable)
 inputs_NL3 <- c("NewLoans_Aggr_Prop", "NewLoans_Aggr_Prop_4", "NewLoans_Aggr_Prop_5")
@@ -529,8 +571,10 @@ varImport_logit(logitMod_NL3, method="stdCoef_Goodman", sig_level=0.1, impPlot=T
 datCredit_valid[, prob_NL3:= predict(logitMod_NL3, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_NL3)
 ### RESULTS:    54.03%
-### CONCLUSION: The model with all the selected variables from the best subset selection performs marginally better than the model with only the top three variables form that selection (54.08% vs 54.03%)
-###             Use the top three variables from the number weighted aggregated variables: [NewLoans_Aggr_Prop_5], [NewLoans_Aggr_Prop], and [NewLoans_Aggr_Prop_4]
+### CONCLUSION: The model with all the selected variables from the best subset selection performs marginally better than the model with
+###             only the top three variables form that selection (54.08% vs 54.03%)
+###             Use the top three variables from the number weighted aggregated variables: [NewLoans_Aggr_Prop_5], 
+###             [NewLoans_Aggr_Prop], and [NewLoans_Aggr_Prop_4]
 
 # --- Clean up
 rm(ColNames, logitMod_NL2, logitMod_NL3, logitMod_NL_best, form_NL2, form_NL3, inputs_NL2, inputs_NL3)
@@ -539,10 +583,9 @@ datCredit_valid[, `:=` (prob_NL2=NULL, prob_NL_best=NULL, prob_NL3=NULL)]
 
 
 
-# ------ 5. Loan-level delinquency volatilities/standard deviations
-# --- All column names of training dataset
+# ------ 5. Loan-level delinquency volatilities/standard deviations over different window lengths
+# - Select relevant columns
 ColNames <- colnames(datCredit_train); ColNames <- ColNames[which(grepl("g0_Delinq_SD_",ColNames) & !grepl("PerfSpell_",ColNames))]
-### NOTE: Exclude [g0_Delinq_SD] as this variable computes the volatility/standard deviation over the laon's entire history
 
 # --- Full model
 inputs_g0_SD1 <- ColNames
@@ -557,6 +600,7 @@ varImport_logit(logitMod_g0_SD1, method="stdCoef_Goodman", sig_level=0.1, impPlo
 datCredit_valid[, prob_g0_SD1 := predict(logitMod_g0_SD1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_SD1) # 79.87%
 
+
 # --- Best subset selection
 # - Conducting the best subset procedure
 logitMod_g0_SD_best <- MASS::stepAIC(logitMod_g0_SD1, direction="both")
@@ -565,11 +609,13 @@ logitMod_g0_SD_best <- MASS::stepAIC(logitMod_g0_SD1, direction="both")
 # - Deviance and AIC
 summary(logitMod_g0_SD_best) # Null deviance = 279124; Residual deviance = 225149; AIC = 225161
 # - Variable importance
-varImport_logit(logitMod_g0_SD_best, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) # Top 3 variables: [g0_Delinq_SD_12], [g0_Delinq_SD_4], and [g0_Delinq_SD_6]
+varImport_logit(logitMod_g0_SD_best, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) 
+### RESULTS: Top 3 variables: [g0_Delinq_SD_12], [g0_Delinq_SD_4], and [g0_Delinq_SD_6]
 # - ROC analysis
 datCredit_valid[, prob_g0_best := predict(logitMod_g0_SD_best, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_best) # 79.87%
 ### RESULTS:  The final set of variables are [g0_Delinq_SD_12], [g0_Delinq_SD_4], [g0_Delinq_SD_6], [g0_Delinq_SD_9], and [g0_Delinq_SD_5]
+
 
 # --- Refitting the logit model by keeping only the top 3 variables
 inputs_g0_SD2 <- c("g0_Delinq_SD_12", "g0_Delinq_SD_4", "g0_Delinq_SD_6")
@@ -579,40 +625,48 @@ logitMod_g0_SD2 <- glm(form_g0_SD2, data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_g0_SD2) # Null deviance = 279124; Residual deviance = 225247; AIC = 225255
 # - Variable importance
-varImport_logit(logitMod_g0_SD2, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) # Top 3 variables: [g0_Delinq_SD_12], [g0_Delinq_SD_4], and [g0_Delinq_SD_6]
+varImport_logit(logitMod_g0_SD2, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) 
+### RESULTS: Top 3 variables: [g0_Delinq_SD_12], [g0_Delinq_SD_4], and [g0_Delinq_SD_6]
 # - ROC analysis
 datCredit_valid[, prob_g0_SD2 := predict(logitMod_g0_SD2, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_SD2) # 79.83%
-### CONCLUSION: Use [g0_Delinq_SD_12], [g0_Delinq_SD_4], and [g0_Delinq_SD_6] given model parsimony and predictive performance
+### CONCLUSION: Use [g0_Delinq_SD_12], [g0_Delinq_SD_4], and [g0_Delinq_SD_6] given model parsimony and 
+#               marginal drop in predictive performance
+
 
 # --- Clean up
 rm(logitMod_g0_SD1, logitMod_g0_SD2, logitMod_g0_SD_best, form_g0_SD1, form_g0_SD2, inputs_g0_SD1, inputs_g0_SD2, ColNames)
 datCredit_valid[, `:=` (prob_g0_SD1=NULL, prob_g0_best=NULL, prob_g0_SD2=NULL)]
 
-# - Load datasets which has the default rate variables
+
+
+
+# ------ 6. Portfolio-level default rates and lags
+
+# --- Preliminaries
+# - Load previously resampled datasets since they already contain the relevant and previously-engineered variables for testing purposes
 rm(datCredit_train,datCredit_valid)
 if (!exists('datCredit_train')) unpack.ffdf(paste0(genPath,"creditdata_train"), tempPath)
 if (!exists('datCredit_valid')) unpack.ffdf(paste0(genPath,"creditdata_valid"), tempPath)
-
-# - Subset to exclude default spells
+# - Filter only for non-defaulted cases since the lead default indicators are already fused
 datCredit_train <- datCredit_train %>% subset(DefaultStatus1==0)
 datCredit_valid <- datCredit_valid %>% subset(DefaultStatus1==0)
-
-# ------ 6. Portfolio level default rates
-# --- All column names of training dataset
+# - Select relevant columns
 ColNames <- colnames(datCredit_train); ColNames <- ColNames[which(grepl("DefaultStatus1_Aggr_Prop",ColNames))]
+
 
 # --- Full model
 form_Def_Rate <- as.formula(paste("DefaultStatus1_lead_12_max~", paste(ColNames, collapse="+")))
-
 logitMod_FULL <- glm(form_Def_Rate, data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_FULL) # Null deviance = 279124; Residual deviance = 277061; AIC = 277081
 # - Variable importance
-varImport_logit(logitMod_FULL, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) # Top 3 variables: [DefaultStatus1_Aggr_Prop], [DefaultStatus1_Aggr_Prop_Lag_9], and [DefaultStatus1_Aggr_Prop_Lag_1]
+varImport_logit(logitMod_FULL, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) 
+### RESULTS: Top 3 variables: [DefaultStatus1_Aggr_Prop], [DefaultStatus1_Aggr_Prop_Lag_9], and [DefaultStatus1_Aggr_Prop_Lag_1]
 # - ROC analysis
 datCredit_valid[, prob_DefRte := predict(logitMod_FULL, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_DefRte) # 56.42%
+
 
 # --- Best subset selection
 # - Conducting the best subset procedure
@@ -622,10 +676,12 @@ logitMod_FULL_Best <- MASS::stepAIC(logitMod_FULL, direction="both")
 # - Deviance and AIC
 summary(logitMod_FULL_Best) # Null deviance = 279124; Residual deviance = 277062; AIC = 277074
 # - Variable importance
-varImport_logit(logitMod_FULL_Best, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) # Top 3 variables: [DefaultStatus1_Aggr_Prop], [DefaultStatus1_Aggr_Prop_Lag_1], and [DefaultStatus1_Aggr_Prop_Lag_9]
+varImport_logit(logitMod_FULL_Best, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) #
+## RESULTS: Top 3 variables: [DefaultStatus1_Aggr_Prop], [DefaultStatus1_Aggr_Prop_Lag_1], and [DefaultStatus1_Aggr_Prop_Lag_9]
 # - ROC analysis
 datCredit_valid[, prob_DR_best := predict(logitMod_FULL_Best, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_DR_best) # 56.44%
+
 
 # --- Refitting the logit model by keeping only the top 3 variables
 inputs_reduced <- c("DefaultStatus1_Aggr_Prop", "DefaultStatus1_Aggr_Prop_Lag_1", "DefaultStatus1_Aggr_Prop_Lag_9")
@@ -639,4 +695,4 @@ varImport_logit(logitMod_red, method="stdCoef_Goodman", sig_level=0.1, impPlot=T
 # - ROC analysis
 datCredit_valid[, prob_red := predict(logitMod_red, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_red) # 56.4%
-### CONCLUSION: Reduced model is prefered, given predictive performance and model parsimony
+### CONCLUSION: Reduced model is preferred, given predictive performance and model parsimony

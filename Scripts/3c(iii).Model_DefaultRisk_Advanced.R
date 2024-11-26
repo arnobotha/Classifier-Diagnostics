@@ -59,7 +59,7 @@ cor_thresh <- 0.6
 # - Computing the correlation matrix
 cor_del_spear <-cor(x=datCredit_train[!is.na(g0_Delinq_SD_6),list(PrevDefaults=as.numeric(PrevDefaults), TimeInPerfSpell,
                                                                   g0_Delinq_Num, g0_Delinq_SD_4, g0_Delinq_SD_6,
-                                                                  PerfSpell_g0_Delinq_Num, # PerfSpell_g0_Delinq_SD is excluded since it is forward looking (it uses all information in a performance spell...predictions made before the end of that spell are thus using information of the future)
+                                                                  PerfSpell_g0_Delinq_Num,
                                                                   slc_acct_roll_ever_24_imputed_mean, slc_past_due_amt_imputed_med)], # slc_acct_arr_dir_3 excluded since it is a categorical variable
                     method = "spearman")
 # - Creating a correlalogram
