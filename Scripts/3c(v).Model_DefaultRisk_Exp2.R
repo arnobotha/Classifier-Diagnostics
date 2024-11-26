@@ -597,7 +597,8 @@ logitMod_g0_SD1 <- glm(form_g0_SD1, data=datCredit_train, family="binomial")
 # - Deviance and AIC
 summary(logitMod_g0_SD1) # Null deviance = 279124; Residual deviance = 225149; AIC = 225161
 # - Variable importance
-varImport_logit(logitMod_g0_SD1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) # Top 3 variables: [g0_Delinq_SD_12], [g0_Delinq_SD_4], and [g0_Delinq_SD_6]
+varImport_logit(logitMod_g0_SD1, method="stdCoef_Goodman", sig_level=0.1, impPlot=T) 
+### RESULTS: Top 3 variables: [g0_Delinq_SD_12], [g0_Delinq_SD_4], and [g0_Delinq_SD_6]
 # - ROC analysis
 datCredit_valid[, prob_g0_SD1 := predict(logitMod_g0_SD1, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_SD1) # 79.87%
@@ -616,7 +617,8 @@ varImport_logit(logitMod_g0_SD_best, method="stdCoef_Goodman", sig_level=0.1, im
 # - ROC analysis
 datCredit_valid[, prob_g0_best := predict(logitMod_g0_SD_best, newdata = datCredit_valid, type="response")]
 auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_best) # 79.87%
-### RESULTS:  The final set of variables are [g0_Delinq_SD_12], [g0_Delinq_SD_4], [g0_Delinq_SD_6], [g0_Delinq_SD_9], and [g0_Delinq_SD_5]
+### RESULTS:  The final set of variables are [g0_Delinq_SD_12], [g0_Delinq_SD_4], 
+#    [g0_Delinq_SD_6], [g0_Delinq_SD_9], and [g0_Delinq_SD_5]
 
 
 # --- Refitting the logit model by keeping only the top 3 variables
@@ -637,16 +639,18 @@ auc(datCredit_valid$DefaultStatus1_lead_12_max, datCredit_valid$prob_g0_SD2) # 7
 
 
 # --- Clean up
-rm(logitMod_g0_SD1, logitMod_g0_SD2, logitMod_g0_SD_best, form_g0_SD1, form_g0_SD2, inputs_g0_SD1, inputs_g0_SD2, ColNames)
+rm(logitMod_g0_SD1, logitMod_g0_SD2, logitMod_g0_SD_best, form_g0_SD1, form_g0_SD2, inputs_g0_SD1, 
+   inputs_g0_SD2, ColNames)
 datCredit_valid[, `:=` (prob_g0_SD1=NULL, prob_g0_best=NULL, prob_g0_SD2=NULL)]
 
 
 
 
-# ------ 6. Portfolio-level default rates and lags
+# ------ 6. Portfolio-level default rates over different lags
 
 # --- Preliminaries
-# - Load previously resampled datasets since they already contain the relevant and previously-engineered variables for testing purposes
+# - Load previously resampled datasets since they already contain the relevant and previously-engineered 
+# variables for testing purposes
 rm(datCredit_train,datCredit_valid)
 if (!exists('datCredit_train')) unpack.ffdf(paste0(genPath,"creditdata_train"), tempPath)
 if (!exists('datCredit_valid')) unpack.ffdf(paste0(genPath,"creditdata_valid"), tempPath)
