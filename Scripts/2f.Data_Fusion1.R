@@ -201,12 +201,12 @@ describe(datCredit_real$g0_Delinq_Num)
 SD_LoanLevel<-datCredit_real[,list(SD_Loans=sd(g0_Delinq,na.rm=TRUE)),by=list(LoanID)] # Create standard deviation variable for each loan account
 SD_Overall<-mean(SD_LoanLevel[,SD_Loans],na.rm=TRUE) # Obtain mean SD over loan accounts for imputation of NA's at the beginning of each loan's history
 
-# frollapply function lags the variable across some fixed window
-datCredit_real[, g0_Delinq_SD_12 := frollapply(g0_Delinq, n=12, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]
-datCredit_real[, g0_Delinq_SD_9 := frollapply(g0_Delinq, n=9, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]
-datCredit_real[, g0_Delinq_SD_6 := frollapply(g0_Delinq, n=6, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]
-datCredit_real[, g0_Delinq_SD_5 := frollapply(g0_Delinq, n=5, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]
-datCredit_real[, g0_Delinq_SD_4 := frollapply(g0_Delinq, n=4, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]
+# frollapply function lags the variable across some fixed window. Wait a bit after each execution to protect against memory overflow
+datCredit_real[, g0_Delinq_SD_12 := frollapply(g0_Delinq, n=12, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]; Sys.sleep(0.5)
+datCredit_real[, g0_Delinq_SD_9 := frollapply(g0_Delinq, n=9, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]; Sys.sleep(0.5)
+datCredit_real[, g0_Delinq_SD_6 := frollapply(g0_Delinq, n=6, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]; Sys.sleep(0.5)
+datCredit_real[, g0_Delinq_SD_5 := frollapply(g0_Delinq, n=5, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]; Sys.sleep(0.5)
+datCredit_real[, g0_Delinq_SD_4 := frollapply(g0_Delinq, n=4, FUN=sd, align="right",fill=SD_Overall), by=list(LoanID)]; Sys.sleep(0.5)
 
 # [SANITY CHECK] Check for missingness in engineered variables
 cat((anyNA(datCredit_real[,g0_Delinq_SD_12]) | anyNA(datCredit_real[,g0_Delinq_SD_9]) | anyNA(datCredit_real[,g0_Delinq_SD_6])
@@ -247,7 +247,7 @@ port.aggr <- datCredit_real[, list(DefaultStatus1_Aggr_Prop = sum(DefaultStatus1
 # Quick plot for visual inspection
 plot(port.aggr[,1],as.matrix(port.aggr[,2]),type="l",xlab="Date", ylab="Probability", main="Default incidence rate")
 # Merge default incidence to credit dataset by date
-datCredit_real <- merge(datCredit_real, port.aggr, by="Date", all.x=T)
+datCredit_real <- merge(datCredit_real, port.aggr, by="Date", all.x=T); Sys.sleep(0.5)
 # [Sanity Check] Check for any missingness in the DefaultStatus1_Aggr_Prop variable
 cat(anyNA(datCredit_real[,DefaultStatus1_Aggr_Prop]) %?% "WARNING: Missingness detected in the DefaultStatus1_Aggr_Prop variable. \n" %:%
       "SAFE: No Missingness detected in the DefaultStatus1_Aggr_Prop variable. \n")
