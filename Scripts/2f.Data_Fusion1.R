@@ -282,7 +282,7 @@ for (i in 1:length(list_merge_variables)){
 }
 cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fusion with aggregated data is successful.\n" %:%
        "WARNING: Missingness in certain aggregated fields detected, fusion compromised.\n")
-describe(datCredit_real$NewLoans_Aggr_Prop); plot(unique(datCredit_real$NewLoans_Aggr_Prop), type="b")
+#describe(datCredit_real$NewLoans_Aggr_Prop); #plot(unique(datCredit_real$NewLoans_Aggr_Prop), type="b")
 ### RESULTS: Variable has mean of 0.008 vs median of 0.007,
 # bounded by [0.003, 0.014] for 5%-95% percentiles; no major outliers
 
