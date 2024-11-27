@@ -120,8 +120,7 @@ datCredit_real <- subset(datCredit_real,
                                      # The following fields are intermediary ones and/or are (should) never used analytically 
                                      # or predictively within the current project's context
                                      PerfSpell_TimeEnd, Account_Censored, ZeroBal_Start, NCA_CODE, STAT_CDE, LN_TPE,
-                                     CLS_STAMP, WriteOff_Amt, EarlySettle_Amt, 
-                                     Curing_Ind, BOND_IND, Undrawn_Amt,
+                                     CLS_STAMP, WriteOff_Amt, EarlySettle_Amt, Curing_Ind, BOND_IND, Undrawn_Amt,
                                      # The following are needless account-level flags
                                      HasRepaid, HasLeftTruncDefSpell, HasLeftTruncPerfSpell, HasTrailingZeroBalances,
                                      HasWOff, HasClosure, HasSettle, HasFurtherLoan, HasRedraw,
