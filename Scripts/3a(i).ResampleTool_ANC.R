@@ -61,13 +61,13 @@ train_prop <- 0.7 # sampling fraction for resampling scheme
 smp_perc <- smp_size/datCredit[, .N] # Implied sampling fraction for downsampling step
 
 # - Downsample data into a set with a fixed size (using stratified sampling) before implementing resampling scheme
-set.seed(1)
+set.seed(1, kind="Mersenne-Twister")
 datCredit_smp <- datCredit %>% group_by(across(all_of(stratifiers))) %>% slice_sample(prop=smp_perc) %>% as.data.table()
 #datCredit_smp <- datCredit %>% group_by(DefaultStatus1_lead_12_max, Date) %>% slice_sample(prop=train_prop) %>% as.data.table() # should yield same
 datCredit_smp[, Ind := 1:.N] # prepare for resampling scheme
 
 # - Implement resampling scheme using given main sampling fraction
-set.seed(1)
+set.seed(1, kind="Mersenne-Twister")
 datCredit_train <- datCredit_smp %>% group_by(across(all_of(stratifiers))) %>% slice_sample(prop=train_prop) %>% as.data.table()
 #datCredit_train <- datCredit_smp %>% group_by(DefaultStatus1_lead_12_max, Date) %>% slice_sample(prop=train_prop) %>% as.data.table() # should yield same
 datCredit_valid <- subset(datCredit_smp, !(Ind %in% datCredit_train$Ind)) %>% as.data.table()
