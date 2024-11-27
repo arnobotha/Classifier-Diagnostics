@@ -15,6 +15,7 @@
 #       itself used in tracking influence of exclusions
 #   3b) Engineers a few basic features that require entire loan histories, given
 #       the intended (non-clustered) subsampling scheme in script 3-series
+#   4) Embeds a given state space for Markov-type modelling in future
 # ---------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
@@ -110,6 +111,8 @@ datCredit_real <- subset(datCredit_real,
                          select = -c(Age, AccountStatus, DelinqState_g0, 
                                      # The following fields are kept simply for diagnostic purposes (script 2g)
                                      #DefaultStatus1, DefSpell_Num, TimeInDefSpell, TreatmentID, 
+                                     # The following fields are kept for Markov-type modelling
+                                     #WOff_Ind, EarlySettle_Ind, Repaid_Ind
                                      # The following fields are related to default spells (LGD-modelling)
                                      DefSpell_LeftTrunc, DefSpell_Event, DefSpell_Censored,
                                      DefSpellResol_TimeEnd, DefSpell_Age, DefSpellResol_Type_Hist,
@@ -117,14 +120,14 @@ datCredit_real <- subset(datCredit_real,
                                      # The following fields are intermediary ones and/or are (should) never used analytically 
                                      # or predictively within the current project's context
                                      PerfSpell_TimeEnd, Account_Censored, ZeroBal_Start, NCA_CODE, STAT_CDE, LN_TPE,
-                                     CLS_STAMP, WOff_Ind, WriteOff_Amt, EarlySettle_Ind, EarlySettle_Amt, 
+                                     CLS_STAMP, WriteOff_Amt, EarlySettle_Amt, 
                                      Curing_Ind, BOND_IND, Undrawn_Amt,
                                      # The following are needless account-level flags
                                      HasRepaid, HasLeftTruncDefSpell, HasLeftTruncPerfSpell, HasTrailingZeroBalances,
                                      HasWOff, HasClosure, HasSettle, HasFurtherLoan, HasRedraw,
                                      # The following do not typically add any predictive value, whilst their creation in the 
                                      # underlying SAS-based DataFeed is in itself suspicious
-                                     FurtherLoan_Amt, FurtherLoan_Ind, Redraw_Ind, Redrawn_Amt, Repaid_Ind,
+                                     FurtherLoan_Amt, FurtherLoan_Ind, Redraw_Ind, Redrawn_Amt,
                                      # The following are suspicious fields or originate from other suspicious fields
                                      ReceiptPV, LossRate_Real, slc_past_due_amt
                                      )); gc()
@@ -152,7 +155,7 @@ rm(datMV); gc()
 
 
 
-# ------- 3. Feature Engineering that needs entire loan- and spell histories
+# ------- 3. Feature Engineering that requires entire loan- and spell histories
 
 # --- Create preliminary target/outcome variables for stated modelling objective
 # NOTE: This particular field is instrumental to designing the subsampling & resampling scheme,
@@ -295,7 +298,19 @@ cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fu
 
 
 
-# ------ 4. General cleanup & checks
+# ------ 4. Enforce a given state space for Markov-type modelling
+# - Create [Status] as the State in which the loan resides at any given point of its history
+# Performing = "Perf"; Default = "Def"; Settlement = "Set"; Write-Off = "W_Off"
+datCredit_real[,MarkovStatus := case_when(EarlySettle_Ind==1 | Repaid_Ind==1 ~ "Set",
+                                          WOff_Ind==1 ~ "W_Off",DefaultStatus1==1 ~ "Def",.default = "Perf")]
+
+# - Lead the [Status] by 1 period, thereby observing the future 1-period state of each loan
+datCredit_real[,MarkovStatus_Future:=shift(x=Status,n=1,type="lead",fill="NA"),by=LoanID]
+
+
+
+
+# ------ 5. General cleanup & checks
 
 # - remove intermediary fields, as a memory enhancement
 datCredit_real[, g0_Delinq_Shift := NULL]
