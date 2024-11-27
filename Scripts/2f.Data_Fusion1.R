@@ -312,8 +312,9 @@ datCredit_real[,MarkovStatus_Future:=shift(x=Status,n=1,type="lead",fill="NA"),b
 
 # ------ 5. General cleanup & checks
 
-# - remove intermediary fields, as a memory enhancement
-datCredit_real[, g0_Delinq_Shift := NULL]
+# - remove intermediary and redundant fields
+datCredit_real <- subset(datCredit_real, 
+                         select = -c(WOff_Ind, EarlySettle_Ind, Repaid_Ind, g0_Delinq_Shift)); gc()
 
 # - Clean-up
 rm(list_merge_variables, results_missingness, port.aggr, dat_NewLoans_Aggr)
