@@ -2,7 +2,7 @@
 # Subsampling and resampling data prior to fusing the input space towards PD-modelling
 # ------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Esmerelda Oberholzer, Marcel Muller, Roland Breedt
+# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller, Roland Breedt
 
 # DESCRIPTION:
 # This script performs the following high-level tasks:
@@ -196,30 +196,11 @@ suppressWarnings( datCredit_smp[, `:=`(value_ind_slc_days_excess = NULL, slc_day
 
 
 
-# --- 2. Basic statistics of each variable
-# - Categorical variables
-varList_Cat <- c('slc_pmnt_method','slc_acct_arr_dir_3',
-                 'g0_Delinq','DefaultStatus1', 'DefaultStatus1_lead_12_max',
-                 'PerfSpellResol_Type_Hist','HasLeftTruncPerfSpell',
-                 'DefSpellResol_Type_Hist','HasLeftTruncDefSpell',
-                 'Event_Type')
-var_Info_Cat <- describe(subset(datCredit_smp, select = varList_Cat))
-
-# - Numeric variables
-varList_Num <- c('slc_past_due_amt','slc_acct_pre_lim_perc','slc_acct_prepaid_perc_dir_12','slc_acct_roll_ever_24',
-                 'Age_Adj', 'PerfSpell_Num','Term','InterestRate_Nom','InterestRate_Margin','Principal','Instalment','Receipt_Inf','Arrears',
-                 'Balance','TimeInPerfSpell','PerfSpell_Age', 'PerfSpell_Counter',
-                 'TimeInDefSpell', 'DefSpell_Age', 'DefSpell_Counter',
-                 'Event_Time', 'g0_Delinq_Num', 'NewLoans_Aggr_Prop')
-var_Info_Num <- describe(subset(datCredit_smp, select = varList_Num))
-
-
-
 # --- 3. Missing value treatment (categorical variables)
 # Treatment: create "missing"-bin for all N/A values
 
 # - Payment method
-var_Info_Cat$slc_pmnt_method
+describe(datCredit_smp$slc_pmnt_method)
 # Merge with existing "Unknown" bin or empty values
 datCredit_smp[, slc_pmnt_method := 
                 ifelse(is.na(slc_pmnt_method) | slc_pmnt_method == "" | slc_pmnt_method == "Unknown",
@@ -228,11 +209,10 @@ datCredit_smp[, slc_pmnt_method :=
 cat( (sum(datCredit_smp$slc_pmnt_method == "" | is.na(datCredit_smp$slc_pmnt_method) | 
             datCredit_smp$slc_pmnt_method == "Unknown") == 0) %?% 
        'SAFE: Treatment successful for [slc_pmnt_method].\n' %:% 'ERROR: Treatment failed for [slc_pmnt_method] \n' )
-(var_Info_Cat$slc_pmnt_method <- describe(datCredit_smp$slc_pmnt_method))
 ### RESULTS: Treatment for missingness was successful
 
 # - Account-level arrears direction vs three months ago
-var_Info_Cat$slc_acct_arr_dir_3
+describe(datCredit_smp$slc_acct_arr_dir_3)
 # Merge with existing "N/A" bin or empty values
 datCredit_smp[, slc_acct_arr_dir_3 := 
                 ifelse(is.na(slc_acct_arr_dir_3) | slc_acct_arr_dir_3 == "" | slc_acct_arr_dir_3 == "N/A", 
@@ -241,7 +221,6 @@ datCredit_smp[, slc_acct_arr_dir_3 :=
 cat( ( sum(datCredit_smp$slc_acct_arr_dir_3 == "" | is.na(datCredit_smp$slc_acct_arr_dir_3) |
              datCredit_smp$slc_acct_arr_dir_3 == "N/A") == 0) %?% 
        'SAFE: Treatment successful for [slc_acct_arr_dir_3].\n' %:% 'ERROR: Treatment failed for [slc_acct_arr_dir_3] \n' )
-(var_Info_Cat$slc_acct_arr_dir_3 <- describe(datCredit_smp$slc_acct_arr_dir_3))
 ### RESULTS: Treatment for missingness was successful
 
 
@@ -250,7 +229,7 @@ cat( ( sum(datCredit_smp$slc_acct_arr_dir_3 == "" | is.na(datCredit_smp$slc_acct
 # Analyse whether to use mean or median value imputation
 
 # - Prepaid/available funds to limit
-var_Info_Num$slc_acct_pre_lim_perc; hist(datCredit_smp$slc_acct_pre_lim_perc, breaks='FD')
+describe(datCredit_smp$slc_acct_pre_lim_perc); hist(datCredit_smp$slc_acct_pre_lim_perc, breaks='FD')
 datCredit_smp[is.na(slc_acct_pre_lim_perc), .N] / datCredit_smp[,.N] * 100
 ### RESULTS: Highly right-skewed distribution, with mean of ~0.09 vs median of 0,
 # bounded by [0, 0.79] for 5%-95% percentiles; no outliers
@@ -262,12 +241,12 @@ datCredit_smp[, slc_acct_pre_lim_perc_imputed_med :=
 cat( ( datCredit_smp[is.na(slc_acct_pre_lim_perc_imputed_med), .N ] == 0) %?% 
        'SAFE: Treatment successful for [slc_acct_pre_lim_perc_imputed_med].\n' %:% 
        'ERROR: Treatment failed for [slc_acct_pre_lim_perc_imputed_med] \n' )
-(var_Info_Num$slc_acct_pre_lim_perc_imputed_med <- describe(datCredit_smp$slc_acct_pre_lim_perc_imputed_med)); hist(datCredit_smp$slc_acct_pre_lim_perc_imputed_med, breaks='FD')
+describe(datCredit_smp$slc_acct_pre_lim_perc_imputed_med); hist(datCredit_smp$slc_acct_pre_lim_perc_imputed_med, breaks='FD')
 ### RESULTS: Imputation successful, with mean of 0.085 vs median of 0,
 # bounded by [0, 0.73] for 5%-95% percentiles; no outliers
 
 # - Number of times an account was in arrears over last 24 months
-var_Info_Num$slc_acct_roll_ever_24; hist(datCredit_smp$slc_acct_roll_ever_24, breaks='FD')
+describe(datCredit_smp$slc_acct_roll_ever_24); hist(datCredit_smp$slc_acct_roll_ever_24, breaks='FD')
 datCredit_smp[is.na(slc_acct_roll_ever_24), .N] / datCredit_smp[,.N] * 100
 ### RESULTS: Highly right-skewed distribution with mean of 0.4892, though discrete values with 80% of data having 0-value.
 # Use mean imputation, given 8.45% missingness degree, trading off the minor distributional distortion as a result
@@ -278,12 +257,12 @@ datCredit_smp[, slc_acct_roll_ever_24_imputed_mean :=
 cat( ( datCredit_smp[is.na(slc_acct_roll_ever_24_imputed_mean), .N ] == 0) %?% 
        'SAFE: Treatment successful for [slc_acct_roll_ever_24_imputed_mean].\n' %:% 
        'ERROR: Treatment failed for [slc_acct_roll_ever_24_imputed_mean] \n' )
-(var_Info_Num$slc_acct_roll_ever_24_imputed_mean <- describe(datCredit_smp$slc_acct_roll_ever_24_imputed_mean)); hist(datCredit_smp$slc_acct_roll_ever_24_imputed_mean, breaks='FD')
+describe(datCredit_smp$slc_acct_roll_ever_24_imputed_mean); hist(datCredit_smp$slc_acct_roll_ever_24_imputed_mean, breaks='FD')
 ### RESULTS: Imputation successful, categorical variable now has 6 distinct classes, with majority having 0-value, while
-# the imputed cases (value of 0.48) being the second most prevalent.
+# the imputed cases (value of 0.49) being the second most prevalent.
 
 # - Percentage-valued direction of prepaid/available funds - current compared to 12 months ago
-var_Info_Num$slc_acct_prepaid_perc_dir_12; hist(datCredit_smp[slc_acct_prepaid_perc_dir_12<=5, slc_acct_prepaid_perc_dir_12])
+describe(datCredit_smp$slc_acct_prepaid_perc_dir_12); hist(datCredit_smp[slc_acct_prepaid_perc_dir_12<=5, slc_acct_prepaid_perc_dir_12])
 datCredit_smp[is.na(slc_acct_prepaid_perc_dir_12), .N] / datCredit_smp[,.N] * 100
 ### RESULTS: Highly right-skewed distribution, with mean of ~2.26m vs median of 0, 
 # bounded by [0, 3.34] for 5%-95% percentiles; some very large outliers
@@ -301,7 +280,7 @@ describe(datCredit_smp$slc_acct_prepaid_perc_dir_12_imputed_med); hist(datCredit
 # bounded by [0, 2.99] for 5%-95% percentiles; extreme outliers
 
 # - Amount by which the account is overdue at the associated reporting date
-var_Info_Num$slc_past_due_amt; hist(datCredit_smp$slc_past_due_amt, breaks='FD')
+describe(datCredit_smp$slc_past_due_amt); hist(datCredit_smp$slc_past_due_amt, breaks='FD')
 datCredit_smp[is.na(slc_past_due_amt), .N] / datCredit_smp[,.N] * 100
 ### RESULTS: Highly right-skewed distribution, with mean of 2721 vs median of 0, 
 # bounded by [0, 5714] for 5%-95% percentiles; some very large outliers
@@ -314,12 +293,13 @@ datCredit_smp[, slc_past_due_amt_imputed_med :=
 cat( ( datCredit_smp[is.na(slc_past_due_amt_imputed_med), .N] == 0) %?% 
        'SAFE: Treatment successful for [slc_past_due_amt_imputed_med].\n' %:% 
        'ERROR: Treatment failed for [slc_past_due_amt_imputed_med] \n' )
-(var_Info_Num$slc_past_due_amt_imputed_med <- describe(datCredit_smp$slc_past_due_amt_imputed_med)); hist(datCredit_smp$slc_past_due_amt_imputed_med, breaks='FD')
+describe(datCredit_smp$slc_past_due_amt_imputed_med); 
+hist(datCredit_smp$slc_past_due_amt_imputed_med[datCredit_smp$slc_past_due_amt_imputed_med>0], breaks='FD')
 ### RESULTS: Imputation successful, with mean of 2491 vs median of 0,
 # bounded by [0, 4638] for 5%-95% percentiles; extreme outliers
 
 # - InterestRate_Margin (incorporating risk-based pricing info)
-var_Info_Num$InterestRate_Margin; hist(datCredit_smp$InterestRate_Margin, breaks="FD")
+describe(datCredit_smp$InterestRate_Margin); hist(datCredit_smp$InterestRate_Margin, breaks="FD")
 datCredit_smp[is.na(InterestRate_Margin), .N] / datCredit_smp[,.N] * 100
 ### RESULTS: Highly right-skewed distribution (as expected), with mean of -0.007 vs median of -0.008, 
 # bounded by [-0.02, 0.01] for 5%-95% percentiles; some negative outliers distort shape of distribution
@@ -331,7 +311,7 @@ datCredit_smp[, InterestRate_Margin_imputed_mean :=
 cat( ( datCredit_smp[is.na(InterestRate_Margin_imputed_mean), .N] == 0) %?% 
        'SAFE: Treatment successful for [InterestRate_Margin_imputed_mean].\n' %:% 
        'ERROR: Treatment failed for [InterestRate_Margin_imputed_mean] \n' )
-(var_Info_Num$InterestRate_Margin_imputed_mean <- describe(datCredit_smp$InterestRate_Margin_imputed_mean)); hist(datCredit_smp$InterestRate_Margin_imputed_mean, breaks="FD")
+describe(datCredit_smp$InterestRate_Margin_imputed_mean); hist(datCredit_smp$InterestRate_Margin_imputed_mean, breaks="FD")
 ### RESULTS: Imputation successful, with mean of -0.007 vs median of -0.008,
 # bounded by [-0.02, 0.01] for 5%-95% percentiles; some negative outliers distort shape of distribution
 
@@ -345,7 +325,7 @@ datCredit_smp[, AgeToTerm := Age_Adj/Term] # where the loan is in its lifetime
 cat( ( datCredit_smp[is.na(AgeToTerm), .N] == 0) %?% 
        'SAFE: New feature [AgeToTerm] has logical values.\n' %:% 
        'WARNING: New feature [AgeToTerm] has illogical values \n' )
-(var_Info_Num$AgeToTerm <- describe(datCredit_smp$AgeToTerm)); hist(datCredit_smp[AgeToTerm<2, AgeToTerm], breaks='FD')
+describe(datCredit_smp$AgteToTerm); hist(datCredit_smp[AgeToTerm<2, AgeToTerm], breaks='FD')
 ### RESULTS: Highly right-skewed distribution as expected, with mean of 0.37 vs median of 0.29,
 # bounded by [0.03, 0.9] for 5%-95% percentiles; some large outliers (max: 224)
 
@@ -356,7 +336,7 @@ cat( ( datCredit_smp[is.na(BalanceToPrincipal), .N] == 0) %?%
        'SAFE: New feature [BalanceToPrincipal] has logical values.\n' %:% 
        'WARNING: New feature [BalanceToPrincipal] has illogical values \n' )
 # distributional analysis
-(var_Info_Num$BalanceToTerm <- describe(datCredit_smp$BalanceToPrincipal)); hist(datCredit_smp$BalanceToPrincipal, breaks='FD')
+describe(datCredit_smp$BalanceToPrincipal); hist(datCredit_smp$BalanceToPrincipal, breaks='FD')
 ### RESULTS: Highly left-skewed distribution, with mean of 0.7 vs median of 0.85,
 # bounded by [~0, 1] for 5%-95% percentiles; no outliers
 
@@ -372,9 +352,10 @@ datCredit_smp[, pmnt_method_grp :=
 cat((datCredit_smp[is.na(pmnt_method_grp), .N] == 0) %?% 
       'SAFE: New feature [pmnt_method_grp] has logical values.\n' %:% 
       'WARNING: New feature [pmnt_method_grp] has illogical values \n' )
-(var_Info_Cat$pmnt_method_grp <- describe(datCredit_smp$pmnt_method_grp))
+describe(datCredit_smp$pmnt_method_grp)
 ### RESULTS: Bins grouped logically such that each bin now has sufficient observations, with proportions:
 # Debit Order: 67.9%; MISSING_DATA: 9.7%; Salary/Suspense: 7.7%; Statement: 14.8%
+### CONCLUSION: Given the greater utility of this newly-binned
 
 # - Factorised [g0_Delinq] variable
 datCredit_smp[,g0_Delinq_fac := as.factor(g0_Delinq)]

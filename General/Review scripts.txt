@@ -1,4 +1,4 @@
-Ancillary scripts that should follow the improved script 3c(v):
+Ancillary scripts that should follow the improved script 3c(v) after my review:
 - 3c(iv)
 - 3c(vi)
 - 3c(vii)
