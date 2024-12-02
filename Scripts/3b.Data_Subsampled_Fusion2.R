@@ -100,8 +100,8 @@ if (diag.real_subsamp_5a > 0) {
 
 # ------ 2. Subsampling scheme with 2-way stratified random sampling
 
-# - Preliminaries
-smp_perc <- smp_size / ( datCredit_real[complete.cases(mget(stratifiers)), mget(stratifiers)][,.N] ) # Implied sampling fraction for downsampling step
+# - Implied sampling fraction for downsampling step
+smp_perc <- smp_size / ( datCredit_real[complete.cases(mget(stratifiers)), mget(stratifiers)][,.N] )
 
 # - Downsample data into a set with a fixed size (using stratified sampling) before implementing resampling scheme
 set.seed(1, kind="Mersenne-Twister")
@@ -644,11 +644,6 @@ cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fu
 # - Cleanup
 rm(datMV); gc()
 
-
-
-# --- Save "description" objects to disk
-pack.ffdf(paste0(genObjPath, "var_Info_Cat"), var_Info_Cat)
-pack.ffdf(paste0(genObjPath, "var_Info_Num"), var_Info_Num)
 
 # --- Save fused- and enriched subsampled dataset for quick disk-based retrieval later
 pack.ffdf(paste0(genPath, "creditdata_smp"), datCredit_smp); gc()
