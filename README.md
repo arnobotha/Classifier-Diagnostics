@@ -1,7 +1,7 @@
 # Classifier-Diagnostics
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13799785.svg)](https://doi.org/10.5281/zenodo.13799785)
 
- R-codebase for the Modelling-standard titlted "Diagnostics for Binary Classification" (Std-ClassifierDiagnostics), developed using retail mortgage data.
+ R-codebase for the Modelling-standard titled "Diagnostics for Binary Classification" (Std-ClassifierDiagnostics), developed using retail mortgage data.
 
 
 ## Structure
