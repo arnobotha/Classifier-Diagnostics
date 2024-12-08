@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
 # SCRIPT AUTHOR(S): Dr Arno Botha (AB), Marcel Muller (MM), Roland Breedt (RB)
-
+#
 # DESCRIPTION:
 # This script performs the following high-level tasks:
 #   1) Subsample main dataset into a more manageable but still representative dataset
@@ -19,7 +19,7 @@
 #   - 2c.Data_Prepare_Credit_Advanced2.R
 #   - 2d.Data_Enrich.R
 #   - 2f.Data_Fusion1.R
-
+#
 # -- Inputs:
 #   - datCredit_real | Prepared from script 2f.
 #   - creditdata_input1 | Imported input space from script 2a
@@ -34,9 +34,12 @@
 
 
 
-# ------ 1. Preliminaries
+# ------ 1. Preliminaries & Exclusions
 
 ptm <- proc.time() # for runtime calculations (ignore)
+
+
+# --- Preliminaries
 
 # - Confirm prepared datasets are loaded into memory
 if (!exists('datCredit_real')) unpack.ffdf(paste0(genPath,"creditdata_final4a"), tempPath)
@@ -44,14 +47,18 @@ if (!exists('datExclusions')) unpack.ffdf(paste0(genObjPath,"Exclusions-TruEnd-E
 
 # - Field names  and other parameters
 stratifiers <- c("DefaultStatus1_lead_12_max", "Date") # Must at least include target variable used in graphing event rate
-targetVar <- "DefaultStatus1_lead_12_max"
-currStatusVar <- "DefaultStatus1"
-timeVar <- "Date"
+targetVar <- "DefaultStatus1_lead_12_max" #main event variable to be predicted later
+currStatusVar <- "DefaultStatus1" # main observed outcome variable
+timeVar <- "Date" # calendar time variable over which main event is observed & predicted
 doDescribe <- F # whether to run describe as part of production run or not
 
 # - Subsampling & resampling parameters
 smp_size <- 1500000 # fixed size of downsampled set
 train_prop <- 0.7 # sampling fraction for resampling scheme
+# Implied sampling fraction for downsampling step
+smp_perc <- smp_size / ( datCredit_real[complete.cases(mget(stratifiers)), mget(stratifiers)][,.N] )
+cat("Implied sampling fraction = ", round(smp_perc*100,3),"% of loan accounts","\n",sep="")
+### RESULTS: Implied sampling fraction = 3.362%
 
 
 # --- Exclusions: NAs in provided stratifiers
@@ -101,9 +108,6 @@ if (diag.real_subsamp_5a > 0) {
 
 # ------ 2. Subsampling scheme with 2-way stratified random sampling
 
-# - Implied sampling fraction for downsampling step
-smp_perc <- smp_size / ( datCredit_real[complete.cases(mget(stratifiers)), mget(stratifiers)][,.N] )
-
 # - Downsample data into a set with a fixed size (using stratified sampling) before implementing resampling scheme
 set.seed(1, kind="Mersenne-Twister")
 datCredit_smp <- datCredit_real %>% drop_na(all_of(stratifiers)) %>% group_by(across(all_of(stratifiers))) %>% slice_sample(prop=smp_perc) %>% as.data.table()
@@ -120,10 +124,8 @@ pack.ffdf(paste0(genPath, "creditdata_final4b"), datCredit_smp)
 
 # ------ 3. Fuse the input space with the subsampled prepared dataset
 
-# --- Load in main dataset (subsampled)
+# - Confirm that required data objects are loaded into memory
 if (!exists('datCredit_smp')) unpack.ffdf(paste0(genPath,"creditdata_final4b"), tempPath)
-
-# - Confirm if the input space data is loaded into memory
 if (!exists('datInput.raw')) unpack.ffdf(paste0(genPath,"creditdata_input1"), tempPath)
 
 # - Find intersection between fields in input space and those perhaps already in the main credit dataset
@@ -170,12 +172,12 @@ rm(datInput.raw, check_input2a, check_input2b, overlap_flds); gc()
 
 # ------- 4. Feature engineering for modelling purposes
 
-# - Load in main dataset (subsampled)
+# - Confirm that required data objects are loaded into memory
 if (!exists('datCredit_smp')) unpack.ffdf(paste0(genPath,"creditdata_final4c"), tempPath)
 
 
 # --- 1. Missing value indicators for the input space variables
-# NOTE: There are a lot of missing values for these variables because of system changes etc.
+# NOTE: There are a lot of missing values for these variables because of system changes, data migrations, etc.
 datCredit_smp[, value_ind_slc_pmnt_method := ifelse(is.na(slc_pmnt_method) | slc_pmnt_method == "", 1, 0)]
 datCredit_smp[, value_ind_slc_days_excess := ifelse(is.na(slc_days_excess) | slc_days_excess == "", 1, 0)]
 datCredit_smp[, value_ind_slc_acct_pre_lim_perc := ifelse(is.na(slc_acct_pre_lim_perc) | slc_acct_pre_lim_perc == "", 1, 0)]
@@ -233,14 +235,14 @@ pack.ffdf(paste0(genPath, "creditdata_final4d"), datCredit_smp); gc()
 # --- 3. Missing value treatment (numeric variables)
 # Analyse whether to use mean or median value imputation
 
-# - Load in main dataset (subsampled)
+# - Confirm that required data objects are loaded into memory
 if (!exists('datCredit_smp')) unpack.ffdf(paste0(genPath,"creditdata_final4d"), tempPath)
 
 # - Prepaid/available funds to limit
 if (doDescribe) describe(datCredit_smp$slc_acct_pre_lim_perc); hist(datCredit_smp$slc_acct_pre_lim_perc, breaks='FD')
 datCredit_smp[is.na(slc_acct_pre_lim_perc), .N] / datCredit_smp[,.N] * 100
 ### RESULTS: Highly right-skewed distribution, with mean of ~0.09 vs median of 0,
-# bounded by [0, 0.79] for 5%-95% percentiles; no outliers
+# bounded by [0, 0.79] for 5%-95% percentiles; no outliers, other than at 0 and 1
 # Use median imputation, given 8.44% missingness degree, trading off the minor distributional distortion as a result
 datCredit_smp[, slc_acct_pre_lim_perc_imputed_med := 
                 ifelse(is.na(slc_acct_pre_lim_perc) | slc_acct_pre_lim_perc == "", 
@@ -252,7 +254,7 @@ cat( ( datCredit_smp[is.na(slc_acct_pre_lim_perc_imputed_med), .N ] == 0) %?%
 if (doDescribe) describe(datCredit_smp$slc_acct_pre_lim_perc_imputed_med); 
 hist(datCredit_smp$slc_acct_pre_lim_perc_imputed_med, breaks='FD')
 ### RESULTS: Imputation successful, with mean of 0.085 vs median of 0,
-# bounded by [0, 0.73] for 5%-95% percentiles; no outliers
+# bounded by [0, 0.73] for 5%-95% percentiles; no outliers, other than at 0 and 1
 
 # - Number of times an account was in arrears over last 24 months
 if (doDescribe) describe(datCredit_smp$slc_acct_roll_ever_24); hist(datCredit_smp$slc_acct_roll_ever_24, breaks='FD')
@@ -277,7 +279,7 @@ hist(datCredit_smp[slc_acct_prepaid_perc_dir_12<=5, slc_acct_prepaid_perc_dir_12
 datCredit_smp[is.na(slc_acct_prepaid_perc_dir_12), .N] / datCredit_smp[,.N] * 100
 ### RESULTS: Highly right-skewed distribution, with mean of ~2.26m vs median of 0, 
 # bounded by [0, 3.34] for 5%-95% percentiles; some very large outliers
-### AB: Scope for extreme value treatment if those outliers are correct; or use winsorized mean (Std-PrinciplesForDataPrep)
+### AB: Scope for eventual extreme value treatment if those outliers are correct; or use winsorized mean
 # Use median imputation, given 8.44% missingness degree, trading off the minor distributional distortion as a result
 datCredit_smp[, slc_acct_prepaid_perc_dir_12_imputed_med := 
                 ifelse(is.na(slc_acct_prepaid_perc_dir_12) | slc_acct_prepaid_perc_dir_12 == "", 
@@ -335,7 +337,7 @@ pack.ffdf(paste0(genPath, "creditdata_final4e"), datCredit_smp); gc()
 
 # --- 4. Feature Engineering: ratio-type variables (Period-level)
 
-# - Load in main dataset (subsampled)
+# - Confirm that required data objects are loaded into memory
 if (!exists('datCredit_smp')) unpack.ffdf(paste0(genPath,"creditdata_final4e"), tempPath)
 
 # - Loan age to loan term
@@ -374,7 +376,7 @@ cat((datCredit_smp[is.na(pmnt_method_grp), .N] == 0) %?%
 if (doDescribe) describe(datCredit_smp$pmnt_method_grp)
 ### RESULTS: Bins grouped logically such that each bin now has sufficient observations, with proportions:
 # Debit Order: 67.9%; MISSING_DATA: 9.7%; Salary/Suspense: 7.7%; Statement: 14.8%
-### CONCLUSION: Given the greater utility of this newly-binned
+### CONCLUSION: Given the greater utility of this newly-binned variable, rather use this variable than [scl_pmnt_method]
 
 # - Factorised [g0_Delinq] variable
 datCredit_smp[,g0_Delinq_fac := as.factor(g0_Delinq)]
@@ -389,7 +391,7 @@ cat((anyNA(datCredit_smp$g0_Delinq_fac)) %?% 'WARNING: New feature [g0_Delinq_fa
 # - Bin [InterestRate_Margin_imputed] | Binning the variable into three equally sized bins
 datCredit_smp[, InterestRate_Margin_imputed_bin := factor(ntile(InterestRate_Margin_imputed_mean, n=3))]
 if (doDescribe) describe(datCredit_smp$InterestRate_Margin_imputed_bin)
-### RESULTS: Binning was successful into three equal sized bins each having 499 940 observations
+### RESULTS: Binning was successful into three equal sized bins
 # [SANITY CHECK] Check new feature for illogical values
 cat((anyNA(datCredit_smp$InterestRate_Margin_imputed_bin)) %?% 'WARNING: New feature [InterestRate_Margin_imputed_bin] has missing values. \n' %:%
       'SAFE: New feature [InterestRate_Margin_imputed_bin] has no missing values. \n')
@@ -398,7 +400,7 @@ cat((anyNA(datCredit_smp$InterestRate_Margin_imputed_bin)) %?% 'WARNING: New fea
 
 
 # --- 6. Feature Engineering: Inflating time-sensitive monetary variables to the latest date
-#- Load macroeconmic information to facilitate inflation
+# - Confirm that required data objects are loaded into memory
 if (!exists('datMV')) unpack.ffdf(paste0(genPath,"datMV"), tempPath)
 
 # - Getting a range of inflation factors for each date in the sampling window
@@ -441,7 +443,7 @@ rm(datMV, date_range, datInflation)
 
 # --- 8. Featuring Engineering: Portfolio-level information
 
-# - Load in main dataset (subsampled)
+# - Confirm that required data objects are loaded into memory
 if (!exists('datCredit_smp')) unpack.ffdf(paste0(genPath,"creditdata_final4f"), tempPath)
 
 # - Pre default delinquency rate
@@ -604,6 +606,7 @@ if (doDescribe) describe(datCredit_smp$InterestRate_Margin_Aggr_Med); plot(datCr
 ### RESULTS: Variable follows a logical trend over time. Has mean -0.008 and median -0.009;
 # bounded by [-0.012, -0.0035] for 5%-95% percentiles; no outliers
 
+
 # - Save to disk (zip) for quick disk-based retrieval later
 pack.ffdf(paste0(genPath, "creditdata_final4g"), datCredit_smp); gc()
 
@@ -615,8 +618,7 @@ suppressWarnings( rm(dat_IRM_Aggr, dat_IRM_Aggr_Check1, list_merge_variables, re
 
 # --- 9. Macroeconomic feature engineering
 
-# - Loading in the raw dataset
-# - Confirm prepared datasets are loaded into memory
+# - Confirm that required data objects are loaded into memory
 if (!exists('datMV')) unpack.ffdf(paste0(genPath,"datMV"), tempPath)
 if (!exists('datCredit_smp')) unpack.ffdf(paste0(genPath,"creditdata_final4g"), tempPath)
 
@@ -679,7 +681,7 @@ cat( (length(which(results_missingness > 0)) == 0) %?% "SAFE: No missingness, fu
 rm(datMV); gc()
 
 
-# --- Save fused- and enriched subsampled dataset for quick disk-based retrieval later
+# -- Save fused- and enriched subsampled dataset for quick disk-based retrieval later
 pack.ffdf(paste0(genPath, "creditdata_smp"), datCredit_smp); gc()
 
 
@@ -687,7 +689,7 @@ pack.ffdf(paste0(genPath, "creditdata_smp"), datCredit_smp); gc()
 
 # ------ 5. Apply basic cross-validation resampling scheme with 2-way stratified sampling
 
-# - Loading in the raw dataset
+# - Confirm that required data objects are loaded into memory
 if (!exists('datCredit_smp')) unpack.ffdf(paste0(genPath,"creditdata_smp"), tempPath)
 datCredit_smp[, Ind := 1:.N] # prepare for resampling scheme
 
