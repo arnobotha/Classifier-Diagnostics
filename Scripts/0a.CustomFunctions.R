@@ -658,19 +658,23 @@ coefDeter_glm <- function(model, model_base = NA) {
   require(scales) # for formatting of results
   L_full <- logLik(model) # log-likelihood of fitted model, ln(L_M)
   nobs <- attr(L_full, "nobs") # sample size, same as NROW(model$model)
-  orig_formula <- deparse(unlist(list(model$formula, formula(model), model$call$formula))[[1]]) # model formula
-  orig_call <- model$call; calltype.char <- as.character(orig_call[1]) # original model fitting call specification, used merely for "plumbing"
-  data <- model.frame(model) # data matrix used in fitting the model (model$model)
-  # get weight matrix corresponding to each observation, if applicable/specified, otherwise, this defaults to just the 0/1-valued observations (Y)
-  if (!is.null(model$prior.weights) & length(model$prior.weights) > 0) {
-    weights <- model$prior.weights
-  } else if (!is.null(data$`(weights)`) & length(data$`(weights)` > 0)) {
-    weights <- data$`(weights)`
-  } else weights <- NULL
-  data <- data[, 1, drop=F]; names(data) <- "y"
-  nullCall <- call(calltype.char, formula = as.formula("y ~ 1"), data = data, weights = weights, family = model$family, 
-                   method = model$method, control = model$control, offset = model$offset)
-  if (any(is.na(model_base))) model_base <- eval(nullCall) # fit base/null model
+  
+  # Fit a base/empty model if not available
+  if (any(is.na(model_base))) {
+    orig_formula <- deparse(unlist(list(model$formula, formula(model), model$call$formula))[[1]]) # model formula
+    orig_call <- model$call; calltype.char <- as.character(orig_call[1]) # original model fitting call specification, used merely for "plumbing"
+    data <- model.frame(model) # data matrix used in fitting the model (model$model)
+    # get weight matrix corresponding to each observation, if applicable/specified, otherwise, this defaults to just the 0/1-valued observations (Y)
+    if (!is.null(model$prior.weights) & length(model$prior.weights) > 0) {
+      weights <- model$prior.weights
+    } else if (!is.null(data$`(weights)`) & length(data$`(weights)` > 0)) {
+      weights <- data$`(weights)`
+    } else weights <- NULL
+    data <- data[, 1, drop=F]; names(data) <- "y"
+    nullCall <- call(calltype.char, formula = as.formula("y ~ 1"), data = data, weights = weights, family = model$family, 
+                     method = model$method, control = model$control, offset = model$offset)
+    model_base <- eval(nullCall) # fit base/null model
+  } 
   L_base <- logLik(model_base) # log-likelihood of the null model, ln(L_0)
   
   # -- Implement the McFadden pseudo R^2 measure from McFadden1974, R^2 = 1 - log(L_M)/log(L_0)
