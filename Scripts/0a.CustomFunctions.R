@@ -647,7 +647,7 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
 # see https://bookdown.org/egarpor/SSS2-UC3M/logreg-deviance.html ; https://web.pdx.edu/~newsomj/cdaclass/ho_logistic.pdf; 
 # https://statisticalhorizons.com/r2logistic/
 # https://stats.stackexchange.com/questions/8511/how-to-calculate-pseudo-r2-from-rs-logistic-regression
-coefDeter_glm <- function(model) {
+coefDeter_glm <- function(model, model_base = NA) {
   
   # - Safety check
   if (!any(class(model) %in% c("glm","multinom"))) stop("Specified model object is not of class 'glm' or 'lm'. Exiting .. ")
@@ -670,7 +670,7 @@ coefDeter_glm <- function(model) {
   data <- data[, 1, drop=F]; names(data) <- "y"
   nullCall <- call(calltype.char, formula = as.formula("y ~ 1"), data = data, weights = weights, family = model$family, 
                    method = model$method, control = model$control, offset = model$offset)
-  model_base <- eval(nullCall) # fit base/null model
+  if (any(is.na(model_base))) model_base <- eval(nullCall) # fit base/null model
   L_base <- logLik(model_base) # log-likelihood of the null model, ln(L_0)
   
   # -- Implement the McFadden pseudo R^2 measure from McFadden1974, R^2 = 1 - log(L_M)/log(L_0)
