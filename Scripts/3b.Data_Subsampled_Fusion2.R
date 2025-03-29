@@ -361,6 +361,17 @@ if (doDescribe) describe(datCredit_smp$BalanceToPrincipal); hist(datCredit_smp$B
 ### RESULTS: Highly left-skewed distribution, with mean of 0.7 vs median of 0.85,
 # bounded by [~0, 1] for 5%-95% percentiles; no outliers
 
+# - Balance to loan term | how much is still outstanding compared to amortization term, i.e., maturity
+datCredit_smp[, BalanceToTerm := Balance/Term]
+# [SANITY CHECK] Check new feature for illogical values
+cat( ( datCredit_smp[is.na(BalanceToTerm), .N] == 0) %?% 
+       'SAFE: New feature [BalanceToTerm] has logical values.\n' %:% 
+       'WARNING: New feature [BalanceToTerm] has illogical values \n' )
+# distributional analysis
+if (doDescribe) describe(datCredit_smp$BalanceToTerm); hist(datCredit_smp$BalanceToTerm, breaks='FD')
+### RESULTS: Highly right-skewed distribution, with mean of 2075 vs median of 1543,
+# bounded by [~1, 6084] for 5%-95% percentiles; no outliers
+
 
 
 # --- 5. Feature Engineering: Binning and factorisation
@@ -441,7 +452,7 @@ rm(datMV, date_range, datInflation)
 
 
 
-# --- 8. Featuring Engineering: Portfolio-level information
+# --- 7. Featuring Engineering: Portfolio-level information
 
 # - Confirm that required data objects are loaded into memory
 if (!exists('datCredit_smp')) unpack.ffdf(paste0(genPath,"creditdata_final4f"), tempPath)
@@ -616,7 +627,7 @@ suppressWarnings( rm(dat_IRM_Aggr, dat_IRM_Aggr_Check1, list_merge_variables, re
 
 
 
-# --- 9. Macroeconomic feature engineering
+# --- 8. Macroeconomic feature engineering
 
 # - Confirm that required data objects are loaded into memory
 if (!exists('datMV')) unpack.ffdf(paste0(genPath,"datMV"), tempPath)
