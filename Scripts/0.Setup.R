@@ -84,7 +84,7 @@ if (Sys.getenv("USERNAME") == "u15247199") { # Dr Arno Botha | Tuks-machine
   # - Common path for saving important analytics and figures
   genFigPath <- "C:/Users/u15247199/Google Drive/My Drive/WorkLife/Analytix/R&D Codebases/Classifier-Diagnostics/Figures/"
   # --- Custom path where R-scripts are saved
-} else if (Sys.getenv("USERNAME") == "Arno Botha") { # Dr Arno Botha | Kralkatorrik-machine
+} else if (Sys.getenv("USERNAME") %in% c("Arno Botha","arnos")) { # Dr Arno Botha | Kralkatorrik-machine
   # - Common path for saving large R-objects as back-up and/or as reusable checkpoints
   genPath <- "E:/DataDump/RetailMortgages-FNB/Classifier-Diagnostics_Data/"
   # - Common path from which raw big datasets are imported
