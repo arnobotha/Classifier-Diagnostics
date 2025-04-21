@@ -547,7 +547,7 @@ binNum <- round(2*datCredit_valid[,.N]^(1/3)*0.5) # using Rice's rule
   #geom_density(aes(colour=factor(DefaultStatus1_lead_12_max), fill=factor(DefaultStatus1_lead_12_max)), 
   #             linewidth=0.3, alpha=0.4) + 
   # Annotations: actual prevalence
-  geom_vline(xintercept=phi_basic, linewidth=0.5, colour="black") + 
+  geom_vline(xintercept=phi, linewidth=0.5, colour="black") + 
   annotate(geom="text", x=phi*0.82, y=max(maxDensPhi_1, maxDensPhi_0)*0.25, 
            label=paste0("'Actual prevalence '*phi[A]==",sprintf("%.3f", phi*100), "*'%'"),
            family=chosenFont, size=3, colour="black", angle=90, parse=T) +
@@ -640,7 +640,7 @@ binNum <- 32 # manually tweaked given extreme bimodality in the distributions
              family=chosenFont, size=2.5, colour="black") +      
     # facets & scale options
     facet_grid(Facet_label ~ .) + 
-    geom_vline(xintercept=phi_basic, linewidth=0.5, colour="black") + 
+    geom_vline(xintercept=phi, linewidth=0.5, colour="black") + 
     scale_color_manual(name=bquote("Class "*italic(Y)), labels=vLabel, values=vCol1) + 
     scale_fill_manual(name=bquote("Class "*italic(Y)), labels=vLabel, values=vFill) + 
     scale_x_continuous(breaks=pretty_breaks(), label=percent))
@@ -704,7 +704,7 @@ binNum <- 36 # manually tweaked given extreme bimodality in the distributions
     annotate(geom="text", x=0.375, y=16, 
              label=paste0("Two-sample ",KS_results_int$KS_decision),
              family=chosenFont, size=2.5, colour="black") +      
-    geom_vline(xintercept=phi_basic, linewidth=0.5, colour="black") + 
+    geom_vline(xintercept=phi, linewidth=0.5, colour="black") + 
     # facets & scale options
     facet_grid(Facet_label ~ .) + 
     scale_color_manual(name=bquote("Class "*italic(Y)), labels=vLabel, values=vCol1) + 
@@ -731,7 +731,7 @@ div_adv$ShannonEntropy
 (CE_Improv_Int<-div_int$CrossEntropy/div_basic$CrossEntropy -1) # 17% decrease / "improvement" of intermediate over baseline/basic
 (CE_Improv_Adv<-div_adv$CrossEntropy/div_basic$CrossEntropy -1) # 29% decrease / "improvement" of advance over baseline/basic
 
-# Focusing on %-differences in KL-devergence when drawing inference
+# Focusing on %-differences in KL-divergence when drawing inference
 (KL_Improv_Int<-div_int$KullbackLeibler_divergence/div_basic$KullbackLeibler_divergence -1) # 48% decrease / "improvement" of intermediate over basic?
 (KL_Improv_Adv<-div_adv$KullbackLeibler_divergence/div_basic$KullbackLeibler_divergence -1) # 94% decrease / "improvement" of intermediate over basic?
 
