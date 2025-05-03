@@ -1209,10 +1209,9 @@ divergences_binary <- function(datGiven, Target, TargetValue=1, Prediction, cutO
 #   algorithm converged.
 
 Gen_Youd_Ind<-function(Trained_Model, Train_DataSet, Target, a){
-  # Trained_Model<-logitMod_Adv
-  # Train_DataSet<-datCredit_train[960000:965000,]
-  # Target<-"DefaultStatus1_lead_12_max"
-  # a<-4
+  # Trained_Model<-modSICR_logit
+  # Train_DataSet<-datCredit_smp[960000:965000,]
+  # Target<-"SICR_target"; a<-4
   
   require(data.table, DEoptimR)
   
@@ -1229,13 +1228,20 @@ Gen_Youd_Ind<-function(Trained_Model, Train_DataSet, Target, a){
     Train_DataSet[, Target := as.numeric(levels(get(Target)))[get(Target)]]
   } else Train_DataSet[, Target := get(Target)]
   
+  # discard missingness
+  
+  
   # - Calculate Prevalence Rate q1
   q1 <- mean(Train_DataSet$Target,na.rm=TRUE)
   
   # - Objective Function to be minimized (negative the function to be maximized)
   GYI_a <- function(pc){
+    # pc <- 0.1
     Train_DataSet[, prob_vals := predict(Trained_Model, Train_DataSet, type="response")] # Obtain predicted probabilities for the model
     Train_DataSet[, class_vals := ifelse(prob_vals<=pc,0,1)] # Dichotomise the probability scores according to the cutoff pc
+    
+    # Discard missing cases
+    Train_DataSet <- Train_DataSet[complete.cases(prob_vals)]
     
     # - Safety Check for missingness in predictions
     if(anyNA(Train_DataSet[,list(prob_vals,class_vals)])){

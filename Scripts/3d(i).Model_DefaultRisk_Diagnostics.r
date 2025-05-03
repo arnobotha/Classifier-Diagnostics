@@ -401,19 +401,17 @@ rm(gMCC_cutoffs, datPlot, datMCC, datMCC_Adv, datMCC_Basic, datMCC_Int, gMCC, da
 # ---  3.5 Generalised Youden Index
 # Create a plot displaying time graphs of actual vs expected default rate as a function of the cost multiple (a)
 
-# - Graphing Parameters
-chosenFont <- "Cambria"
-dpi <- 180
-
 # - Function to create the time graph given a particular TPR:TNR cost ratio a
-DefRte_Plotter<-function(a){
+DefRte_Plotter<-function(a, datGiven, modLogit, chosenFont="Cambria", fldTarget, fldProb){
+  # - Testing conditions
+  # a=1; datGiven=datCredit_smp; modLogit=modSICR_logit; fldTarget="SICR_target"; fldProb="Prob_account"
   
   # - Obtain Generalised Youden Index cut-off pc for the cost ratio a
-  (Algo_Results<-Gen_Youd_Ind(logitMod_Adv, datCredit_train, "DefaultStatus1_lead_12_max", a))
+  (Algo_Results<-Gen_Youd_Ind(modLogit, datGiven, fldTarget, a))
   pc<-Algo_Results$cutoff
   
   # - Dichotomise the probability scores according to the cutoff pc
-  datCredit_valid[, class_vals := ifelse(prob_adv <= pc, 0,1)]
+  datCredit_valid[, class_vals := ifelse(get(fldProb) <= pc, 0,1)]
   
   # - Create plotting dataset
   ActRte_Dset <- datCredit_valid[,list(DefRate=mean(DefaultStatus1_lead_12_max,na.rm=T), Rate="Act"),by=list(Date)]
@@ -422,12 +420,12 @@ DefRte_Plotter<-function(a){
   
   # - Creating annotation datasets for easier annotations
   dat_anno1 <- data.table(MAE = NULL, Label = paste0("'MAE between '*italic(A[t])*' and '*italic(B[t])*'"),
-                          x = rep(as.Date("2016-01-31"),1),
-                          y = ifelse(a>5,0.09,0.055)) # little adjustment such that the text and graph do not overlap
+                          x = as.Date("2016-01-31"),
+                          y = max(PlotSet$DefRate,na.rm=T)*0.65)
   
   dat_anno2 <- data.table(Label =  paste0("' Cut-off  '*italic(p[c])*' = ", as.character(round(pc,4)),"'"),
-                          x = rep(as.Date("2016-01-31"),1),
-                          y = ifelse(a>5,0.08,0.05))
+                          x = as.Date("2016-01-31"),
+                          y = max(PlotSet$DefRate,na.rm=T)*0.6)
   
   # - MAE Calculation between actual and expected rate
   dat_anno1[1, MAE := mean(abs(PlotSet[Rate=="Act", DefRate] - PlotSet[Rate=="Exp", DefRate]), na.rm = T)]
@@ -442,7 +440,7 @@ DefRte_Plotter<-function(a){
   vLineType <- c("dashed","solid")
   
   vLabel <- c("Act"=bquote(italic(A)[t]*": Actual"),
-               "Exp"=bquote(italic(B)[t]*": Expected"))
+              "Exp"=bquote(italic(B)[t]*": Expected"))
   
   # - Aesthetics engineering
   PlotSet[, Facet_label := paste0("' Cost ratio  '*italic(a)*' = ", as.character(a),"'")]
@@ -473,10 +471,10 @@ DefRte_Plotter<-function(a){
 }
 
 # - Call function for various "a" values
-(a_1<-DefRte_Plotter(1))
-(a_3<-DefRte_Plotter(3))
-(a_4<-DefRte_Plotter(4))
-(a_6<-DefRte_Plotter(6))
+(a_1<-DefRte_Plotter(a=1, datGiven=datCredit_train, modLogit=logitMod_Adv, fldTarget="DefaultStatus1_lead_12_max", fldProb="prob_adv"))
+(a_3<-DefRte_Plotter(a=3, datGiven=datCredit_train, modLogit=logitMod_Adv, fldTarget="DefaultStatus1_lead_12_max", fldProb="prob_adv"))
+(a_4<-DefRte_Plotter(a=4, datGiven=datCredit_train, modLogit=logitMod_Adv, fldTarget="DefaultStatus1_lead_12_max", fldProb="prob_adv"))
+(a_6<-DefRte_Plotter(a=6, datGiven=datCredit_train, modLogit=logitMod_Adv, fldTarget="DefaultStatus1_lead_12_max", fldProb="prob_adv"))
 
 # - Bind graphs together
 (gCombined<-grid.arrange(a_1, a_3 ,a_4 ,a_6 ,ncol=2))
