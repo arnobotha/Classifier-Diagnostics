@@ -1,18 +1,23 @@
-# =================================== INFLATION EFFECTS ON SENSITIVE VARIABLES ==========================================
+# =================================== DEFAULT RISK EXPERIMENT ==========================================
 # Exploring the influence of inflation on variables sensitive to the time value of money, i.e., [Principal]
 # and [Balance].
-# -----------------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Marcel Muller
+# SCRIPT AUTHOR(S): Marcel Muller (MM)
 
 # DESCRIPTION:
 # This script explores the influence of inflation on [Principal] and [Balance], which are both sensitive to
 # the time value of money, in terms of their statistical significance in predicting default in a logit model.
-# -----------------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
-#   - 0a.CustomFunctions.R
-#   - 3b.Data_Subsample_Fusion2
+#   - 1.Data_Import.R
+#   - 2a.Data_Prepare_Credit_Basic.R
+#   - 2b.Data_Prepare_Credit_Advanced.R
+#   - 2c.Data_Prepare_Credit_Advanced2.R
+#   - 2d.Data_Enrich.R
+#   - 2f.Data_Fusion1.R
+#   - 3b.Data_Subsampled_Fusion2.R
 #
 # -- Inputs:
 #   - datCredit_train | Prepared credit data from script 3b
@@ -20,7 +25,7 @@
 #
 # -- Outputs:
 #   - Some graphs illustrating the differences in the raw variables vs their defalted counterparts
-# =======================================================================================================================
+# =========================================================================================================
 
 
 

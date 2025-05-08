@@ -1,10 +1,8 @@
-# ========================== MODEL DEFAULT RISK - BASIC =================================
-# Develop several "basic" logistic regression models ranging from models with few
-# features to models with more features to predict default risk. Delinquency-, portfolio-level-,
-# and forward looking information is not considers among these "basic" variables.
+# ============================= DEFAULT RISK - BASIC ====================================
+# Develops the input space of an basic-complexity level PD-model
 # ---------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Marcel Muller, Dr Arno Botha
+# SCRIPT AUTHOR(S): Marcel Muller (MM), Dr Arno Botha (AB)
 
 # DESCRIPTION:
 # This script uses the previously prepared credit dataset to create multiple "basic" 
@@ -17,8 +15,13 @@
 # ---------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
-#   - 0a.CustomFunctions.R
-#   - 3b.Data_Subsample_Fusion2
+#   - 1.Data_Import.R
+#   - 2a.Data_Prepare_Credit_Basic.R
+#   - 2b.Data_Prepare_Credit_Advanced.R
+#   - 2c.Data_Prepare_Credit_Advanced2.R
+#   - 2d.Data_Enrich.R
+#   - 2f.Data_Fusion1.R
+#   - 3b.Data_Subsampled_Fusion2.R
 #
 # -- Inputs:
 #   - datCredit_train | Prepared credit data from script 3b
@@ -297,7 +300,9 @@ datCredit_valid <- datCredit_valid %>% subset(DefaultStatus1==0)
 # Load formula
 unpack.ffdf(paste0(genObjPath, "Basic_Com_Formula"), tempPath)
 if (!exists('inputs_bas')) {
-  inputs_bas <- DefaultStatus1_lead_12_max ~ Age_Adj + Term + PerfSpell_Num + InterestRate_Margin_imputed_mean + Principal_Real + Balance_Real
+  inputs_bas <- DefaultStatus1_lead_12_max ~ Age_Adj + Term + PerfSpell_Num + InterestRate_Margin_imputed_mean + 
+    Principal_Real + Balance_Real
+  # save formula
   pack.ffdf(paste0(genObjPath, "Basic_Com_Formula"), inputs_bas)
 }
 
@@ -347,8 +352,3 @@ datCredit_train[,prob_bas:=NULL]; datCredit_valid[,prob_bas:=NULL]
 ###           The residual deviance analysis indicates that the model fit is strenuous.
 ###           NA single VIF between two associated variables is above 10, but it is expected and of no concern.
 ###           Model is not overfitted as evidenced by almost identical AUCs when a ROC analysis is conducted on the training- and validation datasets (69.66% vs 69.87%)
-
-### FINAL SELECTION: [Age_Adj], [Term], [PerfSpell_Num], [InterestRate_Margin_imputed_mean],
-###                  [Principal_Real], [Balance_Real]
-
-### CONCLUSION: Proceed to variable selection for the intermediate model

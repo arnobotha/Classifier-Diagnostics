@@ -2,7 +2,7 @@
 # Import credit dataset (SAS) into R, containing loan performance data (longitudinal)
 # ---------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha, Marcel Muller
+# SCRIPT AUTHOR(S): Dr Arno Botha (AB)
 # ---------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R

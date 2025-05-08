@@ -1,9 +1,9 @@
-# ========================== MODEL DEFAULT RISK - INPUT DIAGNOSTICS ========================================
-# This script performs input diagnostics on the three logit models. Mainly it assessess the variable importance
+# ========================== ===DEFAULT RISK - INPUT DIAGNOSTICS ===========================================
+# This script performs input diagnostics on the three logit models. Mainly it assesses the variable importance
 # of the three models using z-scores and standardised coefficients.
 # -----------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Marcel Muller
+# SCRIPT AUTHOR(S): Marcel Muller (MM), Dr Arno Botha (AB)
 
 # DESCRIPTION:
 # This script uses the previously selected variables in fitting different logit models according to their
@@ -11,7 +11,13 @@
 # -----------------------------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
-#   - 0a.CustomFunctions.R
+#   - 1.Data_Import.R
+#   - 2a.Data_Prepare_Credit_Basic.R
+#   - 2b.Data_Prepare_Credit_Advanced.R
+#   - 2c.Data_Prepare_Credit_Advanced2.R
+#   - 2d.Data_Enrich.R
+#   - 2f.Data_Fusion1.R
+#   - 3b.Data_Subsampled_Fusion2.R
 #   - 3b.Data_Subsample_Fusion2
 #   - 3c(i).Model_DefaultRisk_Basic
 #   - 3c(ii).Model_DefaultRisk_Intermediate
@@ -21,8 +27,9 @@
 #   - datCredit_train | Prepared credit data from script 3b
 #   - datCredit_valid | Prepared credit data from script 3b
 #   - Final model input variables
+#
 # -- Outputs:
-#   - Some graphs showcasing variable importance
+#   - <analytics> | Graphs showing various input-level diagnostics
 # ===========================================================================================================
 
 # ------ 1. Preliminaries

@@ -1,8 +1,8 @@
-# ======================= MODEL DEFAULT RISK - INTERMEDIATE ==============================
-# Develop several logit models using delinquency- and forward looking information.
+# ========================== DEFAULT RISK - INTERMEDIATE =================================
+# Develops the input space of an intermediate-complexity level PD-model
 # ----------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Marcel Muller, Dr Arno Botha
+# SCRIPT AUTHOR(S): Marcel Muller (MM), Dr Arno Botha (AB)
 
 # DESCRIPTION:
 # This script uses the previously prepared credit dataset fused with macroeconomic
@@ -18,7 +18,13 @@
 # ----------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
-#   - 0a.CustomFunctions.R
+#   - 1.Data_Import.R
+#   - 2a.Data_Prepare_Credit_Basic.R
+#   - 2b.Data_Prepare_Credit_Advanced.R
+#   - 2c.Data_Prepare_Credit_Advanced2.R
+#   - 2d.Data_Enrich.R
+#   - 2f.Data_Fusion1.R
+#   - 3b.Data_Subsampled_Fusion2.R
 #
 # -- Inputs:
 #   - datCredit_train | Prepared credit data from script 3b
@@ -1770,7 +1776,9 @@ datCredit_valid <- datCredit_valid %>% subset(DefaultStatus1==0)
 # Load formula
 unpack.ffdf(paste0(genObjPath, "Int_Formula"), tempPath)
 if (!exists('inputs_int')) {
-  inputs_int <- DefaultStatus1_lead_12_max ~ g0_Delinq + M_Repo_Rate_12 + M_Inflation_Growth_9 + M_RealIncome_Growth_2 + M_RealIncome_Growth_9 + M_RealIncome_Growth_12 + M_DTI_Growth_3 + M_RealGDP_Growth_12
+  inputs_int <- DefaultStatus1_lead_12_max ~ g0_Delinq + M_Repo_Rate_12 + M_Inflation_Growth_9 + 
+    M_RealIncome_Growth_2 + M_RealIncome_Growth_9 + M_RealIncome_Growth_12 + M_DTI_Growth_3 + M_RealGDP_Growth_12
+  # save formula
   pack.ffdf(paste0(genObjPath, "Int_Formula"), inputs_int)
 }
 
@@ -1821,8 +1829,3 @@ datCredit_train[,prob_final:=NULL]; datCredit_valid[,prob_final:=NULL]
 ###             The residual deviance analysis indicates that the model fit is strenuous (1 warning).
 ###             Model is not overfitted as evidenced by the small change in AUC when a ROC analysis is conducted on the training- and validation datasets (77.42% vs 77.60%)
 ###             The VIF values are as expected, with three macroeconomic variables having high VIF values (>10)
-
-### FINAL SELECTION: [g0_Delinq], [M_Repo_Rate_12], [M_Inflation_Growth_9], [M_RealIncome_Growth_2], [M_RealIncome_Growth_9], [M_RealIncome_Growth_12], 
-###                  [M_DTI_Growth_3], and [M_RealGDP_Growth_12]
-
-### CONCLUSION: Proceed to variable selection for the advanced model

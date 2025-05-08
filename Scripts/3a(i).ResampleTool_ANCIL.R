@@ -3,7 +3,7 @@
 # (cross-sectiona modellingl
 # ------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha
+# SCRIPT AUTHOR(S): Dr Arno Botha (AB)
 
 # DESCRIPTION:
 # This ancillary & exploratory script implements a given sample size by first subsampling raw data

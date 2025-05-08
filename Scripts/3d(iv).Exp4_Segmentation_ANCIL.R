@@ -1,8 +1,8 @@
-# =================================== MODEL SEGMENTATION COMPARISON ==========================================
+# ====================================== DEFAULT RISK EXPERIMENT =============================================
 # Exploring the use of segmentation schemes in predicting the occurrence of default.
 # ------------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Marcel Muller
+# SCRIPT AUTHOR(S): Marcel Muller (MM)
 
 # DESCRIPTION:
 # This script explores segmentation schemes in predicting the occurrence of default. Segmentation is done
@@ -10,8 +10,13 @@
 # ------------------------------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
-#   - 0a.CustomFunctions.R
-#   - 3b.Data_Subsample_Fusion2
+#   - 1.Data_Import.R
+#   - 2a.Data_Prepare_Credit_Basic.R
+#   - 2b.Data_Prepare_Credit_Advanced.R
+#   - 2c.Data_Prepare_Credit_Advanced2.R
+#   - 2d.Data_Enrich.R
+#   - 2f.Data_Fusion1.R
+#   - 3b.Data_Subsampled_Fusion2.R
 #
 # -- Inputs:
 #   - datCredit_smp | Prepared credit data from script 3b
@@ -387,7 +392,7 @@ auc(datCredit_valid[g0_Delinq==2,DefaultStatus1_lead_12_max], datCredit_valid[g0
 ###          [g0_Delinq]=0: 66.82%
 ###          [g0_Delinq]=1: 54.76%
 ###          [g0_Delinq]=2: 50%
-### NOTE: The overall AUC is of interest since the segment-specific AUCs are misleading and shouldn't be evaluated individualy.
+### NOTE: The overall AUC is of interest since the segment-specific AUCs are misleading and shouldn't be evaluated individually.
 
 
 

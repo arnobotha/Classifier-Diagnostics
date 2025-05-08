@@ -3,7 +3,7 @@
 # cross-sectional modelling setup (PD-modelling)
 # ------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Dr Arno Botha
+# SCRIPT AUTHOR(S): Dr Arno Botha (AB)
 
 # DESCRIPTION:
 # This ancillary & exploratory script iterates across a given vector of subsample sizes towards

@@ -1,8 +1,8 @@
-# ========================== MODEL DEFAULT RISK - ROC ANALYSIS ILLUSTRATION =================================
+# ============================== DEFAULT RISK - MODEL DIAGNOSTICS =====================================
 # Showcasing the use of ROC curves in evaluating the predictive power of logit models.
 # -----------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Marcel Muller, Roland Breedt, Dr Arno Botha
+# SCRIPT AUTHOR(S): Marcel Muller (MM), Roland Breedt (RB), Dr Arno Botha (AB)
 
 # DESCRIPTION:
 # This script uses the previously selected variables in fitting different logit models according to their
@@ -10,9 +10,14 @@
 # a single graph. This graph is itself used within the binary classification standard.
 # -----------------------------------------------------------------------------------------------------------
 # -- Script dependencies:
-#   - 0.Setup
-#   - 0a.CustomFunctions
-#   - 3b.Data_Subsample_Fusion2
+#   - 0.Setup.R
+#   - 1.Data_Import.R
+#   - 2a.Data_Prepare_Credit_Basic.R
+#   - 2b.Data_Prepare_Credit_Advanced.R
+#   - 2c.Data_Prepare_Credit_Advanced2.R
+#   - 2d.Data_Enrich.R
+#   - 2f.Data_Fusion1.R
+#   - 3b.Data_Subsampled_Fusion2.R
 #   - 3c(i).Model_DefaultRisk_Basic
 #   - 3c(ii).Model_DefaultRisk_Intermediate
 #   - 3c(iii).Model_DefaultRisk_Advanced

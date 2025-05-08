@@ -1,8 +1,8 @@
-# ========================== MODEL DEFAULT RISK - TIME DIAGNOSTICS ========================================
+# =============================== DEFAULT RISK - TIME DIAGNOSTICS ===========================================
 # Benchmarking the predictions of competing classifiers over time by calculating various time diagnostic
 # -----------------------------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Roland Breedt, Dr Arno Botha
+# SCRIPT AUTHOR(S): Roland Breedt (RB), Dr Arno Botha (AB)
 
 # DESCRIPTION:
 # This script uses the previously selected variables in fitting different logit models according to their
@@ -13,8 +13,13 @@
 # -----------------------------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
-#   - 0a.CustomFunctions.R
-#   - 3b.Data_Subsample_Fusion2
+#   - 1.Data_Import.R
+#   - 2a.Data_Prepare_Credit_Basic.R
+#   - 2b.Data_Prepare_Credit_Advanced.R
+#   - 2c.Data_Prepare_Credit_Advanced2.R
+#   - 2d.Data_Enrich.R
+#   - 2f.Data_Fusion1.R
+#   - 3b.Data_Subsampled_Fusion2.R
 #   - 3c(i).Model_DefaultRisk_Basic
 #   - 3c(ii).Model_DefaultRisk_Intermediate
 #   - 3c(iii).Model_DefaultRisk_Advanced
@@ -24,8 +29,9 @@
 #   - datCredit_valid | Prepared credit data from script 3b
 #   - datCredit_smp   | Prepared credit data from script 3b
 #   - Final model input variables
+#
 # -- Outputs:
-#   - Some graphs showcasing model performance over time
+#   - <analytics> | Graphs showing various time-level diagnostics
 # ===========================================================================================================
 
 

@@ -1,10 +1,8 @@
-# ========================= MODEL DEFAULT RISK - COMBINED ===============================
-# Develop several "advanced" logistic regression models. These models include portfolio-
-# level variables along with the combined input space in selecting the "best" variables
-# in the entire existing input space for predicting default.
+# ============================ DEFAULT RISK - ADVANCED ==================================
+# Develops the input space of an advanced-complexity level PD-model
 # ---------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Marcel Muller, Roland Breedt, Dr Arno Botha
+# SCRIPT AUTHOR(S): Marcel Muller (MM), Roland Breedt (RB), Dr Arno Botha (AB)
 
 # DESCRIPTION:
 # This script uses the previously prepared credit dataset fused with basic-, intermediary-
@@ -16,8 +14,13 @@
 # ---------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
-#   - 0a.CustomFunctions.R
-#   - 3c(v).Model_DefaultRisk_Exp2
+#   - 1.Data_Import.R
+#   - 2a.Data_Prepare_Credit_Basic.R
+#   - 2b.Data_Prepare_Credit_Advanced.R
+#   - 2c.Data_Prepare_Credit_Advanced2.R
+#   - 2d.Data_Enrich.R
+#   - 2f.Data_Fusion1.R
+#   - 3b.Data_Subsampled_Fusion2.R
 #
 # -- Inputs:
 #   - datCredit_real | Prepared credit data from script 2f
@@ -628,6 +631,7 @@ if (!exists('inputs_adv')) {
     g0_Delinq + M_RealIncome_Growth_2 + M_RealIncome_Growth_9 + M_RealIncome_Growth_12 + M_DTI_Growth_3 + PrevDefaults + 
     TimeInPerfSpell + g0_Delinq_Num + g0_Delinq_SD_4 + g0_Delinq_SD_6 + slc_acct_roll_ever_24_imputed_mean + slc_acct_arr_dir_3 + 
     slc_past_due_amt_imputed_med + slc_acct_pre_lim_perc_imputed_med + NewLoans_Aggr_Prop_1 + InterestRate_Margin_Aggr_Med_3
+  # save formula
   pack.ffdf(paste0(genObjPath, "Adv_Formula"), inputs_adv)
 }
 
@@ -677,10 +681,3 @@ datCredit_train[,prob_adv:=NULL]; datCredit_valid[,prob_adv:=NULL]
 ### RESULTS:    All variables are significant and have reasonable standard errors; except for two portfolio-level variables
 ###             Model is not overfitted as evidenced by the small change in AUC when a ROC analysis is conducted on the training- and validation datasets (89.82% vs 90.02%)
 ###             The VIF values are as expected with most variables having low VIFs (<10) compared to 4 varaibles with high VIFs (>10)
-
-### FINAL SELECTION: [Age_Adj], [Term], [PerfSpell_Num], [InterestRate_Margin_imputed_mean], [Principal_Real], [Balance_Real],
-###                  [g0_Delinq], [M_RealIncome_Growth_2], [M_RealIncome_Growth_9], [M_RealIncome_Growth_12], [M_DTI_Growth_3], [PrevDefaults],
-###                  [TimeInPerfSpell], [g0_Delinq_Num], [g0_Delinq_SD_4], [g0_Delinq_SD_6], [slc_acct_roll_ever_24_imputed_mean], [slc_acct_arr_dir_3],
-###                  [slc_past_due_amt_imputed_med], [slc_acct_pre_lim_perc_imputed_med], [NewLoans_Aggr_Prop_1], and [InterestRate_Margin_Aggr_Med_3]
-
-### CONCLUSION: Proceed to compute and compare model diagnostics

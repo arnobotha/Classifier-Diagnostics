@@ -1,8 +1,8 @@
-# ========================= MODEL DEFAULT RISK EXPERIMENT =================================
+# ========================= DEFAULT RISK EXPERIMENT =================================
 # Compare logit models with raw variables against their transformed counterparts.
 # -----------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Marcel Muller, Roland Breedt
+# SCRIPT AUTHOR(S): Marcel Muller (MM), Roland Breedt (RB)
 
 # DESCRIPTION:
 # This script uses the previously prepared credit dataset to fit a few logit models
@@ -10,7 +10,13 @@
 # -----------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
-#   - 0a.CustomFunctions.R
+#   - 1.Data_Import.R
+#   - 2a.Data_Prepare_Credit_Basic.R
+#   - 2b.Data_Prepare_Credit_Advanced.R
+#   - 2c.Data_Prepare_Credit_Advanced2.R
+#   - 2d.Data_Enrich.R
+#   - 2f.Data_Fusion1.R
+#   - 3b.Data_Subsampled_Fusion2.R
 #
 # -- Inputs:
 #   - datCredit_real | Prepared credit data from script 2f

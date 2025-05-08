@@ -117,8 +117,29 @@ if (Sys.getenv("USERNAME") == "u15247199") { # Dr Arno Botha | Tuks-machine
   genObjPath <- "C:/Users/R5668395/Documents/GitHub ClassDiag/Classifier-Diagnostics/Objects/"
   # - Common path for saving important analytics and figures
   genFigPath <- "C:/Users/R5668395/Documents/GitHub ClassDiag/Classifier-Diagnostics/Figures/"
+} else if (Sys.getenv("USERNAME") == "P21777810") { # Dr Arno Botha | NWU-machine
+  # - Common path for saving large R-objects as back-up and/or as reusable checkpoints
+  genPath <- "H:/bwisas-em-win1/userdata/FNB-DATA-MORTGAGES/Classifier-Diagnostics_Data/"
+  # - Common path from which raw big datasets are imported
+  genRawPath <- "H:/bwisas-em-win1/userdata/FNB-DATA-MORTGAGES/"
+  # - Common path for sourcing R-scripts in main codebase
+  path_cust <- "H:/bwisas-em-win1/userdata/FNB-DATA-MORTGAGES/Github Codebases/Classifier-Diagnostics/Scripts/"
+  # - Common path for storing important (but small!) R-objects as back-up
+  genObjPath <- "H:/bwisas-em-win1/userdata/FNB-DATA-MORTGAGES/Github Codebases/Classifier-Diagnostics/Objects/"
+  # - Common path for saving important analytics and figures
+  genFigPath <- "H:/bwisas-em-win1/userdata/FNB-DATA-MORTGAGES/Github Codebases/Classifier-Diagnostics/Figures/"
 } else {
-    stop("User-specific paths not set for current user: ", Sys.getenv("USERNAME"), ". Please fix in Setup script (0.Setup.R) before continuing")
+  warning("User-specific paths not set for current user: ", Sys.getenv("USERNAME"), ". Assigning generic NWU-specific paths ..")
+  # - Common path for saving large R-objects as back-up and/or as reusable checkpoints
+  genPath <- "H:/bwisas-em-win1/userdata/FNB-DATA-MORTGAGES/Classifier-Diagnostics_Data/"
+  # - Common path from which raw big datasets are imported
+  genRawPath <- "H:/bwisas-em-win1/userdata/FNB-DATA-MORTGAGES/"
+  # - Common path for sourcing R-scripts in main codebase
+  path_cust <- "H:/bwisas-em-win1/userdata/FNB-DATA-MORTGAGES/Github Codebases/Classifier-Diagnostics/Scripts/"
+  # - Common path for storing important (but small!) R-objects as back-up
+  genObjPath <- "H:/bwisas-em-win1/userdata/FNB-DATA-MORTGAGES/Github Codebases/Classifier-Diagnostics/Objects/"
+  # - Common path for saving important analytics and figures
+  genFigPath <- "H:/bwisas-em-win1/userdata/FNB-DATA-MORTGAGES/Github Codebases/Classifier-Diagnostics/Figures/"
 }
 
 

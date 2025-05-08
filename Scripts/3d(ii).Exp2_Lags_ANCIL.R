@@ -1,8 +1,8 @@
-# ========================= MODEL DEFAULT RISK EXPERIMENT =================================
-# Investigate the utility of different lags of certain variables using comparative studies
+# ========================= DEFAULT RISK EXPERIMENT =================================
+# Investigates the utility of different lags of certain variables using comparative studies
 # -----------------------------------------------------------------------------------------
 # PROJECT TITLE: Classifier Diagnostics
-# SCRIPT AUTHOR(S): Marcel Muller, Roland Breedt, Dr Arno Botha
+# SCRIPT AUTHOR(S): Marcel Muller (MM), Roland Breedt (RB), Dr Arno Botha (AB)
 
 # DESCRIPTION:
 # This script uses the previously prepared credit dataset to fit a few logit models.
@@ -17,7 +17,13 @@
 # -----------------------------------------------------------------------------------------
 # -- Script dependencies:
 #   - 0.Setup.R
-#   - 0a.CustomFunctions.R
+#   - 1.Data_Import.R
+#   - 2a.Data_Prepare_Credit_Basic.R
+#   - 2b.Data_Prepare_Credit_Advanced.R
+#   - 2c.Data_Prepare_Credit_Advanced2.R
+#   - 2d.Data_Enrich.R
+#   - 2f.Data_Fusion1.R
+#   - 3b.Data_Subsampled_Fusion2.R
 #
 # -- Inputs:
 #   - datCredit_smp | Subsampled credit data from script 3b
