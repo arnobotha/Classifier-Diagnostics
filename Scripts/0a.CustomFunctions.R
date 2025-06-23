@@ -648,6 +648,8 @@ varImport_logit <- function(logit_model, method="stdCoef_ZScores", sig_level=0.0
 # https://statisticalhorizons.com/r2logistic/
 # https://stats.stackexchange.com/questions/8511/how-to-calculate-pseudo-r2-from-rs-logistic-regression
 coefDeter_glm <- function(model, model_base = NA) {
+  # Testing conditions:
+  # model <- modLR; model_base <- modLR_base
   
   # - Safety check
   if (!any(class(model) %in% c("glm","multinom"))) stop("Specified model object is not of class 'glm' or 'lm'. Exiting .. ")
@@ -686,7 +688,15 @@ coefDeter_glm <- function(model, model_base = NA) {
     coef_McFadden <- 1 - (as.numeric(L_full) / as.numeric(L_base))
   } else coef_McFadden <- 1 - model$deviance / model$null.deviance
   
-  if ( !all.equal(coef_McFadden, as.numeric(1 - (-2*L_full)/(-2*L_base) ) ) ) stop("ERROR: Internal function error in calculating & verifying McFadden's pseudo R^2-measure")
+  # The following check will fail if the given model does not contain an intercept
+  if ( abs(coef_McFadden - as.numeric(1 - (-2*L_full)/(-2*L_base))) > 0.000001 ) {
+    if (attr(terms(model), "intercept") == 1) {
+      stop("ERROR: Internal function error in calculating & verifying McFadden's pseudo R^2-measure")
+    } else{
+      cat("NOTE: Provided model contains no intercept term.\n")
+      coef_McFadden <- as.numeric(1 - (-2*L_full)/(-2*L_base))
+    }
+  }
   
   
   # -- Implement Cox-Snell R^2 measure from Cox1983, which according to Allison2013 is more a "generalized" R^2 measure than pseudo,
