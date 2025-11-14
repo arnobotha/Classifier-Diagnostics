@@ -104,8 +104,10 @@ colPalette <- "BrBG"; colPaletteDir <- 1
 sumVarImport <- sum(varImp_Adv_Menard$data$Value_Abs, na.rm=T)
 # Graph
 # AB: Look at position of legend and change it to be in the graphing space
-(g_varImp_Adv_Menard <- ggplot(varImp_Adv_Menard$data[1:8,], aes(x=reorder(Variable, Value_Abs))) + theme_minimal() + theme(text=element_text(family=chosenFont), legend.position = c(0.85,0.5)) + 
-   geom_col(aes(y=Value_Abs, fill=Value_Abs)) + geom_label(aes(y=sumVarImport*0.05, label=paste(percent(Contribution, accuracy=0.1)), fill=Value_Abs), family=chosenFont) + 
+(g_varImp_Adv_Menard <- ggplot(varImp_Adv_Menard$data[1:8,], aes(x=reorder(Variable, Value_Abs))) + theme_minimal() + 
+    theme(text=element_text(family=chosenFont), legend.position = c(0.85,0.5)) + 
+   geom_col(aes(y=Value_Abs, fill=Value_Abs)) + 
+   geom_label(aes(y=sumVarImport*0.05, label=paste(percent(Contribution, accuracy=0.1)), fill=Value_Abs), family=chosenFont) + 
    annotate(geom="text", x=varImp_Adv_Menard$data[8, Variable], y=varImp_Adv_Menard$data$Value_Abs[1]*0.75, label=paste0("Variable Importance (sum): ", comma(sumVarImport, accuracy=0.1)), family=chosenFont, size=3) + 
    coord_flip() + scale_fill_distiller(palette=colPalette, name="Absolute value", direction=colPaletteDir) +
    scale_colour_distiller(palette=colPalette, name="Absolute value", direction=colPaletteDir) + 
